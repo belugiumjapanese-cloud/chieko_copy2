@@ -3147,6 +3147,11 @@ function SplitMapView({
     onListFocus?.(pinId)
   }, [onListFocus])
 
+  const selectMapPin = useCallback((pinId: string) => {
+    setFocusedPinId(pinId)
+    onPinClick(pinId)
+  }, [onPinClick])
+
   const searchSuggestions = useMemo(() => {
     const query = mapSearch.trim().toLowerCase()
     if (!query) return []
@@ -3205,7 +3210,7 @@ function SplitMapView({
             selectedPinId={selectedPinId}
             focusPinId={focusedPinId}
             seenPinIds={seenPinIds}
-            onPinClick={onPinClick}
+            onPinClick={selectMapPin}
             onMapClick={onMapClick}
             onMapSurfaceClick={onMapSurfaceClick}
             onVisiblePinsChange={handleVisiblePinsChange}
@@ -3241,7 +3246,7 @@ function SplitMapView({
           </button>
           {overlay}
           {currentMapPin && (!listCollapsed || selectedPinId) && (
-            <button className={styles.mapStoryCard} type="button" onClick={() => onPinClick(currentMapPin.id)}>
+            <button className={styles.mapStoryCard} type="button" onClick={() => selectMapPin(currentMapPin.id)}>
               <img src={currentMapPin.imageUrl} alt="" />
               <div>
                 {getPinMeta && <small>{getPinMeta(currentMapPin)}</small>}
@@ -3321,6 +3326,42 @@ function CommunityMapView({
   onMapSurfaceClick?: () => void
   onPost: () => void
 }) {
+  if (timelineOpen) {
+    return (
+      <section className={styles.page}>
+        <header className={styles.pageHeaderRow}>
+          <div>
+            <span>{communityLabel(community)}</span>
+            <h1>Timeline</h1>
+          </div>
+          <button className={styles.ghostButton} type="button" onClick={onToggleTimeline}>
+            <ArrowLeft size={17} />
+            Map
+          </button>
+        </header>
+        <section className={styles.contentSection}>
+          <div className={styles.timelineListPage}>
+            {activities.map((activity) => {
+              const user = usersById.get(activity.userId)
+              return (
+                <article key={activity.id}>
+                  <strong>@{user?.username ?? 'user'}</strong>
+                  <span>{activity.text}</span>
+                  <small>{formatShortDate(activity.createdAt)}</small>
+                </article>
+              )
+            })}
+            {!activities.length && <p className={styles.muted}>まだtimelineはありません。</p>}
+          </div>
+          <div className={styles.timelineChatPage}>
+            <input value={chatText} onChange={(event) => onChatText(event.target.value)} placeholder="コメントを書く" />
+            <button type="button" onClick={onSendChat}><Send size={16} /></button>
+          </div>
+        </section>
+      </section>
+    )
+  }
+
   return (
     <SplitMapView
       pins={pins}
@@ -3332,38 +3373,10 @@ function CommunityMapView({
       onMapSurfaceClick={onMapSurfaceClick}
       overlay={(
         <>
-          <div className={styles.communityMapHeader}>
+          <div className={styles.communityMapActions}>
             <button type="button" onClick={onBack}><ArrowLeft size={18} /></button>
-            <div>
-              <strong>{communityLabel(community)}</strong>
-              <span>{community.memberIds.length}人 / {pins.length} pins</span>
-            </div>
             <button type="button" onClick={onToggleTimeline}>Timeline</button>
           </div>
-          {timelineOpen && (
-            <aside className={styles.timelinePanel}>
-              <header>
-                <strong>Timeline</strong>
-                <span>{activities.length} updates</span>
-              </header>
-              <div className={styles.timelineList}>
-                {activities.map((activity) => {
-                  const user = usersById.get(activity.userId)
-                  return (
-                    <article key={activity.id}>
-                      <strong>@{user?.username ?? 'user'}</strong>
-                      <span>{activity.text}</span>
-                      <small>{formatShortDate(activity.createdAt)}</small>
-                    </article>
-                  )
-                })}
-              </div>
-              <div className={styles.timelineChat}>
-                <input value={chatText} onChange={(event) => onChatText(event.target.value)} placeholder="コメントを書く" />
-                <button type="button" onClick={onSendChat}><Send size={15} /></button>
-              </div>
-            </aside>
-          )}
           {manualPlacement && (
             <div className={styles.placementBanner}>
               map上で投稿位置をクリックしてください。

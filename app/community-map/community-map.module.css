@@ -176,7 +176,7 @@
 
 .pageHeaderRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
@@ -442,8 +442,9 @@
 
 .libraryHeaderActions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  align-items: center;
   justify-content: flex-end;
 }
 
@@ -1102,6 +1103,7 @@
 }
 
 .communityMapHeader,
+.communityMapActions,
 .mapOverlay,
 .mapScopeBar,
 .placementBanner,
@@ -1125,6 +1127,35 @@
   border-radius: 8px;
   box-shadow: 0 14px 34px rgba(24, 34, 29, 0.16);
   backdrop-filter: blur(12px);
+}
+
+.communityMapActions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 26;
+  display: flex;
+  gap: 8px;
+}
+
+.communityMapActions button {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 8px 12px;
+  color: #126b58;
+  font-weight: 950;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(24, 35, 30, 0.14);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgba(24, 34, 29, 0.16);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.communityMapActions button:first-child {
+  width: 42px;
+  padding: 0;
 }
 
 .communityMapHeader button {
@@ -1204,45 +1235,16 @@
   cursor: pointer;
 }
 
-.timelinePanel {
-  position: absolute;
-  top: 76px;
-  right: 16px;
-  z-index: 20;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(430px, calc(100dvh - 340px));
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.97);
-  border: 1px solid rgba(24, 35, 30, 0.14);
-  border-radius: 8px;
-  box-shadow: 0 18px 46px rgba(24, 34, 29, 0.18);
-  backdrop-filter: blur(12px);
-}
-
-.timelinePanel header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.timelinePanel header span {
-  color: #65736b;
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-
-.timelineList {
+.timelineList,
+.timelineListPage {
   display: grid;
   gap: 8px;
   min-height: 0;
   overflow: auto;
 }
 
-.timelineList article {
+.timelineList article,
+.timelineListPage article {
   display: grid;
   gap: 3px;
   padding: 9px;
@@ -1251,28 +1253,33 @@
   border-radius: 8px;
 }
 
-.timelineList strong {
+.timelineList strong,
+.timelineListPage strong {
   color: #126b58;
 }
 
-.timelineList span {
+.timelineList span,
+.timelineListPage span {
   color: #18231e;
   font-size: 0.88rem;
   line-height: 1.45;
 }
 
-.timelineList small {
+.timelineList small,
+.timelineListPage small {
   color: #65736b;
   font-size: 0.74rem;
 }
 
-.timelineChat {
+.timelineChat,
+.timelineChatPage {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 40px;
   gap: 8px;
 }
 
-.timelineChat input {
+.timelineChat input,
+.timelineChatPage input {
   min-height: 40px;
   min-width: 0;
   padding: 8px 10px;
@@ -1281,7 +1288,8 @@
   border-radius: 8px;
 }
 
-.timelineChat button {
+.timelineChat button,
+.timelineChatPage button {
   display: grid;
   place-items: center;
   color: #ffffff;
@@ -1314,6 +1322,16 @@
   right: 18px;
   top: 210px;
   z-index: 24;
+}
+
+.mapPageListCollapsed .mapFloatingAction {
+  top: auto;
+  bottom: 188px;
+}
+
+.mapPageListCollapsed .mapSortControl {
+  top: auto;
+  bottom: 102px;
 }
 
 .libraryMapControls .folderFilter {
@@ -1421,7 +1439,7 @@
   z-index: 18;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  width: min(250px, 34vw);
+  width: 122px;
   height: min(360px, 31dvh);
   min-height: 0;
   background: rgba(255, 255, 255, 0.98);
@@ -1437,7 +1455,7 @@
 
 .visibleListScroll {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-height: 0;
   padding: 12px;
   overflow-y: auto;
@@ -1447,11 +1465,11 @@
 
 .visibleListScroll button {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 0;
   align-items: center;
-  min-height: 84px;
-  padding: 7px;
+  min-height: 92px;
+  padding: 6px;
   text-align: left;
   background: #f7faf8;
   border: 1px solid #d8e2db;
@@ -1471,23 +1489,19 @@
 }
 
 .visibleListScroll img {
-  width: 72px;
-  height: 68px;
+  width: 100%;
+  height: 80px;
   object-fit: cover;
   border-radius: 8px;
 }
 
 .visibleListScroll span {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
+  display: none;
 }
 
+.visibleListScroll strong,
 .visibleListScroll small {
-  overflow: hidden;
-  color: #65736b;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .mineMapPanel {
@@ -1507,7 +1521,7 @@
 
 .mapStoryCard {
   position: absolute;
-  left: min(282px, calc(34vw + 28px));
+  left: 154px;
   right: 16px;
   bottom: 16px;
   z-index: 18;
@@ -2580,12 +2594,12 @@
   .visibleListPanel {
     left: 12px;
     bottom: 12px;
-    width: 240px;
+    width: 108px;
     height: min(344px, 31dvh);
   }
 
   .mapStoryCard {
-    left: 264px;
+    left: 132px;
     right: 12px;
     bottom: 12px;
   }
@@ -2594,6 +2608,16 @@
     left: auto;
     right: 14px;
     top: 280px;
+  }
+
+  .mapPageListCollapsed .mapFloatingAction {
+    top: auto;
+    bottom: 188px;
+  }
+
+  .mapPageListCollapsed .mapSortControl {
+    top: auto;
+    bottom: 102px;
   }
 
   .folderFilter {
