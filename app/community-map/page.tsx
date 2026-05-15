@@ -405,6 +405,15 @@ function mapCommunityPrivacy(value: string | null | undefined): Privacy {
   return value === 'public' ? 'public' : 'limited'
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message) return message
+  }
+  return fallback
+}
+
 function buildUsers(profileRows: ProfileRow[], followRows: FollowRow[]) {
   return profileRows.map((profile) => ({
     id: profile.id,
@@ -967,7 +976,7 @@ export default function CommunityMapPrototype() {
       setProfileUserId((current) => (current && remoteUsers.some((user) => user.id === current) ? current : userId))
     } catch (error) {
       console.error(error)
-      setRemoteError(error instanceof Error ? error.message : 'Supabaseからデータを取得できませんでした。')
+      setRemoteError(getErrorMessage(error, 'Supabaseからデータを取得できませんでした。'))
       setUsers([])
       setPins([])
       setFolders([])
@@ -1080,6 +1089,7 @@ export default function CommunityMapPrototype() {
         email,
         password: authPassword,
         options: {
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/community-map` : undefined,
           data: {
             display_name: displayName,
             username,
