@@ -2,6 +2,10 @@
 -- Run this AFTER the main schema in Supabase SQL Editor.
 -- This does not drop or recreate your core tables.
 
+-- 0) Small additive columns used by the refreshed app UI.
+alter table public.folders
+  add column if not exists thumbnail_url text;
+
 -- 1) Storage read setup
 -- The current frontend uses image_url values directly. For that to work with
 -- Supabase Storage public URLs, the buckets need public read access.
@@ -206,7 +210,7 @@ drop function if exists public.app_community_feed(uuid, integer);
 drop function if exists public.app_add_post_to_folder(uuid, uuid);
 drop function if exists public.app_remove_post_from_folder(uuid, uuid);
 
-drop view if exists public.app_post_cards;
+drop view if exists public.app_post_cards cascade;
 create view public.app_post_cards
 with (security_invoker = true)
 as
@@ -250,7 +254,7 @@ group by
   p.id,
   pr.id;
 
-drop view if exists public.app_folder_cards;
+drop view if exists public.app_folder_cards cascade;
 create view public.app_folder_cards
 with (security_invoker = true)
 as
@@ -263,6 +267,7 @@ select
   f.name,
   f.description,
   f.color,
+  f.thumbnail_url,
   f.visibility,
   f.is_paid,
   f.paid_from_index,
@@ -292,7 +297,7 @@ group by
   pr.id,
   preview.image_url;
 
-drop view if exists public.app_community_cards;
+drop view if exists public.app_community_cards cascade;
 create view public.app_community_cards
 with (security_invoker = true)
 as
@@ -329,7 +334,7 @@ left join lateral (
   limit 1
 ) preview on true;
 
-drop view if exists public.app_community_activity;
+drop view if exists public.app_community_activity cascade;
 create view public.app_community_activity
 with (security_invoker = true)
 as

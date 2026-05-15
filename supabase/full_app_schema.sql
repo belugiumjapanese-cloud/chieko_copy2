@@ -70,6 +70,7 @@ create table if not exists public.folders (
   name text not null,
   description text not null default '',
   color text not null default '#126b58',
+  thumbnail_url text,
   visibility text not null default 'private' check (visibility in ('private', 'public', 'followers')),
   is_paid boolean not null default false,
   paid_from_index integer,

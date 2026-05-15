@@ -959,19 +959,18 @@
 }
 
 .splitMap {
-  display: grid;
-  grid-template-rows: minmax(260px, 1fr) 236px;
-  height: calc(100dvh - 78px);
-}
-
-.mapPageListCollapsed .splitMap {
   position: relative;
   display: block;
   height: calc(100dvh - 78px);
 }
 
+.mapPageListCollapsed .splitMap {
+  height: calc(100dvh - 78px);
+}
+
 .splitMapPane {
   position: relative;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -1147,6 +1146,7 @@
 
 .mapOverlay {
   max-width: min(320px, calc(100vw - 180px));
+  top: 74px;
 }
 
 .mapScopeBar {
@@ -1281,7 +1281,7 @@
 .mapFloatingAction {
   position: absolute;
   right: 18px;
-  top: 82px;
+  top: 118px;
   bottom: auto;
   z-index: 22;
 }
@@ -1296,7 +1296,18 @@
   align-items: flex-start;
 }
 
+.mapSortControl {
+  position: absolute;
+  right: 18px;
+  top: 198px;
+  z-index: 24;
+}
+
 .libraryMapControls .folderFilter {
+  position: static;
+}
+
+.mapSortControl .folderFilter {
   position: static;
 }
 
@@ -1314,16 +1325,23 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 42px;
-  padding: 8px 12px;
-  color: #126b58;
+  width: 62px;
+  height: 62px;
+  justify-content: center;
+  padding: 0;
+  color: #ffffff;
   font-weight: 950;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(100, 104, 102, 0.9);
   border: 1px solid rgba(24, 35, 30, 0.14);
   border-radius: 999px;
   box-shadow: 0 12px 30px rgba(24, 34, 29, 0.16);
   backdrop-filter: blur(12px);
   cursor: pointer;
+}
+
+.folderFilter > button span,
+.folderFilter > button small {
+  display: none;
 }
 
 .folderFilter > button small {
@@ -1384,26 +1402,24 @@
 }
 
 .visibleListPanel {
-  position: relative;
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
   z-index: 18;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  width: min(250px, 34vw);
+  height: min(360px, 31dvh);
   min-height: 0;
   background: rgba(255, 255, 255, 0.98);
-  border-top: 1px solid rgba(24, 35, 30, 0.12);
-  box-shadow: 0 -12px 32px rgba(24, 34, 29, 0.14);
+  border: 1px solid rgba(24, 35, 30, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 16px 42px rgba(24, 34, 29, 0.18);
+  backdrop-filter: blur(12px);
 }
 
 .mapPageListCollapsed .visibleListPanel {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  display: block;
-  width: auto;
-  min-height: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  display: none;
 }
 
 .visibleListPanel header {
@@ -1416,8 +1432,7 @@
 }
 
 .mapPageListCollapsed .visibleListPanel header {
-  min-height: 0;
-  padding: 0;
+  display: none;
 }
 
 .mapPageListCollapsed .visibleListPanel header div {
@@ -1446,12 +1461,7 @@
 }
 
 .mapPageListCollapsed .visibleListPanel header button {
-  min-height: 44px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(24, 35, 30, 0.14);
-  box-shadow: 0 12px 30px rgba(24, 34, 29, 0.18);
-  backdrop-filter: blur(12px);
+  display: none;
 }
 
 .visibleListScroll {
@@ -1526,13 +1536,14 @@
 
 .mapStoryCard {
   position: absolute;
-  left: 16px;
+  left: min(282px, calc(34vw + 28px));
+  right: 16px;
   bottom: 16px;
   z-index: 18;
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);
   gap: 10px;
-  width: min(360px, calc(100vw - 32px));
+  width: auto;
   padding: 8px;
   color: #18231e;
   background: rgba(255, 255, 255, 0.96);
@@ -1541,6 +1552,12 @@
   box-shadow: 0 16px 42px rgba(24, 34, 29, 0.2);
   backdrop-filter: blur(12px);
   cursor: pointer;
+}
+
+.mapPageListCollapsed .mapStoryCard {
+  left: 16px;
+  right: 16px;
+  bottom: 18px;
 }
 
 .mapStoryCard img {
@@ -1877,7 +1894,7 @@
 }
 
 .profileHeader {
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr) auto;
   align-items: center;
   padding: 16px;
   background: #ffffff;
@@ -2088,6 +2105,382 @@
   }
 }
 
+.usernameInput {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 42px;
+  overflow: hidden;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
+.usernameInput span {
+  padding-left: 12px;
+  color: #126b58;
+  font-weight: 950;
+}
+
+.usernameInput input {
+  border: 0;
+  background: transparent;
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: #18231e;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.profileMenuWrap {
+  position: relative;
+  justify-self: end;
+}
+
+.profileMenu {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 190px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  box-shadow: 0 16px 42px rgba(24, 34, 29, 0.16);
+}
+
+.profileMenu button {
+  min-height: 40px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profileMenu button:hover {
+  background: #f1f6f3;
+}
+
+.editProfileButton {
+  width: 100%;
+  min-height: 42px;
+  margin: -4px 0 14px;
+  color: #126b58;
+  font-weight: 950;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profileEditorPanel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
+.profileEditorPanel label,
+.folderEditor label {
+  display: grid;
+  gap: 6px;
+  color: #405049;
+  font-weight: 900;
+}
+
+.profileEditorPanel input,
+.profileEditorPanel textarea,
+.folderEditor input,
+.folderEditor textarea {
+  min-height: 42px;
+  padding: 10px;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
+.profileEditorPanel textarea,
+.folderEditor textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.avatarEdit {
+  align-items: center;
+  grid-template-columns: 82px minmax(0, 1fr);
+}
+
+.avatarEdit img {
+  width: 82px;
+  height: 82px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatarEdit input,
+.avatarEdit span {
+  grid-column: 2;
+}
+
+.avatarEdit span {
+  color: #65736b;
+  font-size: 0.82rem;
+}
+
+.authorLink {
+  display: inline;
+  padding: 0;
+  color: #126b58;
+  font: inherit;
+  font-weight: 950;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.mapSearchBox {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 25;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  width: min(540px, calc(100vw - 260px));
+  min-height: 46px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(24, 35, 30, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(24, 34, 29, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.mapSearchBox input {
+  min-width: 0;
+  height: 42px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.mapSearchSuggestions {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  box-shadow: 0 16px 42px rgba(24, 34, 29, 0.16);
+}
+
+.mapSearchSuggestions button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  text-align: left;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mapSearchSuggestions img {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.locateButton,
+.hidePanelsButton {
+  position: absolute;
+  z-index: 24;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  color: #ffffff;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 14px 34px rgba(24, 34, 29, 0.22);
+  cursor: pointer;
+}
+
+.locateButton {
+  left: 18px;
+  bottom: calc(31dvh + 34px);
+  background: #f59e0b;
+}
+
+.hidePanelsButton {
+  left: min(282px, calc(34vw + 28px));
+  bottom: calc(31dvh + 34px);
+  background: #0ea5d8;
+}
+
+.mapPageListCollapsed .locateButton,
+.mapPageListCollapsed .hidePanelsButton {
+  bottom: 84px;
+}
+
+.mapFloatingAction .communityPostButton {
+  width: 74px;
+  height: 74px;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+  background: #ef3b2d;
+  box-shadow: 0 18px 38px rgba(239, 59, 45, 0.34);
+}
+
+.mapFloatingAction .communityPostButton svg {
+  width: 34px;
+  height: 34px;
+}
+
+.folderPlaylistList {
+  display: grid;
+  gap: 10px;
+}
+
+.folderPlaylistList article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
+.folderPlaylistList article > button:first-child {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.folderPlaylistList img,
+.folderPlaylistList article > button:first-child > span {
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.folderPlaylistList small {
+  color: #65736b;
+}
+
+.folderPlaylistList article > button:last-child {
+  min-height: 36px;
+  color: #126b58;
+  font-weight: 900;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.createFolderBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.createFolderBar input {
+  min-height: 42px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
+.createFolderBar button {
+  min-height: 42px;
+  padding: 8px 12px;
+  color: #ffffff;
+  font-weight: 900;
+  background: #126b58;
+  border: 0;
+  border-radius: 8px;
+}
+
+.folderDetailHero {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.folderDetailHero img,
+.folderDetailHero > span {
+  width: 92px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.folderDetailHero div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.folderDetailHero strong {
+  font-size: 1.3rem;
+}
+
+.folderDetailHero p,
+.folderDetailHero small {
+  margin: 0;
+  color: #65736b;
+}
+
+.folderEditPreview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.checkboxLine {
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+}
+
 @media (max-width: 900px) {
   .findLayout {
     grid-template-columns: 1fr;
@@ -2149,7 +2542,7 @@
   }
 
   .profileHeader {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr) auto;
   }
 
   .profileHeader img {
@@ -2184,7 +2577,7 @@
 
   .mapFloatingAction {
     right: 14px;
-    top: 76px;
+    top: 112px;
     bottom: auto;
   }
 
@@ -2193,6 +2586,34 @@
     right: 12px;
     flex-direction: column;
     align-items: flex-end;
+  }
+
+  .mapSearchBox {
+    top: 12px;
+    left: 12px;
+    width: calc(100vw - 188px);
+  }
+
+  .mapSortControl {
+    top: 190px;
+    right: 14px;
+  }
+
+  .visibleListPanel {
+    left: 12px;
+    bottom: 12px;
+    width: 240px;
+    height: min(344px, 31dvh);
+  }
+
+  .mapStoryCard {
+    left: 264px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .hidePanelsButton {
+    left: 264px;
   }
 
   .folderFilter {
@@ -2204,7 +2625,8 @@
     display: none;
   }
 
-  .splitMap {
-    grid-template-rows: minmax(250px, 1fr) 226px;
+  .folderDetailHero,
+  .createFolderBar {
+    grid-template-columns: 1fr;
   }
 }
