@@ -370,6 +370,19 @@
   color: #65736b;
 }
 
+.findGrid em {
+  margin: 0 10px 10px;
+  padding: 7px 9px;
+  color: #126b58;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 950;
+  text-align: center;
+  background: #eff7f3;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
 .segmented {
   display: flex;
   flex-wrap: wrap;
@@ -1281,7 +1294,7 @@
 .mapFloatingAction {
   position: absolute;
   right: 18px;
-  top: 118px;
+  top: 124px;
   bottom: auto;
   z-index: 22;
 }
@@ -1299,7 +1312,7 @@
 .mapSortControl {
   position: absolute;
   right: 18px;
-  top: 198px;
+  top: 210px;
   z-index: 24;
 }
 
@@ -1325,8 +1338,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  width: 62px;
-  height: 62px;
+  width: 74px;
+  height: 74px;
   justify-content: center;
   padding: 0;
   color: #ffffff;
@@ -1407,7 +1420,7 @@
   bottom: 16px;
   z-index: 18;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   width: min(250px, 34vw);
   height: min(360px, 31dvh);
   min-height: 0;
@@ -1422,53 +1435,11 @@
   display: none;
 }
 
-.visibleListPanel header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px 14px;
-}
-
-.mapPageListCollapsed .visibleListPanel header {
-  display: none;
-}
-
-.mapPageListCollapsed .visibleListPanel header div {
-  display: none;
-}
-
-.visibleListPanel header div {
-  display: grid;
-  gap: 2px;
-}
-
-.visibleListPanel header span {
-  color: #65736b;
-  font-size: 0.78rem;
-}
-
-.visibleListPanel header button {
-  min-height: 34px;
-  padding: 6px 10px;
-  color: #126b58;
-  font-weight: 900;
-  background: #eff7f3;
-  border: 1px solid #d8e2db;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.mapPageListCollapsed .visibleListPanel header button {
-  display: none;
-}
-
 .visibleListScroll {
   display: grid;
   gap: 8px;
   min-height: 0;
-  padding: 0 12px 12px;
+  padding: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -2318,8 +2289,8 @@
   z-index: 24;
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
+  width: 74px;
+  height: 74px;
   color: #ffffff;
   border: 0;
   border-radius: 50%;
@@ -2334,14 +2305,21 @@
 }
 
 .hidePanelsButton {
-  left: min(282px, calc(34vw + 28px));
-  bottom: calc(31dvh + 34px);
+  left: auto;
+  right: 18px;
+  top: 296px;
+  bottom: auto;
   background: #0ea5d8;
 }
 
 .mapPageListCollapsed .locateButton,
 .mapPageListCollapsed .hidePanelsButton {
   bottom: 84px;
+}
+
+.mapPageListCollapsed .hidePanelsButton {
+  top: auto;
+  right: 18px;
 }
 
 .mapFloatingAction .communityPostButton {
@@ -2595,7 +2573,7 @@
   }
 
   .mapSortControl {
-    top: 190px;
+    top: 196px;
     right: 14px;
   }
 
@@ -2613,7 +2591,9 @@
   }
 
   .hidePanelsButton {
-    left: 264px;
+    left: auto;
+    right: 14px;
+    top: 280px;
   }
 
   .folderFilter {

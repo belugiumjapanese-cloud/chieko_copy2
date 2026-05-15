@@ -849,7 +849,7 @@ export default function CommunityMapPrototype() {
   const [communitySubmitOpen, setCommunitySubmitOpen] = useState(false)
   const [communitySubmitPinId, setCommunitySubmitPinId] = useState<string | null>(null)
   const [communitySubmitComposer, setCommunitySubmitComposer] = useState({ title: '', description: '', tags: '' })
-  const [timelineOpen, setTimelineOpen] = useState(true)
+  const [timelineOpen, setTimelineOpen] = useState(false)
   const [communityChatText, setCommunityChatText] = useState('')
   const [manualPlacement, setManualPlacement] = useState(false)
   const [commentText, setCommentText] = useState('')
@@ -1284,6 +1284,7 @@ export default function CommunityMapPrototype() {
     }
     setSelectedCommunityId(communityId)
     setSelectedPinId(null)
+    setTimelineOpen(false)
     setActiveTab('find')
   }, [activeUserId, communitiesById, loadRemoteData])
 
@@ -2359,9 +2360,9 @@ export default function CommunityMapPrototype() {
         </section>
       )}
 
-      {selectedPin && (
+      {selectedPin && !(activeTab === 'myworld' || activeTab === 'tovisit') && (
         <>
-          {!(activeTab === 'myworld' || activeTab === 'tovisit' || (activeTab === 'find' && Boolean(selectedCommunity))) && (
+          {!(activeTab === 'find' && Boolean(selectedCommunity)) && (
             <button className={styles.detailBackdrop} type="button" aria-label="詳細を閉じる" onClick={() => setSelectedPinId(null)} />
           )}
           <PinDetail
@@ -2372,7 +2373,7 @@ export default function CommunityMapPrototype() {
             isMine={selectedPin.ownerId === activeUserId}
             currentUserId={activeUserId}
           commentText={commentText}
-          onMapSurface={activeTab === 'myworld' || activeTab === 'tovisit' || (activeTab === 'find' && Boolean(selectedCommunity))}
+          onMapSurface={activeTab === 'find' && Boolean(selectedCommunity)}
           onCommentText={setCommentText}
           onClose={() => setSelectedPinId(null)}
             onLike={() => toggleLike(selectedPin.id)}
@@ -2772,20 +2773,31 @@ function FolderLibraryView({
         </section>
       ) : (
         <section className={styles.contentSection}>
-          <div className={styles.folderPlaylistList}>
+          <div className={styles.findGrid}>
             {filteredFolders.map((folder) => {
               const preview = folder.thumbnailUrl || folder.pinIds.map((id) => pins.find((pin) => pin.id === id)?.imageUrl).find(Boolean)
               return (
-                <article key={folder.id}>
-                  <button type="button" onClick={() => onSelectFolder(folder.id)}>
-                    {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
-                    <div>
-                      <strong>{folder.name}</strong>
-                      <small>{folder.pinIds.length} pins / {folder.visibility}</small>
-                    </div>
-                  </button>
-                  <button type="button" onClick={() => onEditFolder(folder.id)}>Edit</button>
-                </article>
+                <button key={folder.id} type="button" onClick={() => onSelectFolder(folder.id)}>
+                  {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
+                  <strong>{folder.name}</strong>
+                  <small>{folder.pinIds.length} pins / {folder.visibility}</small>
+                  <em
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onEditFolder(folder.id)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onEditFolder(folder.id)
+                    }}
+                  >
+                    Edit Folder
+                  </em>
+                </button>
               )
             })}
           </div>
@@ -3241,16 +3253,8 @@ function SplitMapView({
           )}
           {floatingAction && <div className={styles.mapFloatingAction}>{floatingAction}</div>}
         </div>
+        {!listCollapsed && (
         <aside className={styles.visibleListPanel}>
-          <header>
-            <div>
-              <strong>表示範囲のピン</strong>
-              <span>{visiblePins.length} pins</span>
-            </div>
-            <button type="button" onClick={() => setPanelsHidden(!listCollapsed)}>
-              {listCollapsed ? 'Show List' : 'Hide List'}
-            </button>
-          </header>
           {!listCollapsed && (
             <div ref={listRef} className={styles.visibleListScroll} onScroll={handleListScroll}>
               {visiblePins.map((pin) => (
@@ -3270,6 +3274,7 @@ function SplitMapView({
             </div>
           )}
         </aside>
+        )}
       </div>
     </section>
   )
