@@ -1081,6 +1081,24 @@
   outline-width: 5px;
 }
 
+.currentLocationMarker {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  background: #2f80ed;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px rgba(47, 128, 237, 0.18), 0 8px 22px rgba(24, 34, 29, 0.2);
+}
+
+.currentLocationMarker::after {
+  position: absolute;
+  inset: -14px;
+  content: '';
+  border: 1px solid rgba(47, 128, 237, 0.24);
+  border-radius: 50%;
+}
+
 .clusterMarker {
   display: grid;
   place-items: center;
@@ -1269,6 +1287,44 @@
 .timelineListPage small {
   color: #65736b;
   font-size: 0.74rem;
+}
+
+.timelinePostCard {
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.timelinePostCard img {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.timelinePostCard div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.timelinePostCard b,
+.timelinePostCard em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelinePostCard b {
+  color: #18231e;
+  font-size: 1rem;
+}
+
+.timelinePostCard em {
+  color: #126b58;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
 }
 
 .timelineChat,
@@ -2334,6 +2390,7 @@
 .mapPageListCollapsed .hidePanelsButton {
   top: auto;
   right: 18px;
+  bottom: 16px;
 }
 
 .mapFloatingAction .communityPostButton {
@@ -2618,6 +2675,12 @@
   .mapPageListCollapsed .mapSortControl {
     top: auto;
     bottom: 102px;
+  }
+
+  .mapPageListCollapsed .hidePanelsButton {
+    top: auto;
+    right: 14px;
+    bottom: 16px;
   }
 
   .folderFilter {

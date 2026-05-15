@@ -158,6 +158,7 @@ type CommunityActivity = {
   pinId?: string
   action: 'added' | 'edited' | 'comment'
   text: string
+  title: string
   createdAt: string
 }
 
@@ -302,6 +303,12 @@ function markerElement(pin: Pin, seen = false, showTitle = false) {
     element.append(title)
   }
   element.setAttribute('aria-label', pin.title)
+  return element
+}
+
+function currentLocationElement() {
+  const element = document.createElement('div')
+  element.className = styles.currentLocationMarker
   return element
 }
 
@@ -558,6 +565,7 @@ function buildActivities(rows: AppCommunityActivityRow[]): CommunityActivity[] {
     pinId: activity.post_id ?? undefined,
     action: activity.activity_type === 'message' ? 'comment' : 'added',
     text: activity.body || activity.title || '',
+    title: activity.title || '',
     createdAt: activity.created_at,
   }))
 }
@@ -589,6 +597,8 @@ function PinMap({
   selectedPinId,
   focusPinId,
   seenPinIds = [],
+  currentLocation,
+  startAtCurrentLocation = false,
   onPinClick,
   onMapClick,
   onMapSurfaceClick,
@@ -600,6 +610,8 @@ function PinMap({
   selectedPinId?: string | null
   focusPinId?: string | null
   seenPinIds?: string[]
+  currentLocation?: Coordinates | null
+  startAtCurrentLocation?: boolean
   onPinClick: (pinId: string) => void
   onMapClick?: (coordinates: Coordinates) => void
   onMapSurfaceClick?: () => void
@@ -610,7 +622,9 @@ function PinMap({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markerRefs = useRef<mapboxgl.Marker[]>([])
+  const locationMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const fittedPinsKeyRef = useRef('')
+  const centeredOnLocationRef = useRef(false)
   const pinsRef = useRef(pins)
   const [mapVersion, setMapVersion] = useState(0)
   const onPinClickRef = useRef(onPinClick)
@@ -669,8 +683,8 @@ function PinMap({
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/streets-v11',
-      center: DEFAULT_CENTER,
-      zoom: compact ? 2 : 11,
+      center: (startAtCurrentLocation && currentLocation ? toLngLat(currentLocation) : null) ?? DEFAULT_CENTER,
+      zoom: startAtCurrentLocation && currentLocation ? (compact ? 11 : 14) : (compact ? 2 : 11),
     })
 
     mapRef.current = map
@@ -707,10 +721,29 @@ function PinMap({
       map.off('zoomend', refreshMapState)
       markerRefs.current.forEach((marker) => marker.remove())
       markerRefs.current = []
+      locationMarkerRef.current?.remove()
+      locationMarkerRef.current = null
       map.remove()
       mapRef.current = null
     }
-  }, [compact, updateVisiblePins])
+  }, [compact, currentLocation, startAtCurrentLocation, updateVisiblePins])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const lngLat = toLngLat(currentLocation)
+    if (!map || !lngLat) return
+
+    if (!locationMarkerRef.current) {
+      locationMarkerRef.current = new mapboxgl.Marker({ element: currentLocationElement(), anchor: 'center' })
+    }
+
+    locationMarkerRef.current.setLngLat(lngLat).addTo(map)
+
+    if (startAtCurrentLocation && !centeredOnLocationRef.current) {
+      map.flyTo({ center: lngLat, zoom: compact ? 11 : 14, essential: true })
+      centeredOnLocationRef.current = true
+    }
+  }, [compact, currentLocation, startAtCurrentLocation])
 
   useEffect(() => {
     const map = mapRef.current
@@ -720,7 +753,8 @@ function PinMap({
     markerRefs.current = []
 
     const pinsKey = pins.map((pin) => pin.id).join('|')
-    const shouldFitPins = fittedPinsKeyRef.current !== pinsKey
+    const shouldPreferCurrentLocation = startAtCurrentLocation && Boolean(currentLocation)
+    const shouldFitPins = !shouldPreferCurrentLocation && fittedPinsKeyRef.current !== pinsKey
     const bounds = new mapboxgl.LngLatBounds()
     let count = 0
     pins.forEach((pin) => {
@@ -765,7 +799,7 @@ function PinMap({
     }
 
     updateVisiblePins()
-  }, [compact, focusPinId, mapVersion, pins, seenPinIds, selectedPinId, updateVisiblePins])
+  }, [compact, currentLocation, focusPinId, mapVersion, pins, seenPinIds, selectedPinId, startAtCurrentLocation, updateVisiblePins])
 
   useEffect(() => {
     if (!focusPinId) return
@@ -795,7 +829,7 @@ function PinMap({
 }
 
 export default function CommunityMapPrototype() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('home')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('myworld')
   const [homeMode, setHomeMode] = useState<HomeMode>('timeline')
   const [findChaosOpen, setFindChaosOpen] = useState(false)
   const [myWorldMode, setMyWorldMode] = useState<LibraryMode>('map')
@@ -829,6 +863,7 @@ export default function CommunityMapPrototype() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [savedPinIds, setSavedPinIds] = useState<string[]>([])
   const [seenPinIds, setSeenPinIds] = useState<string[]>([])
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null)
   const [communityQuery, setCommunityQuery] = useState('')
   const [createCommunityOpen, setCreateCommunityOpen] = useState(false)
@@ -857,6 +892,31 @@ export default function CommunityMapPrototype() {
   const [composerFolderName, setComposerFolderName] = useState('')
   const [composerFolderColor, setComposerFolderColor] = useState(COLORS[1])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+
+    const updateLocation = (position: GeolocationPosition) => {
+      setUserLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      })
+    }
+
+    navigator.geolocation.getCurrentPosition(updateLocation, () => undefined, {
+      enableHighAccuracy: true,
+      maximumAge: 30000,
+      timeout: 10000,
+    })
+
+    const watchId = navigator.geolocation.watchPosition(updateLocation, () => undefined, {
+      enableHighAccuracy: true,
+      maximumAge: 30000,
+      timeout: 15000,
+    })
+
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [])
 
   const currentUser = users.find((user) => user.id === activeUserId) ?? GUEST_USER
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users])
@@ -1931,6 +1991,7 @@ export default function CommunityMapPrototype() {
             postMessage={postMessage}
             activities={activities.filter((activity) => activity.communityId === selectedCommunity.id)}
             usersById={usersById}
+            pinsById={pinsById}
             timelineOpen={timelineOpen}
             chatText={communityChatText}
             onBack={() => setSelectedCommunityId(null)}
@@ -2044,6 +2105,8 @@ export default function CommunityMapPrototype() {
             onPinClick={openPinFromMap}
             onListFocus={openPinFromMap}
             onMapSurfaceClick={() => setSelectedPinId(null)}
+            currentLocation={userLocation}
+            startAtCurrentLocation
             panelsHidden={myWorldPanelsHidden}
             onPanelsHiddenChange={setMyWorldPanelsHidden}
             getPinMeta={(pin) => {
@@ -2117,6 +2180,7 @@ export default function CommunityMapPrototype() {
             onPinClick={openPinFromMap}
             onListFocus={openPinFromMap}
             onMapSurfaceClick={() => setSelectedPinId(null)}
+            currentLocation={userLocation}
             panelsHidden={toVisitPanelsHidden}
             onPanelsHiddenChange={setToVisitPanelsHidden}
             getPinMeta={getMapPinMeta}
@@ -3051,6 +3115,8 @@ function SplitMapView({
   pins,
   selectedPinId,
   seenPinIds,
+  currentLocation,
+  startAtCurrentLocation = false,
   onPinClick,
   onListFocus,
   getPinMeta,
@@ -3064,6 +3130,8 @@ function SplitMapView({
   pins: Pin[]
   selectedPinId: string | null
   seenPinIds?: string[]
+  currentLocation?: Coordinates | null
+  startAtCurrentLocation?: boolean
   onPinClick: (pinId: string) => void
   onListFocus?: (pinId: string) => void
   getPinMeta?: (pin: Pin) => string
@@ -3188,6 +3256,9 @@ function SplitMapView({
   }, [mapSearch, onListFocus, searchSuggestions])
 
   const moveToCurrentLocation = useCallback(() => {
+    if (currentLocation) {
+      setFlyToCoordinates(currentLocation)
+    }
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -3199,7 +3270,7 @@ function SplitMapView({
       () => undefined,
       { enableHighAccuracy: true, timeout: 8000 },
     )
-  }, [])
+  }, [currentLocation])
 
   return (
     <section className={`${styles.mapPage} ${listCollapsed ? styles.mapPageListCollapsed : ''}`}>
@@ -3210,6 +3281,8 @@ function SplitMapView({
             selectedPinId={selectedPinId}
             focusPinId={focusedPinId}
             seenPinIds={seenPinIds}
+            currentLocation={currentLocation}
+            startAtCurrentLocation={startAtCurrentLocation}
             onPinClick={selectMapPin}
             onMapClick={onMapClick}
             onMapSurfaceClick={onMapSurfaceClick}
@@ -3293,6 +3366,7 @@ function CommunityMapView({
   postMessage,
   activities,
   usersById,
+  pinsById,
   timelineOpen,
   chatText,
   onBack,
@@ -3313,6 +3387,7 @@ function CommunityMapView({
   postMessage: string
   activities: CommunityActivity[]
   usersById: Map<string, DemoUser>
+  pinsById: Map<string, Pin>
   timelineOpen: boolean
   chatText: string
   onBack: () => void
@@ -3343,10 +3418,22 @@ function CommunityMapView({
           <div className={styles.timelineListPage}>
             {activities.map((activity) => {
               const user = usersById.get(activity.userId)
+              const pin = activity.pinId ? pinsById.get(activity.pinId) : null
               return (
-                <article key={activity.id}>
-                  <strong>@{user?.username ?? 'user'}</strong>
-                  <span>{activity.text}</span>
+                <article key={activity.id} className={pin ? styles.timelinePostCard : undefined}>
+                  {pin && <img src={pin.imageUrl} alt="" />}
+                  <div>
+                    <strong>@{user?.username ?? 'user'}</strong>
+                    {pin ? (
+                      <>
+                        <b>{activity.title || pin.title}</b>
+                        <span>{activity.text || pin.description || '説明文なし'}</span>
+                        {pin.tags.length > 0 && <em>{pin.tags.map((tag) => `#${tag}`).join(' ')}</em>}
+                      </>
+                    ) : (
+                      <span>{activity.text}</span>
+                    )}
+                  </div>
                   <small>{formatShortDate(activity.createdAt)}</small>
                 </article>
               )
