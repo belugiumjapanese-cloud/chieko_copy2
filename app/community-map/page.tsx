@@ -33,7 +33,8 @@ import styles from './community-map.module.css'
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
 mapboxgl.accessToken = MAPBOX_TOKEN
 
-const APP_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
+const PRODUCTION_SITE_URL = 'https://map-omega-nine.vercel.app'
+const CONFIGURED_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
 const DEFAULT_CENTER: [number, number] = [139.7671, 35.6812]
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const EMPTY_IMAGE =
@@ -50,9 +51,10 @@ const GUEST_USER: DemoUser = {
 }
 
 function getAuthRedirectUrl() {
-  if (APP_SITE_URL) return `${APP_SITE_URL}/community-map`
-  if (typeof window !== 'undefined') return `${window.location.origin}/community-map`
-  return undefined
+  const siteUrl = CONFIGURED_SITE_URL && !CONFIGURED_SITE_URL.includes('localhost')
+    ? CONFIGURED_SITE_URL
+    : PRODUCTION_SITE_URL
+  return `${siteUrl}/community-map`
 }
 
 type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
