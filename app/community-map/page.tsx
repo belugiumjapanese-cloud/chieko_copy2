@@ -402,6 +402,10 @@ function cleanTag(tag: string) {
   return tag.replace(/^#/, '').trim()
 }
 
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
 function profileFallbackName(id: string) {
   return `user_${id.slice(0, 8)}`
 }
@@ -825,11 +829,26 @@ export default function CommunityMapPrototype() {
   const selectedProfile = (profileUserId ? usersById.get(profileUserId) : null) ?? currentUser
   const isMyProfile = Boolean(activeUserId) && selectedProfile.id === activeUserId
   const folderEditorPin = folderEditorPinId ? pinsById.get(folderEditorPinId) ?? null : null
-  const myPostedPins = pins.filter((pin) => pin.ownerId === activeUserId)
-  const savedPins = savedPinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin))
-  const toVisitPins = savedPins.filter((pin) => pin.ownerId !== activeUserId)
-  const myFolders = folders.filter((folder) => folder.ownerId === activeUserId)
-  const publicPins = pins.filter((pin) => pin.visibility === 'public')
+  const myPostedPins = useMemo(
+    () => pins.filter((pin) => pin.ownerId === activeUserId),
+    [activeUserId, pins],
+  )
+  const savedPins = useMemo(
+    () => savedPinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin)),
+    [pinsById, savedPinIds],
+  )
+  const toVisitPins = useMemo(
+    () => savedPins.filter((pin) => pin.ownerId !== activeUserId),
+    [activeUserId, savedPins],
+  )
+  const myFolders = useMemo(
+    () => folders.filter((folder) => folder.ownerId === activeUserId),
+    [activeUserId, folders],
+  )
+  const publicPins = useMemo(
+    () => pins.filter((pin) => pin.visibility === 'public'),
+    [pins],
+  )
   const myWorldMapPins = useMemo(
     () => filterPinsByFolders(myPostedPins, myFolders, myWorldVisibleFolderIds),
     [myFolders, myPostedPins, myWorldVisibleFolderIds],
@@ -2615,7 +2634,8 @@ function SplitMapView({
   const listInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    setVisiblePinIds(pins.map((pin) => pin.id))
+    const nextIds = pins.map((pin) => pin.id)
+    setVisiblePinIds((currentIds) => (sameStringArray(currentIds, nextIds) ? currentIds : nextIds))
   }, [pins])
 
   useEffect(() => {
@@ -2661,7 +2681,7 @@ function SplitMapView({
 
   const handleVisiblePinsChange = useCallback((pinIds: string[]) => {
     if (listInteractionRef.current) return
-    setVisiblePinIds(pinIds)
+    setVisiblePinIds((currentIds) => (sameStringArray(currentIds, pinIds) ? currentIds : pinIds))
   }, [])
 
   const selectListPin = useCallback((pinId: string) => {
