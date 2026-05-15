@@ -19,6 +19,7 @@ Local development uses `.env.local`. Vercel uses Project Settings -> Environment
 NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_public_token
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+NEXT_PUBLIC_SITE_URL=https://your-production-domain.vercel.app
 ```
 
 Do not commit `.env.local`. The file is ignored by Git.
