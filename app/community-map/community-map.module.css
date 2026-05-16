@@ -1982,6 +1982,23 @@
   color: #405049;
 }
 
+.followButton {
+  min-height: 42px;
+  padding: 9px 14px;
+  color: #ffffff;
+  font-weight: 950;
+  background: #126b58;
+  border: 1px solid #126b58;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.followButton.following {
+  color: #126b58;
+  background: #eef8f4;
+  border-color: #b7d5ca;
+}
+
 .profileStats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

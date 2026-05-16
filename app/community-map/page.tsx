@@ -947,6 +947,7 @@ export default function CommunityMapPrototype() {
   const selectedCommunity = selectedCommunityId ? communitiesById.get(selectedCommunityId) ?? null : null
   const selectedProfile = (profileUserId ? usersById.get(profileUserId) : null) ?? currentUser
   const isMyProfile = Boolean(activeUserId) && selectedProfile.id === activeUserId
+  const isFollowingSelectedProfile = Boolean(activeUserId) && currentUser.followingIds.includes(selectedProfile.id)
   const folderEditorPin = folderEditorPinId ? pinsById.get(folderEditorPinId) ?? null : null
   const folderEditTarget = folderEditId ? folders.find((folder) => folder.id === folderEditId) ?? null : null
   const myPostedPins = useMemo(
@@ -1705,12 +1706,79 @@ export default function CommunityMapPrototype() {
     await loadRemoteData(activeUserId)
   }, [activeUserId, communityChatText, loadRemoteData, requireSignedIn, selectedCommunityId])
 
+  const toggleFollowProfile = useCallback(async (targetUserId: string) => {
+    const client = supabase
+    if (!client || !requireSignedIn() || targetUserId === activeUserId) return
+    const alreadyFollowing = currentUser.followingIds.includes(targetUserId)
+
+    setUsers((current) =>
+      current.map((user) => {
+        if (user.id === activeUserId) {
+          return {
+            ...user,
+            followingIds: alreadyFollowing
+              ? user.followingIds.filter((id) => id !== targetUserId)
+              : Array.from(new Set([...user.followingIds, targetUserId])),
+          }
+        }
+        if (user.id === targetUserId) {
+          return {
+            ...user,
+            followerIds: alreadyFollowing
+              ? user.followerIds.filter((id) => id !== activeUserId)
+              : Array.from(new Set([...user.followerIds, activeUserId])),
+          }
+        }
+        return user
+      }),
+    )
+
+    const result = alreadyFollowing
+      ? await client.from('follows').delete().eq('follower_id', activeUserId).eq('following_id', targetUserId)
+      : await client.from('follows').insert({ follower_id: activeUserId, following_id: targetUserId })
+
+    if (result.error) {
+      await loadRemoteData(activeUserId)
+    }
+  }, [activeUserId, currentUser.followingIds, loadRemoteData, requireSignedIn])
+
   const switchTab = useCallback((nextTab: ActiveTab) => {
     setActiveTab(nextTab)
     setSelectedPinId(null)
     setFolderEditorPinId(null)
-    if (nextTab !== 'find') setFindChaosOpen(false)
-  }, [])
+    setCommunitySubmitOpen(false)
+    setComposerOpen(false)
+    setFolderEditId(null)
+    setProfileMenuOpen(false)
+    setProfileEditorOpen(false)
+    if (nextTab === 'home') {
+      setHomeMode('timeline')
+      setTimelineOpen(false)
+    }
+    if (nextTab === 'find') {
+      setSelectedCommunityId(null)
+      setFindChaosOpen(false)
+      setTimelineOpen(false)
+      setCommunityQuery('')
+      setCreateCommunityOpen(false)
+    } else {
+      setFindChaosOpen(false)
+      setSelectedCommunityId(null)
+      setTimelineOpen(false)
+    }
+    if (nextTab === 'myworld') {
+      setMyWorldMode('map')
+      setMyWorldFolderId(null)
+    }
+    if (nextTab === 'tovisit') {
+      setToVisitMode('map')
+      setToVisitFolderId(null)
+    }
+    if (nextTab === 'mypage') {
+      setProfileUserId(activeUserId)
+      setProfileListMode('profile')
+    }
+  }, [activeUserId])
 
   const openPinFromMap = useCallback((pinId: string) => {
     setSelectedPinId(pinId)
@@ -1963,12 +2031,6 @@ export default function CommunityMapPrototype() {
   return (
     <main className={`${styles.shell} ${activeTab === 'home' ? styles.homeShell : ''}`}>
       <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handlePostImage} />
-      {(remoteLoading || remoteError) && (
-        <button className={`${styles.toast} ${remoteError ? styles.toastError : ''}`} type="button" onClick={() => setRemoteError('')}>
-          {remoteError ? `Supabase: ${remoteError}` : 'Supabaseから読み込み中...'}
-        </button>
-      )}
-
       {activeTab === 'home' && (
         <section className={styles.homePage}>
           <header className={styles.homeTopbar}>
@@ -2209,7 +2271,6 @@ export default function CommunityMapPrototype() {
             onCreateFolder={addFolderForPin}
             onCreateEmptyFolder={createEmptyFolder}
             onEditFolder={setFolderEditId}
-            onAddMemory={openLibraryPicker}
             getMeta={(pin) => {
               const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
               return communitiesText || 'private memory'
@@ -2365,6 +2426,15 @@ export default function CommunityMapPrototype() {
                   </div>
                 )}
               </div>
+            )}
+            {!isMyProfile && (
+              <button
+                className={`${styles.followButton} ${isFollowingSelectedProfile ? styles.following : ''}`}
+                type="button"
+                onClick={() => toggleFollowProfile(selectedProfile.id)}
+              >
+                {isFollowingSelectedProfile ? 'Following' : 'Follow'}
+              </button>
             )}
           </header>
           {isMyProfile && (
@@ -2684,12 +2754,6 @@ export default function CommunityMapPrototype() {
             <button className={styles.primaryButton} type="submit">{postDraft.communityId ? '投稿' : 'My Worldに保存'}</button>
           </form>
         </aside>
-      )}
-
-      {toast && (
-        <button className={styles.toast} type="button" onClick={() => setToast('')}>
-          {toast}
-        </button>
       )}
 
       <nav className={styles.footer}>
