@@ -390,6 +390,17 @@
   border: 1px solid #d8e2db;
 }
 
+.dangerButton {
+  min-height: 38px;
+  padding: 8px 12px;
+  color: #b42318;
+  font-weight: 950;
+  background: #fff4f2;
+  border: 1px solid #ffd0c9;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .contentSection {
   margin: 22px 0;
 }
@@ -2807,6 +2818,33 @@
 
 .folderPlaylistHeader > button {
   justify-self: end;
+}
+
+.folderPlaylistHeader small {
+  color: #65736b;
+  font-weight: 850;
+  text-align: center;
+}
+
+.folderPlaylistActions,
+.pinDetailActions,
+.editorActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.folderPlaylistActions {
+  justify-content: flex-end;
+}
+
+.pinDetailActions {
+  justify-content: flex-start;
+}
+
+.editorActionRow {
+  justify-content: space-between;
 }
 
 .folderPlaylistList {

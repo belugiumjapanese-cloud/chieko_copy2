@@ -903,6 +903,7 @@ export default function CommunityMapPrototype() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('myworld')
   const [homeMode, setHomeMode] = useState<HomeMode>('timeline')
   const [findChaosOpen, setFindChaosOpen] = useState(false)
+  const [findCommunityOpen, setFindCommunityOpen] = useState(false)
   const [myWorldMode, setMyWorldMode] = useState<LibraryMode>('map')
   const [toVisitMode, setToVisitMode] = useState<LibraryMode>('map')
   const [users, setUsers] = useState<DemoUser[]>([])
@@ -919,6 +920,7 @@ export default function CommunityMapPrototype() {
   const [authUsername, setAuthUsername] = useState('')
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([])
   const [profileEditorOpen, setProfileEditorOpen] = useState(false)
   const [accountCreatorOpen, setAccountCreatorOpen] = useState(false)
   const [profileDraft, setProfileDraft] = useState({ displayName: '', username: '', bio: '', avatarUrl: '' })
@@ -1001,6 +1003,7 @@ export default function CommunityMapPrototype() {
   const selectedProfile = (profileUserId ? usersById.get(profileUserId) : null) ?? currentUser
   const isMyProfile = Boolean(activeUserId) && selectedProfile.id === activeUserId
   const isFollowingSelectedProfile = Boolean(activeUserId) && currentUser.followingIds.includes(selectedProfile.id)
+  const unreadNotificationCount = notifications.filter((notification) => !readNotificationIds.includes(notification.id)).length
   const folderEditorPin = folderEditorPinId ? pinsById.get(folderEditorPinId) ?? null : null
   const folderEditTarget = folderEditId ? folders.find((folder) => folder.id === folderEditId) ?? null : null
   const myPostedPins = useMemo(
@@ -1832,11 +1835,13 @@ export default function CommunityMapPrototype() {
     if (nextTab === 'find') {
       setSelectedCommunityId(null)
       setFindChaosOpen(false)
+      setFindCommunityOpen(false)
       setTimelineOpen(false)
       setCommunityQuery('')
       setCreateCommunityOpen(false)
     } else {
       setFindChaosOpen(false)
+      setFindCommunityOpen(false)
       setSelectedCommunityId(null)
       setTimelineOpen(false)
     }
@@ -1879,6 +1884,45 @@ export default function CommunityMapPrototype() {
     setToast(alreadySaved ? '保存済みです。フォルダーを選べます。' : 'To Visitに保存しました。フォルダーを選んでください。')
     await loadRemoteData(activeUserId)
   }, [activeUserId, loadRemoteData, requireSignedIn, savedPinIds])
+
+  const deletePin = useCallback(async (pinId: string) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    const pin = pinsById.get(pinId)
+    if (!pin) return
+    if (!window.confirm('このpinを削除しますか？')) return
+
+    setSelectedPinId((current) => (current === pinId ? null : current))
+    setFolders((current) => current.map((folder) => ({ ...folder, pinIds: folder.pinIds.filter((id) => id !== pinId) })))
+
+    if (pin.ownerId === activeUserId) {
+      setPins((current) => current.filter((item) => item.id !== pinId))
+      const { error } = await client.from('posts').delete().eq('id', pinId).eq('user_id', activeUserId)
+      if (error) setToast(error.message)
+    } else {
+      setSavedPinIds((current) => current.filter((id) => id !== pinId))
+      await client.from('folder_posts').delete().eq('post_id', pinId).eq('user_id', activeUserId)
+      const { error } = await client.from('saved_posts').delete().eq('post_id', pinId).eq('user_id', activeUserId)
+      if (error) setToast(error.message)
+    }
+
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, loadRemoteData, pinsById, requireSignedIn])
+
+  const deleteFolder = useCallback(async (folderId: string) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    if (!window.confirm('このfolderを削除しますか？')) return
+
+    setFolderEditId(null)
+    setMyWorldFolderId((current) => (current === folderId ? null : current))
+    setToVisitFolderId((current) => (current === folderId ? null : current))
+    setFolders((current) => current.filter((folder) => folder.id !== folderId))
+
+    const { error } = await client.from('folders').delete().eq('id', folderId).eq('user_id', activeUserId)
+    if (error) setToast(error.message)
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, loadRemoteData, requireSignedIn])
 
   const togglePinFolder = useCallback(async (pinId: string, folderId: string, checked: boolean) => {
     const client = supabase
@@ -2236,6 +2280,59 @@ export default function CommunityMapPrototype() {
               </div>
             )}
           />
+        ) : findCommunityOpen ? (
+          <section className={styles.page}>
+            <header className={styles.pageHeaderRow}>
+              <div>
+                <span>Find</span>
+                <h1>Join Community</h1>
+              </div>
+              <button className={styles.ghostButton} type="button" onClick={() => setFindCommunityOpen(false)}>
+                <ArrowLeft size={17} />
+                戻る
+              </button>
+            </header>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <h2>Community</h2>
+                <p>貯めた自分のピンを、ここからコミュニティに共有できます。</p>
+              </div>
+              <button className={styles.primaryButton} type="button" onClick={() => setCreateCommunityOpen(true)}>作成</button>
+            </div>
+            <div className={styles.searchBox}>
+              <Search size={18} />
+              <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="建築、映画、友達の旅 などで検索" />
+              <button type="button">検索</button>
+            </div>
+            {createCommunityOpen && (
+              <form className={styles.createPanel} onSubmit={createCommunity}>
+                <button className={styles.closeButton} type="button" onClick={() => setCreateCommunityOpen(false)}><X size={17} /></button>
+                <h2>コミュニティを作成</h2>
+                <label>
+                  名前
+                  <input value={newCommunityName} onChange={(event) => setNewCommunityName(event.target.value)} placeholder="architecture club" />
+                </label>
+                <div className={styles.segmented}>
+                  <button className={newCommunityPrivacy === 'public' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('public')}>公開</button>
+                  <button className={newCommunityPrivacy === 'limited' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('limited')}>限定公開</button>
+                </div>
+                {newCommunityPrivacy === 'limited' && <p className={styles.muted}>作成後、招待リンクで友達だけ参加できる設定になります。</p>}
+                <button className={styles.primaryButton} type="submit">作成してmapへ</button>
+              </form>
+            )}
+            <CommunityListSection
+              title="関係ありそうなコミュニティ"
+              communities={filteredCommunities.filter((community) => recommendedCommunities.some((item) => item.id === community.id))}
+              currentUserId={activeUserId}
+              onOpen={openCommunity}
+            />
+            <CommunityListSection
+              title="所属しているコミュニティ"
+              communities={filteredCommunities.filter((community) => community.memberIds.includes(activeUserId))}
+              currentUserId={activeUserId}
+              onOpen={openCommunity}
+            />
+          </section>
         ) : (
           <section className={styles.page}>
             <header className={styles.pageHeader}>
@@ -2251,59 +2348,24 @@ export default function CommunityMapPrototype() {
                 Open
               </button>
             </section>
+            <section className={styles.chaosEntry}>
+              <div>
+                <strong>Join Community</strong>
+                <span>コミュニティを探して、自分のpinを共有する</span>
+              </div>
+              <button className={styles.primaryButton} type="button" onClick={() => setFindCommunityOpen(true)}>
+                Open
+              </button>
+            </section>
             <div className={styles.searchBox}>
               <Search size={18} />
               <input placeholder="キーワードで検索" />
               <button type="button">検索</button>
             </div>
-            <div className={styles.findLayout}>
-              <div className={styles.findMain}>
-                <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenPin={setSelectedPinId} />
-                <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenPin={setSelectedPinId} />
-                <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenPin={setSelectedPinId} />
-              </div>
-              <aside className={styles.communityDock}>
-                <div className={styles.sectionHeadingRow}>
-                  <div>
-                    <h2>Community</h2>
-                    <p>貯めた自分のピンを、ここからコミュニティに共有できます。</p>
-                  </div>
-                  <button className={styles.ghostButton} type="button" onClick={() => setCreateCommunityOpen(true)}>作成</button>
-                </div>
-                <div className={styles.searchBox}>
-                  <Search size={18} />
-                  <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="建築、映画、友達の旅 などで検索" />
-                  <button type="button">検索</button>
-                </div>
-                {createCommunityOpen && (
-                  <form className={styles.createPanel} onSubmit={createCommunity}>
-                    <button className={styles.closeButton} type="button" onClick={() => setCreateCommunityOpen(false)}><X size={17} /></button>
-                    <h2>コミュニティを作成</h2>
-                    <label>
-                      名前
-                      <input value={newCommunityName} onChange={(event) => setNewCommunityName(event.target.value)} placeholder="architecture club" />
-                    </label>
-                    <div className={styles.segmented}>
-                      <button className={newCommunityPrivacy === 'public' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('public')}>公開</button>
-                      <button className={newCommunityPrivacy === 'limited' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('limited')}>限定公開</button>
-                    </div>
-                    {newCommunityPrivacy === 'limited' && <p className={styles.muted}>作成後、招待リンクで友達だけ参加できる設定になります。</p>}
-                    <button className={styles.primaryButton} type="submit">作成してmapへ</button>
-                  </form>
-                )}
-                <CommunityListSection
-                  title="関係ありそうなコミュニティ"
-                  communities={filteredCommunities.filter((community) => recommendedCommunities.some((item) => item.id === community.id))}
-                  currentUserId={activeUserId}
-                  onOpen={openCommunity}
-                />
-                <CommunityListSection
-                  title="所属しているコミュニティ"
-                  communities={filteredCommunities.filter((community) => community.memberIds.includes(activeUserId))}
-                  currentUserId={activeUserId}
-                  onOpen={openCommunity}
-                />
-              </aside>
+            <div className={styles.findMain}>
+              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenPin={setSelectedPinId} />
+              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenPin={setSelectedPinId} />
+              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenPin={setSelectedPinId} />
             </div>
           </section>
         )
@@ -2374,7 +2436,8 @@ export default function CommunityMapPrototype() {
             onCreateFolder={addFolderForPin}
             onCreateEmptyFolder={createEmptyFolder}
             onEditFolder={setFolderEditId}
-            onUpdateFolder={updateFolder}
+            onDeleteFolder={deleteFolder}
+            onDeletePin={deletePin}
             getMeta={(pin) => {
               const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
               return communitiesText || 'private memory'
@@ -2433,7 +2496,8 @@ export default function CommunityMapPrototype() {
             onCreateFolder={addFolderForPin}
             onCreateEmptyFolder={(name, color) => createEmptyFolder(name, color, 'to_visit')}
             onEditFolder={setFolderEditId}
-            onUpdateFolder={updateFolder}
+            onDeleteFolder={deleteFolder}
+            onDeletePin={deletePin}
             getMeta={getMapPinMeta}
           />
         )
@@ -2519,13 +2583,18 @@ export default function CommunityMapPrototype() {
                   className={styles.iconButton}
                   type="button"
                   onClick={() => {
-                    setNotificationsOpen((value) => !value)
+                    setNotificationsOpen((value) => {
+                      if (!value) {
+                        setReadNotificationIds((current) => Array.from(new Set([...current, ...notifications.map((notification) => notification.id)])))
+                      }
+                      return !value
+                    })
                     setProfileMenuOpen(false)
                   }}
                   aria-label="notifications"
                 >
                   <Heart size={22} />
-                  {notifications.length > 0 && <span className={styles.notificationBadge}>{notifications.length}</span>}
+                  {unreadNotificationCount > 0 && <span className={styles.notificationBadge}>{unreadNotificationCount}</span>}
                 </button>
                 {notificationsOpen && (
                   <div className={styles.notificationPanel}>
@@ -2538,6 +2607,10 @@ export default function CommunityMapPrototype() {
                           key={notification.id}
                           type="button"
                           onClick={() => {
+                            setActiveTab('myworld')
+                            setMyWorldMode('map')
+                            setMyWorldFolderId(null)
+                            setMyWorldVisibleFolderIds(myFolders.map((folder) => folder.id))
                             setSelectedPinId(notification.pinId)
                             setNotificationsOpen(false)
                           }}
@@ -2754,6 +2827,7 @@ export default function CommunityMapPrototype() {
             folder={folderEditTarget}
             onClose={() => setFolderEditId(null)}
             onSave={updateFolder}
+            onDelete={deleteFolder}
           />
         </aside>
       )}
@@ -3055,7 +3129,8 @@ function FolderLibraryView({
   onCreateFolder,
   onCreateEmptyFolder,
   onEditFolder,
-  onUpdateFolder,
+  onDeleteFolder,
+  onDeletePin,
   onAddMemory,
 }: {
   title: string
@@ -3073,7 +3148,8 @@ function FolderLibraryView({
   onCreateFolder: (pinId: string, name: string, color: string) => boolean
   onCreateEmptyFolder: (name: string, color: string) => Promise<boolean>
   onEditFolder: (folderId: string) => void
-  onUpdateFolder: (folderId: string, values: Partial<Folder>) => void
+  onDeleteFolder: (folderId: string) => void
+  onDeletePin: (pinId: string) => void
   onAddMemory?: () => void
 }) {
   const [newFolderName, setNewFolderName] = useState('')
@@ -3109,16 +3185,11 @@ function FolderLibraryView({
           <div className={styles.folderPlaylistHeader}>
             <h2>{selectedFolder.name}</h2>
             <p>{selectedFolder.description || 'Description'}</p>
-            <label className={styles.profilePublishToggle}>
-              <span>Show on My Profile and in Search</span>
-              <input
-                type="checkbox"
-                checked={selectedFolder.visibility === 'public'}
-                onChange={(event) => onUpdateFolder(selectedFolder.id, { visibility: event.target.checked ? 'public' : 'private' })}
-              />
-              <b />
-            </label>
-            <button className={styles.ghostButton} type="button" onClick={() => onEditFolder(selectedFolder.id)}>Edit Folder</button>
+            <small>{selectedFolder.visibility === 'public' ? 'Public folder' : 'Private folder'}{selectedFolder.isPaid ? ' / Paid' : ''}</small>
+            <div className={styles.folderPlaylistActions}>
+              <button className={styles.ghostButton} type="button" onClick={() => onEditFolder(selectedFolder.id)}>Edit Folder</button>
+              <button className={styles.dangerButton} type="button" onClick={() => onDeleteFolder(selectedFolder.id)}>Delete Folder</button>
+            </div>
           </div>
           <PinFolderList
             pins={selectedPins}
@@ -3127,6 +3198,7 @@ function FolderLibraryView({
             onOpenPin={onOpenPin}
             onToggleFolder={onToggleFolder}
             onCreateFolder={onCreateFolder}
+            onDeletePin={onDeletePin}
           />
         </section>
       ) : (
@@ -3184,10 +3256,12 @@ function FolderEditModal({
   folder,
   onClose,
   onSave,
+  onDelete,
 }: {
   folder: Folder
   onClose: () => void
   onSave: (folderId: string, values: Partial<Folder>) => void
+  onDelete: (folderId: string) => void
 }) {
   const [name, setName] = useState(folder.name)
   const [description, setDescription] = useState(folder.description ?? '')
@@ -3238,10 +3312,15 @@ function FolderEditModal({
         <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
       <ColorSwatches value={color} onChange={setColor} />
-      <div className={styles.segmented}>
-        <button className={visibility === 'private' ? styles.active : ''} type="button" onClick={() => setVisibility('private')}>非公開</button>
-        <button className={visibility === 'public' ? styles.active : ''} type="button" onClick={() => setVisibility('public')}>公開</button>
-      </div>
+      <label className={styles.profilePublishToggle}>
+        <span>Show on My Profile and in Search</span>
+        <input
+          type="checkbox"
+          checked={visibility === 'public'}
+          onChange={(event) => setVisibility(event.target.checked ? 'public' : 'private')}
+        />
+        <b />
+      </label>
       <label className={styles.checkboxLine}>
         <input type="checkbox" checked={isPaid} onChange={(event) => setIsPaid(event.target.checked)} />
         有料公開
@@ -3252,7 +3331,10 @@ function FolderEditModal({
           <input type="number" min="1" value={paidFromIndex} onChange={(event) => setPaidFromIndex(event.target.value)} />
         </label>
       )}
-      <button className={styles.primaryButton} type="submit">Save</button>
+      <div className={styles.editorActionRow}>
+        <button className={styles.primaryButton} type="submit">Save</button>
+        <button className={styles.dangerButton} type="button" onClick={() => onDelete(folder.id)}>Delete Folder</button>
+      </div>
     </form>
   )
 }
@@ -3264,6 +3346,7 @@ function PinFolderList({
   onOpenPin,
   onToggleFolder,
   onCreateFolder,
+  onDeletePin,
 }: {
   pins: Pin[]
   folders: Folder[]
@@ -3271,6 +3354,7 @@ function PinFolderList({
   onOpenPin: (pinId: string) => void
   onToggleFolder: (pinId: string, folderId: string, checked: boolean) => void
   onCreateFolder: (pinId: string, name: string, color: string) => boolean
+  onDeletePin: (pinId: string) => void
 }) {
   const [openPinId, setOpenPinId] = useState<string | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
@@ -3327,7 +3411,10 @@ function PinFolderList({
                     </span>
                   )) : <span>フォルダー未設定</span>}
                 </div>
-                <button className={styles.ghostButton} type="button" onClick={() => onOpenPin(pin.id)}>詳細を開く</button>
+                <div className={styles.pinDetailActions}>
+                  <button className={styles.ghostButton} type="button" onClick={() => onOpenPin(pin.id)}>詳細を開く</button>
+                  <button className={styles.dangerButton} type="button" onClick={() => onDeletePin(pin.id)}>Delete</button>
+                </div>
                 <strong>入れるフォルダー</strong>
                 {folders.map((folder) => (
                   <label key={folder.id}>
