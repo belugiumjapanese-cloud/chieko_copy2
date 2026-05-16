@@ -1085,7 +1085,7 @@ export default function CommunityMapPrototype() {
   const profilePins = pins
     .filter((pin) => pin.ownerId === selectedProfile.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  const profileFolders = folders.filter((folder) => folder.ownerId === selectedProfile.id && folder.visibility === 'public')
+  const profileFolders = folders.filter((folder) => folder.ownerId === selectedProfile.id && folder.kind === 'my_world' && folder.visibility === 'public')
   const profilePublicFolderPinIds = new Set(profileFolders.flatMap((folder) => folder.pinIds))
   const profilePublicPins = profilePins.filter((pin) => pin.visibility === 'public' && profilePublicFolderPinIds.has(pin.id))
   const profileRecentPins = profilePublicPins.slice(0, 10)
@@ -3757,6 +3757,7 @@ function SplitMapView({
   const [internalPanelsHidden, setInternalPanelsHidden] = useState(false)
   const [mapSearch, setMapSearch] = useState('')
   const [flyToCoordinates, setFlyToCoordinates] = useState<Coordinates | null>(null)
+  const [expandedStoryPinId, setExpandedStoryPinId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
   const listInteractionRef = useRef(false)
   const listInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -3799,6 +3800,7 @@ function SplitMapView({
   const currentMapPin = useMemo(() => {
     return pins.find((pin) => pin.id === focusedPinId) ?? pins.find((pin) => pin.id === selectedPinId) ?? visiblePins[0]
   }, [focusedPinId, pins, selectedPinId, visiblePins])
+  const expandedStoryPin = expandedStoryPinId ? pins.find((pin) => pin.id === expandedStoryPinId) ?? null : null
 
   const handleListScroll = useCallback(() => {
     const list = listRef.current
@@ -3838,11 +3840,13 @@ function SplitMapView({
   }, [])
 
   const selectListPin = useCallback((pinId: string) => {
+    setExpandedStoryPinId(null)
     setFocusedPinId(pinId)
     onListFocus?.(pinId)
   }, [onListFocus])
 
   const selectMapPin = useCallback((pinId: string) => {
+    setExpandedStoryPinId(null)
     setFocusedPinId(pinId)
     onPinClick(pinId)
   }, [onPinClick])
@@ -3912,7 +3916,10 @@ function SplitMapView({
             startAtCurrentLocation={startAtCurrentLocation}
             onPinClick={selectMapPin}
             onMapClick={onMapClick}
-            onMapSurfaceClick={onMapSurfaceClick}
+            onMapSurfaceClick={() => {
+              setExpandedStoryPinId(null)
+              onMapSurfaceClick?.()
+            }}
             onVisiblePinsChange={handleVisiblePinsChange}
             flyToCoordinates={flyToCoordinates}
           />
@@ -3946,7 +3953,7 @@ function SplitMapView({
           </button>
           {overlay}
           {currentMapPin && (!listCollapsed || selectedPinId) && (
-            <button className={styles.mapStoryCard} type="button" onClick={() => selectMapPin(currentMapPin.id)}>
+            <button className={styles.mapStoryCard} type="button" onClick={() => setExpandedStoryPinId(currentMapPin.id)}>
               <img src={currentMapPin.imageUrl} alt="" />
               <div>
                 {getPinMeta && <small>{getPinMeta(currentMapPin)}</small>}
@@ -3955,6 +3962,20 @@ function SplitMapView({
                 <span>{currentMapPin.tags.map((tag) => `#${tag}`).join(' ')}</span>
               </div>
             </button>
+          )}
+          {expandedStoryPin && (
+            <aside className={styles.mapStoryDetail}>
+              <button className={styles.closeButton} type="button" aria-label="詳細を閉じる" onClick={() => setExpandedStoryPinId(null)}>
+                <X size={16} />
+              </button>
+              <img src={expandedStoryPin.imageUrl} alt="" />
+              <div>
+                {getPinMeta && <small>{getPinMeta(expandedStoryPin)}</small>}
+                <h2>{expandedStoryPin.title}</h2>
+                <p>{expandedStoryPin.description || '説明文なし'}</p>
+                {!!expandedStoryPin.tags.length && <span>{expandedStoryPin.tags.map((tag) => `#${tag}`).join(' ')}</span>}
+              </div>
+            </aside>
           )}
           {floatingAction && <div className={styles.mapFloatingAction}>{floatingAction}</div>}
         </div>
