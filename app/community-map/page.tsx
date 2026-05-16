@@ -123,6 +123,7 @@ type Pin = Coordinates & {
 type Folder = {
   id: string
   ownerId: string
+  kind: 'my_world' | 'to_visit'
   name: string
   color: string
   description?: string
@@ -203,6 +204,7 @@ type AppPostCardRow = {
 type AppFolderCardRow = {
   id: string
   user_id: string
+  folder_kind?: 'my_world' | 'to_visit' | null
   name: string
   description?: string | null
   color: string | null
@@ -463,6 +465,7 @@ function buildFolders(folderRows: AppFolderCardRow[]): Folder[] {
   return folderRows.map((folder) => ({
     id: folder.id,
     ownerId: folder.user_id,
+    kind: folder.folder_kind === 'to_visit' ? 'to_visit' : 'my_world',
     name: folder.name,
     description: folder.description ?? '',
     color: folder.color || COLORS[0],
@@ -941,9 +944,16 @@ export default function CommunityMapPrototype() {
     [activeUserId, savedPins],
   )
   const myFolders = useMemo(
-    () => folders.filter((folder) => folder.ownerId === activeUserId),
+    () => folders.filter((folder) => folder.ownerId === activeUserId && folder.kind === 'my_world'),
     [activeUserId, folders],
   )
+  const toVisitFolders = useMemo(
+    () => folders.filter((folder) => folder.ownerId === activeUserId && folder.kind === 'to_visit'),
+    [activeUserId, folders],
+  )
+  const folderEditorFolders = folderEditorPin
+    ? (folderEditorPin.ownerId === activeUserId ? myFolders : toVisitFolders)
+    : myFolders
   const publicPins = useMemo(
     () => pins.filter((pin) => pin.visibility === 'public'),
     [pins],
@@ -953,8 +963,8 @@ export default function CommunityMapPrototype() {
     [myFolders, myPostedPins, myWorldVisibleFolderIds],
   )
   const toVisitMapPins = useMemo(
-    () => filterPinsByFolders(toVisitPins, myFolders, toVisitVisibleFolderIds),
-    [myFolders, toVisitPins, toVisitVisibleFolderIds],
+    () => filterPinsByFolders(toVisitPins, toVisitFolders, toVisitVisibleFolderIds),
+    [toVisitFolders, toVisitPins, toVisitVisibleFolderIds],
   )
   const profilePins = pins
     .filter((pin) => pin.ownerId === selectedProfile.id)
@@ -1156,14 +1166,19 @@ export default function CommunityMapPrototype() {
   }, [loadRemoteData])
 
   useEffect(() => {
-    const folderIds = folders.filter((folder) => folder.ownerId === activeUserId).map((folder) => folder.id)
-    const syncSelectedFolders = (current: string[]) => {
+    const myWorldFolderIds = folders
+      .filter((folder) => folder.ownerId === activeUserId && folder.kind === 'my_world')
+      .map((folder) => folder.id)
+    const toVisitFolderIds = folders
+      .filter((folder) => folder.ownerId === activeUserId && folder.kind === 'to_visit')
+      .map((folder) => folder.id)
+    const syncByIds = (folderIds: string[]) => (current: string[]) => {
       const next = current.length ? current.filter((id) => folderIds.includes(id)) : folderIds
       return arraysMatch(current, next) ? current : next
     }
 
-    setMyWorldVisibleFolderIds(syncSelectedFolders)
-    setToVisitVisibleFolderIds(syncSelectedFolders)
+    setMyWorldVisibleFolderIds(syncByIds(myWorldFolderIds))
+    setToVisitVisibleFolderIds(syncByIds(toVisitFolderIds))
   }, [activeUserId, folders])
 
   const ownedAccounts = ownedAccountIds.map((id) => usersById.get(id)).filter((user): user is DemoUser => Boolean(user))
@@ -1735,11 +1750,13 @@ export default function CommunityMapPrototype() {
     if (!trimmedName) return false
     const client = supabase
     if (!client || !requireSignedIn()) return false
+    const folderKind: Folder['kind'] = pinsById.get(pinId)?.ownerId === activeUserId ? 'my_world' : 'to_visit'
     const tempId = createId('folder')
     setFolders((current) => [
       {
         id: tempId,
         ownerId: activeUserId,
+        kind: folderKind,
         name: trimmedName,
         color,
         pinIds: [pinId],
@@ -1753,6 +1770,7 @@ export default function CommunityMapPrototype() {
         .from('folders')
         .insert({
           user_id: activeUserId,
+          folder_kind: folderKind,
           name: trimmedName,
           color,
           visibility: 'private',
@@ -1776,7 +1794,7 @@ export default function CommunityMapPrototype() {
       await loadRemoteData(activeUserId)
     })()
     return true
-  }, [activeUserId, loadRemoteData, requireSignedIn])
+  }, [activeUserId, loadRemoteData, pinsById, requireSignedIn])
 
   const createFolderForPin = useCallback((pinId: string) => {
     const name = newFolderName.trim()
@@ -1796,6 +1814,7 @@ export default function CommunityMapPrototype() {
       .from('folders')
       .insert({
         user_id: activeUserId,
+        folder_kind: 'my_world',
         name,
         color: composerFolderColor,
         visibility: 'private',
@@ -1812,6 +1831,7 @@ export default function CommunityMapPrototype() {
       {
         id: data.id,
         ownerId: data.user_id,
+        kind: 'my_world',
         name: data.name,
         color: data.color ?? composerFolderColor,
         pinIds: [],
@@ -1825,7 +1845,7 @@ export default function CommunityMapPrototype() {
     setComposerFolderColor(COLORS[(COLORS.indexOf(composerFolderColor) + 1) % COLORS.length])
   }, [activeUserId, composerFolderColor, composerFolderName, requireSignedIn])
 
-  const createEmptyFolder = useCallback(async (name: string, color: string) => {
+  const createEmptyFolder = useCallback(async (name: string, color: string, kind: Folder['kind'] = 'my_world') => {
     const trimmedName = name.trim()
     if (!trimmedName) return false
     const client = supabase
@@ -1835,6 +1855,7 @@ export default function CommunityMapPrototype() {
       .from('folders')
       .insert({
         user_id: activeUserId,
+        folder_kind: kind,
         name: trimmedName,
         color,
         visibility: 'private',
@@ -1999,6 +2020,7 @@ export default function CommunityMapPrototype() {
             onListFocus={() => setSelectedPinId(null)}
             getPinMeta={getMapPinMeta}
             onToggleTimeline={() => setTimelineOpen((value) => !value)}
+            onOpenProfile={openProfile}
             onChatText={setCommunityChatText}
             onSendChat={addCommunityChat}
             onMapClick={manualPlacement ? confirmManualLocation : undefined}
@@ -2106,7 +2128,6 @@ export default function CommunityMapPrototype() {
             onListFocus={openPinFromMap}
             onMapSurfaceClick={() => setSelectedPinId(null)}
             currentLocation={userLocation}
-            startAtCurrentLocation
             panelsHidden={myWorldPanelsHidden}
             onPanelsHiddenChange={setMyWorldPanelsHidden}
             getPinMeta={(pin) => {
@@ -2196,7 +2217,7 @@ export default function CommunityMapPrototype() {
                 <div className={styles.mapSortControl}>
                   <MapFolderFilter
                     title="My Folder"
-                    folders={myFolders}
+                    folders={toVisitFolders}
                     selectedFolderIds={toVisitVisibleFolderIds}
                     onToggle={(folderId, checked) => toggleVisibleFolder(folderId, checked, setToVisitVisibleFolderIds)}
                   />
@@ -2210,7 +2231,7 @@ export default function CommunityMapPrototype() {
             mode={toVisitMode}
             onModeChange={setToVisitMode}
             pins={toVisitPins}
-            folders={myFolders}
+            folders={toVisitFolders}
             selectedFolderId={toVisitFolderId}
             onSelectFolder={setToVisitFolderId}
             folderSearch={folderSearch}
@@ -2218,7 +2239,7 @@ export default function CommunityMapPrototype() {
             onOpenPin={openPinFromMap}
             onToggleFolder={togglePinFolder}
             onCreateFolder={addFolderForPin}
-            onCreateEmptyFolder={createEmptyFolder}
+            onCreateEmptyFolder={(name, color) => createEmptyFolder(name, color, 'to_visit')}
             onEditFolder={setFolderEditId}
             getMeta={getMapPinMeta}
           />
@@ -2433,6 +2454,7 @@ export default function CommunityMapPrototype() {
             pin={selectedPin}
             owner={usersById.get(selectedPin.ownerId)}
             community={communitiesById.get(pinCommunityIds(selectedPin)[0] ?? '')}
+            usersById={usersById}
             isSaved={savedPinIds.includes(selectedPin.id)}
             isMine={selectedPin.ownerId === activeUserId}
             currentUserId={activeUserId}
@@ -2457,7 +2479,7 @@ export default function CommunityMapPrototype() {
             <h2>フォルダーに追加</h2>
             <p>{folderEditorPin.title}</p>
             <div className={styles.checkboxList}>
-              {myFolders.map((folder) => (
+              {folderEditorFolders.map((folder) => (
                 <label key={folder.id}>
                   <input
                     type="checkbox"
@@ -3374,6 +3396,7 @@ function CommunityMapView({
   onListFocus,
   getPinMeta,
   onToggleTimeline,
+  onOpenProfile,
   onChatText,
   onSendChat,
   onMapClick,
@@ -3395,6 +3418,7 @@ function CommunityMapView({
   onListFocus?: (pinId: string) => void
   getPinMeta?: (pin: Pin) => string
   onToggleTimeline: () => void
+  onOpenProfile: (userId: string) => void
   onChatText: (value: string) => void
   onSendChat: () => void
   onMapClick?: (coordinates: Coordinates) => void
@@ -3423,15 +3447,19 @@ function CommunityMapView({
                 <article key={activity.id} className={pin ? styles.timelinePostCard : undefined}>
                   {pin && <img src={pin.imageUrl} alt="" />}
                   <div>
-                    <strong>@{user?.username ?? 'user'}</strong>
+                    <button className={styles.authorLink} type="button" onClick={() => user && onOpenProfile(user.id)}>
+                      @{user?.username ?? 'user'}
+                    </button>
                     {pin ? (
                       <>
                         <b>{activity.title || pin.title}</b>
-                        <span>{activity.text || pin.description || '説明文なし'}</span>
+                        <span>
+                          <MentionText text={activity.text || pin.description || '説明文なし'} usersById={usersById} onOpenProfile={onOpenProfile} />
+                        </span>
                         {pin.tags.length > 0 && <em>{pin.tags.map((tag) => `#${tag}`).join(' ')}</em>}
                       </>
                     ) : (
-                      <span>{activity.text}</span>
+                      <span><MentionText text={activity.text} usersById={usersById} onOpenProfile={onOpenProfile} /></span>
                     )}
                   </div>
                   <small>{formatShortDate(activity.createdAt)}</small>
@@ -3482,10 +3510,41 @@ function CommunityMapView({
   )
 }
 
+function MentionText({
+  text,
+  usersById,
+  onOpenProfile,
+}: {
+  text: string
+  usersById: Map<string, DemoUser>
+  onOpenProfile: (userId: string) => void
+}) {
+  const usersByUsername = useMemo(() => {
+    return new Map(Array.from(usersById.values()).map((user) => [user.username.toLowerCase(), user]))
+  }, [usersById])
+  const parts = text.split(/(@[a-zA-Z0-9_.]{3,32})/g)
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        const username = part.startsWith('@') ? part.slice(1).toLowerCase() : ''
+        const user = username ? usersByUsername.get(username) : null
+        if (!user) return <span key={`${part}-${index}`}>{part}</span>
+        return (
+          <button key={`${part}-${index}`} className={styles.inlineMention} type="button" onClick={() => onOpenProfile(user.id)}>
+            @{user.username}
+          </button>
+        )
+      })}
+    </>
+  )
+}
+
 function PinDetail({
   pin,
   owner,
   community,
+  usersById,
   isSaved,
   isMine,
   currentUserId,
@@ -3503,6 +3562,7 @@ function PinDetail({
   pin: Pin
   owner?: DemoUser
   community?: Community
+  usersById: Map<string, DemoUser>
   isSaved: boolean
   isMine: boolean
   currentUserId: string
@@ -3546,9 +3606,17 @@ function PinDetail({
         </div>
         <section className={styles.commentBox}>
           <h3><MessageCircle size={16} /> コメント</h3>
-          {pin.comments.map((comment) => (
-            <p key={comment.id}><strong>@{comment.userId === currentUserId ? 'me' : comment.userId}</strong> {comment.text}</p>
-          ))}
+          {pin.comments.map((comment) => {
+            const user = usersById.get(comment.userId)
+            return (
+              <p key={comment.id}>
+                <button className={styles.authorLink} type="button" onClick={() => user && onOpenProfile(user.id)}>
+                  @{comment.userId === currentUserId ? 'me' : user?.username ?? 'user'}
+                </button>{' '}
+                <MentionText text={comment.text} usersById={usersById} onOpenProfile={onOpenProfile} />
+              </p>
+            )
+          })}
           <div>
             <input value={commentText} onChange={(event) => onCommentText(event.target.value)} placeholder="コメントを書く" />
             <button type="button" onClick={onAddComment}><Send size={16} /></button>

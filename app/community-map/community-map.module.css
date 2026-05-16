@@ -2292,6 +2292,17 @@
   cursor: pointer;
 }
 
+.inlineMention {
+  display: inline;
+  padding: 0;
+  color: #126b58;
+  font: inherit;
+  font-weight: 950;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
 .mapSearchBox {
   position: absolute;
   top: 16px;

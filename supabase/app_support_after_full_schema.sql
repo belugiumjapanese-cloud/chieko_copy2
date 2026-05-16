@@ -6,6 +6,35 @@
 alter table public.folders
   add column if not exists thumbnail_url text;
 
+alter table public.folders
+  add column if not exists folder_kind text not null default 'my_world';
+
+alter table public.folders
+  drop constraint if exists folders_folder_kind_check;
+
+alter table public.folders
+  add constraint folders_folder_kind_check check (folder_kind in ('my_world', 'to_visit'));
+
+update public.folders f
+set folder_kind = 'to_visit'
+where exists (
+  select 1
+  from public.folder_posts fp
+  join public.posts p on p.id = fp.post_id
+  where fp.folder_id = f.id
+    and p.user_id <> f.user_id
+)
+and not exists (
+  select 1
+  from public.folder_posts fp
+  join public.posts p on p.id = fp.post_id
+  where fp.folder_id = f.id
+    and p.user_id = f.user_id
+);
+
+create index if not exists folders_user_kind_idx
+on public.folders (user_id, folder_kind, created_at desc);
+
 -- 1) Storage read setup
 -- The current frontend uses image_url values directly. For that to work with
 -- Supabase Storage public URLs, the buckets need public read access.
@@ -268,6 +297,7 @@ select
   f.description,
   f.color,
   f.thumbnail_url,
+  f.folder_kind,
   f.visibility,
   f.is_paid,
   f.paid_from_index,

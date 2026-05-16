@@ -71,6 +71,7 @@ create table if not exists public.folders (
   description text not null default '',
   color text not null default '#126b58',
   thumbnail_url text,
+  folder_kind text not null default 'my_world' check (folder_kind in ('my_world', 'to_visit')),
   visibility text not null default 'private' check (visibility in ('private', 'public', 'followers')),
   is_paid boolean not null default false,
   paid_from_index integer,
@@ -174,6 +175,7 @@ create index if not exists posts_geo_idx on public.posts (latitude, longitude);
 create index if not exists posts_search_idx on public.posts using gin (search_vector);
 create index if not exists posts_tags_idx on public.posts using gin (tags);
 create index if not exists folders_user_idx on public.folders (user_id, created_at desc);
+create index if not exists folders_user_kind_idx on public.folders (user_id, folder_kind, created_at desc);
 create index if not exists folder_posts_post_idx on public.folder_posts (post_id);
 create index if not exists saved_posts_user_idx on public.saved_posts (user_id, created_at desc);
 create index if not exists community_posts_post_idx on public.community_posts (post_id);
