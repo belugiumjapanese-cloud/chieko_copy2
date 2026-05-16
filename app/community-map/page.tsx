@@ -987,7 +987,14 @@ export default function CommunityMapPrototype() {
   )
   const profileCommunities = communities.filter((community) => community.memberIds.includes(selectedProfile.id))
   const homeFeedPins = [...pins]
-    .filter((pin) => pin.ownerId !== activeUserId && pin.visibility === 'public' && (currentUser.followingIds.includes(pin.ownerId) || pinCommunityIds(pin).some((id) => joinedCommunities.some((community) => community.id === id))))
+    .filter((pin) =>
+      pin.visibility === 'public' &&
+      (
+        pin.ownerId === activeUserId ||
+        currentUser.followingIds.includes(pin.ownerId) ||
+        pinCommunityIds(pin).some((id) => joinedCommunities.some((community) => community.id === id))
+      ),
+    )
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   const filteredCommunities = communities.filter((community) => {
     const query = communityQuery.trim().toLowerCase()
@@ -3231,7 +3238,7 @@ function SplitMapView({
       listInteractionRef.current = false
     }, 600)
 
-    const index = Math.min(visiblePins.length - 1, Math.max(0, Math.round(list.scrollTop / 88)))
+    const index = Math.min(visiblePins.length - 1, Math.max(0, Math.round(list.scrollTop / 52)))
     const pin = visiblePins[index]
     if (!pin || pin.id === focusedPinId) return
     setFocusedPinId(pin.id)

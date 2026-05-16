@@ -184,6 +184,7 @@
 
 .pageHeaderRow div {
   display: grid;
+  min-width: 0;
   gap: 6px;
 }
 
@@ -414,6 +415,9 @@
 
 .libraryModeSwitch {
   display: inline-flex;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  width: max-content;
   gap: 4px;
   align-items: center;
   padding: 4px;
@@ -429,6 +433,7 @@
   padding: 6px 12px;
   color: #65736b;
   font-weight: 950;
+  white-space: nowrap;
   background: transparent;
   border: 0;
   border-radius: 999px;
@@ -442,6 +447,7 @@
 
 .libraryHeaderActions {
   display: flex;
+  flex-shrink: 0;
   flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
@@ -1496,7 +1502,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   width: 122px;
-  height: min(360px, 31dvh);
+  height: 92px;
   min-height: 0;
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(24, 35, 30, 0.12);
@@ -1511,9 +1517,9 @@
 
 .visibleListScroll {
   display: grid;
-  gap: 7px;
+  gap: 6px;
   min-height: 0;
-  padding: 12px;
+  padding: 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -1524,8 +1530,8 @@
   grid-template-columns: 1fr;
   gap: 0;
   align-items: center;
-  min-height: 92px;
-  padding: 6px;
+  min-height: 34px;
+  padding: 6px 8px;
   text-align: left;
   background: #f7faf8;
   border: 1px solid #d8e2db;
@@ -1545,19 +1551,26 @@
 }
 
 .visibleListScroll img {
-  width: 100%;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 8px;
+  display: none;
 }
 
 .visibleListScroll span {
+  display: block;
+  min-width: 0;
+}
+
+.visibleListScroll small {
   display: none;
 }
 
-.visibleListScroll strong,
-.visibleListScroll small {
-  display: none;
+.visibleListScroll strong {
+  display: block;
+  overflow: hidden;
+  color: #18231e;
+  font-size: 0.8rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mineMapPanel {
@@ -1585,6 +1598,7 @@
   grid-template-columns: 74px minmax(0, 1fr);
   gap: 10px;
   width: auto;
+  min-height: 92px;
   padding: 8px;
   color: #18231e;
   background: rgba(255, 255, 255, 0.96);
@@ -2381,7 +2395,7 @@
 
 .locateButton {
   left: 18px;
-  bottom: calc(31dvh + 34px);
+  bottom: 124px;
   background: #f59e0b;
 }
 
@@ -2396,6 +2410,10 @@
 .mapPageListCollapsed .locateButton,
 .mapPageListCollapsed .hidePanelsButton {
   bottom: 84px;
+}
+
+.mapPageListCollapsed .locateButton {
+  bottom: 16px;
 }
 
 .mapPageListCollapsed .hidePanelsButton {
@@ -2663,7 +2681,7 @@
     left: 12px;
     bottom: 12px;
     width: 108px;
-    height: min(344px, 31dvh);
+    height: 92px;
   }
 
   .mapStoryCard {
@@ -2691,6 +2709,10 @@
   .mapPageListCollapsed .hidePanelsButton {
     top: auto;
     right: 14px;
+    bottom: 16px;
+  }
+
+  .mapPageListCollapsed .locateButton {
     bottom: 16px;
   }
 
