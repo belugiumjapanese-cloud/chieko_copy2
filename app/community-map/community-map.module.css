@@ -2434,13 +2434,23 @@
 }
 
 .thumbnailGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 9px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.thumbnailGrid::-webkit-scrollbar {
+  display: none;
 }
 
 .thumbnailGrid button {
   position: relative;
+  flex: 0 0 96px;
   aspect-ratio: 1;
   padding: 0;
   overflow: hidden;
@@ -2533,7 +2543,11 @@
   }
 
   .thumbnailGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .thumbnailGrid button {
+    flex-basis: 112px;
   }
 }
 
@@ -3047,10 +3061,47 @@
   border-radius: 8px;
 }
 
+.paidPublishPanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
 .checkboxLine {
-  display: flex !important;
-  flex-direction: row;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
+  color: #17221d;
+}
+
+.checkboxLine span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.checkboxLine strong {
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.checkboxLine small {
+  color: #65736b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.folderEditor .checkboxLine input[type="checkbox"] {
+  width: 30px;
+  height: 30px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: #126b58;
 }
 
 @media (max-width: 900px) {

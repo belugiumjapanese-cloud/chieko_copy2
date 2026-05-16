@@ -1063,9 +1063,16 @@ export default function CommunityMapPrototype() {
   const folderEditorFolders = folderEditorPin
     ? (folderEditorPin.ownerId === activeUserId ? myFolders : toVisitFolders)
     : myFolders
+  const publicFolderPinIds = useMemo(() => {
+    return new Set(
+      folders
+        .filter((folder) => folder.visibility === 'public' && folder.kind === 'my_world')
+        .flatMap((folder) => folder.pinIds),
+    )
+  }, [folders])
   const publicPins = useMemo(
-    () => pins.filter((pin) => pin.visibility === 'public'),
-    [pins],
+    () => pins.filter((pin) => pin.visibility === 'public' && publicFolderPinIds.has(pin.id)),
+    [pins, publicFolderPinIds],
   )
   const myWorldMapPins = useMemo(
     () => filterPinsByFolders(myPostedPins, myFolders, myWorldVisibleFolderIds),
@@ -1078,9 +1085,10 @@ export default function CommunityMapPrototype() {
   const profilePins = pins
     .filter((pin) => pin.ownerId === selectedProfile.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  const profileRecentPins = profilePins.slice(0, 9)
-  const profilePublicPins = profilePins.filter((pin) => pin.visibility === 'public')
   const profileFolders = folders.filter((folder) => folder.ownerId === selectedProfile.id && folder.visibility === 'public')
+  const profilePublicFolderPinIds = new Set(profileFolders.flatMap((folder) => folder.pinIds))
+  const profilePublicPins = profilePins.filter((pin) => pin.visibility === 'public' && profilePublicFolderPinIds.has(pin.id))
+  const profileRecentPins = profilePublicPins.slice(0, 10)
   const profilePinCount = Math.max(selectedProfile.pinCount, profilePins.length)
   const profilePublicFolderCount = Math.max(selectedProfile.publicFolderCount, profileFolders.length)
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
@@ -2236,6 +2244,20 @@ export default function CommunityMapPrototype() {
         .update({ visibility: 'public' })
         .in('id', targetFolder.pinIds)
         .eq('user_id', activeUserId)
+    } else if (nextVisibility === 'private' && targetFolder?.pinIds.length) {
+      const otherPublicFolderPinIds = new Set(
+        folders
+          .filter((folder) => folder.id !== folderId && folder.visibility === 'public')
+          .flatMap((folder) => folder.pinIds),
+      )
+      const pinsToHide = targetFolder.pinIds.filter((pinId) => !otherPublicFolderPinIds.has(pinId))
+      if (pinsToHide.length) {
+        await client
+          .from('posts')
+          .update({ visibility: 'private' })
+          .in('id', pinsToHide)
+          .eq('user_id', activeUserId)
+      }
     }
 
     await loadRemoteData(activeUserId)
@@ -3492,7 +3514,6 @@ function FolderEditModal({
       }}
     >
       <button className={styles.closeButton} type="button" onClick={onClose}><X size={17} /></button>
-      <button className={styles.dangerButton} type="button" onClick={() => onDelete(folder.id)}>Delete Folder</button>
       <h2>Edit Folder</h2>
       <label>
         サムネ
@@ -3518,10 +3539,13 @@ function FolderEditModal({
         <b />
       </label>
       {visibility === 'public' && (
-        <>
+        <div className={styles.paidPublishPanel}>
           <label className={styles.checkboxLine}>
+            <span>
+              <strong>有料公開にしますか？</strong>
+              <small>オンにすると価格と、どこから有料にするかを設定できます。</small>
+            </span>
             <input type="checkbox" checked={isPaid} onChange={(event) => setIsPaid(event.target.checked)} />
-            有料公開にしますか？
           </label>
           {isPaid && (
             <>
@@ -3535,9 +3559,10 @@ function FolderEditModal({
               </label>
             </>
           )}
-        </>
+        </div>
       )}
       <button className={styles.primaryButton} type="submit">Save</button>
+      <button className={styles.dangerButton} type="button" onClick={() => onDelete(folder.id)}>Delete Folder</button>
     </form>
   )
 }
