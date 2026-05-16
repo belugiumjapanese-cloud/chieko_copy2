@@ -628,6 +628,14 @@ function PinMap({
   const locationMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const fittedPinsKeyRef = useRef('')
   const centeredOnLocationRef = useRef(false)
+  const initialMapViewRef = useRef<{
+    center: [number, number]
+    zoom: number
+  } | null>(
+    startAtCurrentLocation && currentLocation
+      ? { center: toLngLat(currentLocation) ?? DEFAULT_CENTER, zoom: compact ? 11 : 14 }
+      : null,
+  )
   const pinsRef = useRef(pins)
   const [mapVersion, setMapVersion] = useState(0)
   const onPinClickRef = useRef(onPinClick)
@@ -686,8 +694,8 @@ function PinMap({
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/streets-v11',
-      center: (startAtCurrentLocation && currentLocation ? toLngLat(currentLocation) : null) ?? DEFAULT_CENTER,
-      zoom: startAtCurrentLocation && currentLocation ? (compact ? 11 : 14) : (compact ? 2 : 11),
+      center: initialMapViewRef.current?.center ?? DEFAULT_CENTER,
+      zoom: initialMapViewRef.current?.zoom ?? (compact ? 2 : 11),
     })
 
     mapRef.current = map
@@ -729,7 +737,7 @@ function PinMap({
       map.remove()
       mapRef.current = null
     }
-  }, [compact, currentLocation, startAtCurrentLocation, updateVisiblePins])
+  }, [compact, updateVisiblePins])
 
   useEffect(() => {
     const map = mapRef.current
@@ -2128,6 +2136,7 @@ export default function CommunityMapPrototype() {
             onListFocus={openPinFromMap}
             onMapSurfaceClick={() => setSelectedPinId(null)}
             currentLocation={userLocation}
+            startAtCurrentLocation
             panelsHidden={myWorldPanelsHidden}
             onPanelsHiddenChange={setMyWorldPanelsHidden}
             getPinMeta={(pin) => {
@@ -2202,6 +2211,7 @@ export default function CommunityMapPrototype() {
             onListFocus={openPinFromMap}
             onMapSurfaceClick={() => setSelectedPinId(null)}
             currentLocation={userLocation}
+            startAtCurrentLocation
             panelsHidden={toVisitPanelsHidden}
             onPanelsHiddenChange={setToVisitPanelsHidden}
             getPinMeta={getMapPinMeta}
