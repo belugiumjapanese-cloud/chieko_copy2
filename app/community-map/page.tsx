@@ -167,6 +167,14 @@ type CommunityActivity = {
   createdAt: string
 }
 
+type NotificationItem = {
+  id: string
+  type: 'like' | 'save'
+  actorId: string
+  pinId: string
+  createdAt: string
+}
+
 const arraysMatch = (a: string[], b: string[]) => a.length === b.length && a.every((value, index) => value === b[index])
 
 type ProfileRow = {
@@ -253,10 +261,13 @@ type CommentRow = {
 type LikeRow = {
   post_id: string
   user_id: string
+  created_at?: string | null
 }
 
 type SavedPostRow = {
   post_id: string
+  user_id?: string | null
+  created_at?: string | null
 }
 
 type AppCommunityActivityRow = {
@@ -484,6 +495,37 @@ function buildFolders(folderRows: AppFolderCardRow[]): Folder[] {
     visibility: folder.visibility === 'public' ? 'public' : 'private',
     createdAt: folder.created_at,
   }))
+}
+
+function buildNotifications(likeRows: LikeRow[], saveRows: SavedPostRow[], pins: Pin[], activeUserId: string): NotificationItem[] {
+  if (!activeUserId) return []
+
+  const myPinIds = new Set(pins.filter((pin) => pin.ownerId === activeUserId).map((pin) => pin.id))
+  const items: NotificationItem[] = []
+
+  likeRows.forEach((row) => {
+    if (!myPinIds.has(row.post_id) || row.user_id === activeUserId) return
+    items.push({
+      id: `like-${row.post_id}-${row.user_id}`,
+      type: 'like',
+      actorId: row.user_id,
+      pinId: row.post_id,
+      createdAt: row.created_at ?? new Date().toISOString(),
+    })
+  })
+
+  saveRows.forEach((row) => {
+    if (!row.user_id || !myPinIds.has(row.post_id) || row.user_id === activeUserId) return
+    items.push({
+      id: `save-${row.post_id}-${row.user_id}`,
+      type: 'save',
+      actorId: row.user_id,
+      pinId: row.post_id,
+      createdAt: row.created_at ?? new Date().toISOString(),
+    })
+  })
+
+  return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 30)
 }
 
 function buildCommunities(communityRows: AppCommunityCardRow[], memberRows: CommunityMemberRow[], activeUserId: string) {
@@ -876,6 +918,7 @@ export default function CommunityMapPrototype() {
   const [authDisplayName, setAuthDisplayName] = useState('')
   const [authUsername, setAuthUsername] = useState('')
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileEditorOpen, setProfileEditorOpen] = useState(false)
   const [accountCreatorOpen, setAccountCreatorOpen] = useState(false)
   const [profileDraft, setProfileDraft] = useState({ displayName: '', username: '', bio: '', avatarUrl: '' })
@@ -889,6 +932,7 @@ export default function CommunityMapPrototype() {
   const [communities, setCommunities] = useState<Community[]>([])
   const [pins, setPins] = useState<Pin[]>([])
   const [activities, setActivities] = useState<CommunityActivity[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [savedPinIds, setSavedPinIds] = useState<string[]>([])
   const [seenPinIds, setSeenPinIds] = useState<string[]>([])
@@ -910,6 +954,7 @@ export default function CommunityMapPrototype() {
   const [postComposer, setPostComposer] = useState<PostComposer>({ title: '', description: '', tags: '', takenAt: '', folderIds: [] })
   const [postMessage, setPostMessage] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
+  const [composerFolderPanelOpen, setComposerFolderPanelOpen] = useState(false)
   const [communitySubmitOpen, setCommunitySubmitOpen] = useState(false)
   const [communitySubmitPinId, setCommunitySubmitPinId] = useState<string | null>(null)
   const [communitySubmitComposer, setCommunitySubmitComposer] = useState({ title: '', description: '', tags: '' })
@@ -1048,6 +1093,7 @@ export default function CommunityMapPrototype() {
       setFolders([])
       setCommunities([])
       setActivities([])
+      setNotifications([])
       setSavedPinIds([])
       return
     }
@@ -1066,6 +1112,7 @@ export default function CommunityMapPrototype() {
         commentsResult,
         likesResult,
         savedPostsResult,
+        saveActivityResult,
         activitiesResult,
       ] = await Promise.all([
         supabase.from('profiles').select('id,username,display_name,avatar_url,bio,pin_count,public_folder_count'),
@@ -1075,10 +1122,11 @@ export default function CommunityMapPrototype() {
         supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
         supabase.from('community_members').select('community_id,user_id'),
         supabase.from('post_comments').select('id,post_id,user_id,body,created_at').order('created_at', { ascending: true }).limit(1000),
-        supabase.from('post_likes').select('post_id,user_id').limit(2000),
+        supabase.from('post_likes').select('post_id,user_id,created_at').limit(2000),
         userId
           ? supabase.from('saved_posts').select('post_id').eq('user_id', userId)
           : Promise.resolve({ data: [] as SavedPostRow[], error: null }),
+        supabase.from('saved_posts').select('post_id,user_id,created_at').limit(2000),
         supabase.from('app_community_activity').select('*').order('created_at', { ascending: false }).limit(500),
       ])
 
@@ -1092,6 +1140,7 @@ export default function CommunityMapPrototype() {
         commentsResult,
         likesResult,
         savedPostsResult,
+        saveActivityResult,
         activitiesResult,
       ]
 
@@ -1135,12 +1184,25 @@ export default function CommunityMapPrototype() {
         memberRows,
         userId,
       )
+      let saveNotificationRows = (saveActivityResult.data ?? []) as SavedPostRow[]
+      if (userId) {
+        const saveNotificationResult = await supabase.rpc('app_save_notifications')
+        if (!saveNotificationResult.error && Array.isArray(saveNotificationResult.data)) {
+          saveNotificationRows = saveNotificationResult.data as SavedPostRow[]
+        }
+      }
 
       setUsers(remoteUsers)
       setFolders(remoteFolders)
       setPins(remotePins)
       setCommunities(remoteCommunities)
       setActivities(buildActivities((activitiesResult.data ?? []) as AppCommunityActivityRow[]))
+      setNotifications(buildNotifications(
+        (likesResult.data ?? []) as LikeRow[],
+        saveNotificationRows,
+        remotePins,
+        userId,
+      ))
       setSavedPinIds(((savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id))
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId((current) => (current && remoteUsers.some((user) => user.id === current) ? current : userId))
@@ -1152,6 +1214,7 @@ export default function CommunityMapPrototype() {
       setFolders([])
       setCommunities([])
       setActivities([])
+      setNotifications([])
       setSavedPinIds([])
     } finally {
       setRemoteLoading(false)
@@ -1492,6 +1555,7 @@ export default function CommunityMapPrototype() {
       takenAt,
       folderIds: myFolders[0] ? [myFolders[0].id] : [],
     })
+    setComposerFolderPanelOpen(false)
 
     if (gps) {
       setManualPlacement(false)
@@ -1576,6 +1640,7 @@ export default function CommunityMapPrototype() {
 
     await loadRemoteData(activeUserId)
     setComposerOpen(false)
+    setComposerFolderPanelOpen(false)
     setPostDraft(null)
     setSelectedPinId(newPost.id)
     setPostMessage(postDraft.communityId ? '投稿しました。' : 'My Worldに保存しました。')
@@ -1757,7 +1822,9 @@ export default function CommunityMapPrototype() {
     setComposerOpen(false)
     setFolderEditId(null)
     setProfileMenuOpen(false)
+    setNotificationsOpen(false)
     setProfileEditorOpen(false)
+    setComposerFolderPanelOpen(false)
     if (nextTab === 'home') {
       setHomeMode('timeline')
       setTimelineOpen(false)
@@ -2044,6 +2111,25 @@ export default function CommunityMapPrototype() {
     const owner = usersById.get(pin.ownerId)
     return `@${owner?.username ?? 'user'} / ${communityLabel(communitiesById.get(pinCommunityIds(pin)[0] ?? ''))}`
   }, [communitiesById, usersById])
+
+  const showInitialLoader = remoteLoading && !remoteError && !pins.length && !folders.length && !communities.length
+
+  if (showInitialLoader) {
+    return (
+      <main className={styles.shell}>
+        <section className={styles.appBootScreen}>
+          <div className={styles.bootMapGlow}>
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className={styles.bootSpinner} />
+          <h1>Loading your world</h1>
+          <p>Supabaseからmemoriesを読み込んでいます。</p>
+        </section>
+      </main>
+    )
+  }
 
   return (
     <main className={`${styles.shell} ${activeTab === 'home' ? styles.homeShell : ''}`}>
@@ -2426,16 +2512,59 @@ export default function CommunityMapPrototype() {
               自分のページへ
             </button>
           )}
-          <header className={styles.profileHeader}>
-            <img src={selectedProfile.avatarUrl} alt="" />
-            <div>
-              <span>@{selectedProfile.username}</span>
-              <h1>{selectedProfile.displayName}</h1>
-              <p>{selectedProfile.bio}</p>
-            </div>
-            {isMyProfile && (
+          {isMyProfile && (
+            <div className={styles.profileTopActions}>
               <div className={styles.profileMenuWrap}>
-                <button className={styles.iconButton} type="button" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="profile menu">
+                <button
+                  className={styles.iconButton}
+                  type="button"
+                  onClick={() => {
+                    setNotificationsOpen((value) => !value)
+                    setProfileMenuOpen(false)
+                  }}
+                  aria-label="notifications"
+                >
+                  <Heart size={22} />
+                  {notifications.length > 0 && <span className={styles.notificationBadge}>{notifications.length}</span>}
+                </button>
+                {notificationsOpen && (
+                  <div className={styles.notificationPanel}>
+                    <strong>Notifications</strong>
+                    {notifications.map((notification) => {
+                      const actor = usersById.get(notification.actorId)
+                      const pin = pinsById.get(notification.pinId)
+                      return (
+                        <button
+                          key={notification.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPinId(notification.pinId)
+                            setNotificationsOpen(false)
+                          }}
+                        >
+                          <img src={actor?.avatarUrl || pin?.imageUrl || EMPTY_IMAGE} alt="" />
+                          <span>
+                            <b>@{actor?.username ?? 'user'}</b>
+                            <small>{notification.type === 'like' ? 'あなたのpinにいいねしました。' : 'あなたのpinを保存しました。'}</small>
+                            <em>{pin?.title ?? 'memory'}</em>
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {!notifications.length && <p>まだ通知はありません。</p>}
+                  </div>
+                )}
+              </div>
+              <div className={styles.profileMenuWrap}>
+                <button
+                  className={styles.iconButton}
+                  type="button"
+                  onClick={() => {
+                    setProfileMenuOpen((value) => !value)
+                    setNotificationsOpen(false)
+                  }}
+                  aria-label="profile menu"
+                >
                   <Menu size={22} />
                 </button>
                 {profileMenuOpen && (
@@ -2445,7 +2574,15 @@ export default function CommunityMapPrototype() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
+          <header className={styles.profileHeader}>
+            <img src={selectedProfile.avatarUrl} alt="" />
+            <div>
+              <span>@{selectedProfile.username}</span>
+              <h1>{selectedProfile.displayName}</h1>
+              <p>{selectedProfile.bio}</p>
+            </div>
             {!isMyProfile && (
               <button
                 className={`${styles.followButton} ${isFollowingSelectedProfile ? styles.following : ''}`}
@@ -2741,30 +2878,45 @@ export default function CommunityMapPrototype() {
                 ))}
               </div>
             )}
-            <div className={styles.checkboxList}>
-              <strong>入れるフォルダー</strong>
-              {myFolders.map((folder) => (
-                <label key={folder.id}>
-                  <input
-                    type="checkbox"
-                    checked={postComposer.folderIds.includes(folder.id)}
-                    onChange={(event) =>
-                      setPostComposer((current) => ({
-                        ...current,
-                        folderIds: event.target.checked
-                          ? [...current.folderIds, folder.id]
-                          : current.folderIds.filter((id) => id !== folder.id),
-                      }))
-                    }
-                  />
-                  <span>{folder.name}</span>
-                </label>
-              ))}
-            </div>
-            <div className={styles.inlineCreate}>
-              <input value={composerFolderName} onChange={(event) => setComposerFolderName(event.target.value)} placeholder="新規フォルダー名" />
-              <ColorSwatches value={composerFolderColor} onChange={setComposerFolderColor} />
-              <button type="button" onClick={createFolderForComposer}>作成</button>
+            <div className={styles.composerFolderField}>
+              <button type="button" onClick={() => setComposerFolderPanelOpen((value) => !value)}>
+                <span>Folder</span>
+                <strong>
+                  {postComposer.folderIds.length
+                    ? myFolders.filter((folder) => postComposer.folderIds.includes(folder.id)).map((folder) => folder.name).join(', ')
+                    : 'フォルダーを選択'}
+                </strong>
+              </button>
+              {composerFolderPanelOpen && (
+                <div className={styles.composerFolderPanel}>
+                  <div className={styles.checkboxList}>
+                    <strong>入れるフォルダー</strong>
+                    {myFolders.map((folder) => (
+                      <label key={folder.id}>
+                        <input
+                          type="checkbox"
+                          checked={postComposer.folderIds.includes(folder.id)}
+                          onChange={(event) =>
+                            setPostComposer((current) => ({
+                              ...current,
+                              folderIds: event.target.checked
+                                ? [...current.folderIds, folder.id]
+                                : current.folderIds.filter((id) => id !== folder.id),
+                            }))
+                          }
+                        />
+                        <span>{folder.name}</span>
+                      </label>
+                    ))}
+                    {!myFolders.length && <p className={styles.muted}>フォルダーはまだありません。</p>}
+                  </div>
+                  <div className={styles.inlineCreate}>
+                    <input value={composerFolderName} onChange={(event) => setComposerFolderName(event.target.value)} placeholder="新規フォルダー名" />
+                    <ColorSwatches value={composerFolderColor} onChange={setComposerFolderColor} />
+                    <button type="button" onClick={createFolderForComposer}>作成</button>
+                  </div>
+                </div>
+              )}
             </div>
             <button className={styles.primaryButton} type="submit">{postDraft.communityId ? '投稿' : 'My Worldに保存'}</button>
           </form>
@@ -3120,7 +3272,7 @@ function PinFolderList({
   onToggleFolder: (pinId: string, folderId: string, checked: boolean) => void
   onCreateFolder: (pinId: string, name: string, color: string) => boolean
 }) {
-  const [openPinId, setOpenPinId] = useState<string | null>(pins[0]?.id ?? null)
+  const [openPinId, setOpenPinId] = useState<string | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
   const [newFolderColor, setNewFolderColor] = useState(COLORS[0])
   const sortedPins = useMemo(
@@ -3133,8 +3285,8 @@ function PinFolderList({
       setOpenPinId(null)
       return
     }
-    if (!openPinId || !sortedPins.some((pin) => pin.id === openPinId)) {
-      setOpenPinId(sortedPins[0].id)
+    if (openPinId && !sortedPins.some((pin) => pin.id === openPinId)) {
+      setOpenPinId(null)
     }
   }, [openPinId, sortedPins])
 

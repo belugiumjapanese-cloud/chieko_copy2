@@ -18,6 +18,110 @@
   clip: rect(0, 0, 0, 0);
 }
 
+.appBootScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  padding: 28px;
+  overflow: hidden;
+  text-align: center;
+  background:
+    linear-gradient(rgba(238, 243, 239, 0.92), rgba(238, 243, 239, 0.94)),
+    linear-gradient(90deg, rgba(18, 107, 88, 0.14) 1px, transparent 1px),
+    linear-gradient(rgba(18, 107, 88, 0.12) 1px, transparent 1px);
+  background-size: auto, 64px 64px, 64px 64px;
+}
+
+.bootMapGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bootMapGlow span {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  background: rgba(18, 107, 88, 0.18);
+  border-radius: 50%;
+  filter: blur(34px);
+  animation: bootFloat 4.4s ease-in-out infinite;
+}
+
+.bootMapGlow span:nth-child(1) {
+  top: 20%;
+  left: 16%;
+}
+
+.bootMapGlow span:nth-child(2) {
+  right: 12%;
+  bottom: 18%;
+  width: 220px;
+  height: 220px;
+  animation-delay: 0.8s;
+}
+
+.bootMapGlow span:nth-child(3) {
+  top: 52%;
+  left: 48%;
+  width: 120px;
+  height: 120px;
+  background: rgba(245, 158, 11, 0.18);
+  animation-delay: 1.5s;
+}
+
+.bootSpinner {
+  position: relative;
+  z-index: 1;
+  width: 76px;
+  height: 76px;
+  border: 8px solid rgba(18, 107, 88, 0.12);
+  border-top-color: #126b58;
+  border-radius: 50%;
+  animation: bootSpin 0.9s linear infinite;
+}
+
+.appBootScreen h1,
+.appBootScreen p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+}
+
+.appBootScreen h1 {
+  color: #17221d;
+  font-size: clamp(2rem, 8vw, 4.6rem);
+  line-height: 1;
+}
+
+.appBootScreen p {
+  max-width: 420px;
+  color: #65736b;
+  font-weight: 850;
+  line-height: 1.5;
+}
+
+@keyframes bootSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bootFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(16px, -18px, 0) scale(1.08);
+  }
+}
+
 .page {
   max-width: 1100px;
   padding: 22px 16px 110px;
@@ -1787,6 +1891,48 @@
   font-size: 0.72rem;
 }
 
+.composerFolderField {
+  display: grid;
+  gap: 10px;
+}
+
+.composerFolderField > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 50px;
+  padding: 10px 12px;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.composerFolderField > button span {
+  color: #65736b;
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.composerFolderField > button strong {
+  overflow: hidden;
+  color: #17221d;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composerFolderPanel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
 .closeButton {
   position: absolute;
   top: 10px;
@@ -1991,6 +2137,101 @@
 .profileHeader p {
   margin: 8px 0 0;
   color: #405049;
+}
+
+.profileTopActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.profileTopActions .iconButton {
+  position: relative;
+}
+
+.notificationBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  color: #ffffff;
+  background: #ef3b2d;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 14px;
+}
+
+.notificationPanel {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 420px;
+  padding: 12px;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(24, 34, 29, 0.18);
+}
+
+.notificationPanel > strong {
+  padding: 2px 4px 8px;
+  color: #17221d;
+  font-size: 1.02rem;
+}
+
+.notificationPanel button {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  text-align: left;
+  background: #f7faf8;
+  border: 1px solid #e0e8e3;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.notificationPanel img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.notificationPanel span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notificationPanel b,
+.notificationPanel small,
+.notificationPanel em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notificationPanel small,
+.notificationPanel em,
+.notificationPanel p {
+  margin: 0;
+  color: #65736b;
+  font-size: 0.82rem;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .followButton {
