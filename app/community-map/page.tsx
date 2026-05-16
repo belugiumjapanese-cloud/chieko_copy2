@@ -134,6 +134,7 @@ type Folder = {
   thumbnailUrl?: string
   isPaid?: boolean
   paidFromIndex?: number | null
+  priceYen?: number | null
   pinIds: string[]
   visibility: 'private' | 'public'
   createdAt: string
@@ -169,9 +170,10 @@ type CommunityActivity = {
 
 type NotificationItem = {
   id: string
-  type: 'like' | 'save'
+  type: 'like' | 'save' | 'invite'
   actorId: string
-  pinId: string
+  pinId?: string
+  communityId?: string
   createdAt: string
 }
 
@@ -225,6 +227,7 @@ type AppFolderCardRow = {
   visibility: 'public' | 'private' | 'followers'
   is_paid?: boolean | null
   paid_from_index?: number | null
+  folder_price_yen?: number | null
   preview_image_url?: string | null
   thumbnail_url?: string | null
   created_at: string
@@ -268,6 +271,14 @@ type SavedPostRow = {
   post_id: string
   user_id?: string | null
   created_at?: string | null
+}
+
+type CommunityInviteRow = {
+  id: string
+  community_id: string
+  invited_by: string
+  invited_user_id: string
+  created_at: string
 }
 
 type AppCommunityActivityRow = {
@@ -491,16 +502,25 @@ function buildFolders(folderRows: AppFolderCardRow[]): Folder[] {
     thumbnailUrl: folder.thumbnail_url || folder.preview_image_url || undefined,
     isPaid: Boolean(folder.is_paid),
     paidFromIndex: folder.paid_from_index ?? null,
+    priceYen: folder.folder_price_yen ?? null,
     pinIds: folder.post_ids ?? [],
     visibility: folder.visibility === 'public' ? 'public' : 'private',
     createdAt: folder.created_at,
   }))
 }
 
-function buildNotifications(likeRows: LikeRow[], saveRows: SavedPostRow[], pins: Pin[], activeUserId: string): NotificationItem[] {
+function buildNotifications(
+  likeRows: LikeRow[],
+  saveRows: SavedPostRow[],
+  inviteRows: CommunityInviteRow[],
+  pins: Pin[],
+  communities: Community[],
+  activeUserId: string,
+): NotificationItem[] {
   if (!activeUserId) return []
 
   const myPinIds = new Set(pins.filter((pin) => pin.ownerId === activeUserId).map((pin) => pin.id))
+  const communityIds = new Set(communities.map((community) => community.id))
   const items: NotificationItem[] = []
 
   likeRows.forEach((row) => {
@@ -522,6 +542,17 @@ function buildNotifications(likeRows: LikeRow[], saveRows: SavedPostRow[], pins:
       actorId: row.user_id,
       pinId: row.post_id,
       createdAt: row.created_at ?? new Date().toISOString(),
+    })
+  })
+
+  inviteRows.forEach((row) => {
+    if (row.invited_user_id !== activeUserId || !communityIds.has(row.community_id)) return
+    items.push({
+      id: `invite-${row.id}`,
+      type: 'invite',
+      actorId: row.invited_by,
+      communityId: row.community_id,
+      createdAt: row.created_at,
     })
   })
 
@@ -944,6 +975,8 @@ export default function CommunityMapPrototype() {
   const [createCommunityOpen, setCreateCommunityOpen] = useState(false)
   const [newCommunityName, setNewCommunityName] = useState('')
   const [newCommunityPrivacy, setNewCommunityPrivacy] = useState<Privacy>('public')
+  const [inviteCommunityId, setInviteCommunityId] = useState<string | null>(null)
+  const [inviteQuery, setInviteQuery] = useState('')
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
   const [folderEditorPinId, setFolderEditorPinId] = useState<string | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
@@ -1004,6 +1037,7 @@ export default function CommunityMapPrototype() {
   const isMyProfile = Boolean(activeUserId) && selectedProfile.id === activeUserId
   const isFollowingSelectedProfile = Boolean(activeUserId) && currentUser.followingIds.includes(selectedProfile.id)
   const unreadNotificationCount = notifications.filter((notification) => !readNotificationIds.includes(notification.id)).length
+  const readNotificationStorageKey = activeUserId ? `spot-map-read-notifications-${activeUserId}` : ''
   const folderEditorPin = folderEditorPinId ? pinsById.get(folderEditorPinId) ?? null : null
   const folderEditTarget = folderEditId ? folders.find((folder) => folder.id === folderEditId) ?? null : null
   const myPostedPins = useMemo(
@@ -1076,6 +1110,35 @@ export default function CommunityMapPrototype() {
       .filter((folder) => folder.visibility === 'public' && folder.kind === 'my_world')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [folders])
+  const inviteCommunity = inviteCommunityId ? communitiesById.get(inviteCommunityId) ?? null : null
+  const inviteQueryText = inviteQuery.replace(/^@/, '').trim().toLowerCase()
+  const inviteUserSuggestions = users
+    .filter((user) =>
+      user.id !== activeUserId &&
+      !inviteCommunity?.memberIds.includes(user.id) &&
+      (!inviteQueryText || `${user.username} ${user.displayName}`.toLowerCase().includes(inviteQueryText))
+    )
+    .slice(0, 8)
+
+  useEffect(() => {
+    if (!readNotificationStorageKey || typeof window === 'undefined') {
+      setReadNotificationIds([])
+      return
+    }
+
+    try {
+      const stored = window.localStorage.getItem(readNotificationStorageKey)
+      const parsed = stored ? JSON.parse(stored) : []
+      setReadNotificationIds(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [])
+    } catch {
+      setReadNotificationIds([])
+    }
+  }, [readNotificationStorageKey])
+
+  useEffect(() => {
+    if (!readNotificationStorageKey || typeof window === 'undefined') return
+    window.localStorage.setItem(readNotificationStorageKey, JSON.stringify(readNotificationIds.slice(-200)))
+  }, [readNotificationIds, readNotificationStorageKey])
 
   const tagStats = useMemo(() => tagStatsFromPins(pins), [pins])
   const activeTagQuery = activeHashtagQuery(postComposer.tags)
@@ -1188,10 +1251,15 @@ export default function CommunityMapPrototype() {
         userId,
       )
       let saveNotificationRows = (saveActivityResult.data ?? []) as SavedPostRow[]
+      let inviteNotificationRows: CommunityInviteRow[] = []
       if (userId) {
         const saveNotificationResult = await supabase.rpc('app_save_notifications')
         if (!saveNotificationResult.error && Array.isArray(saveNotificationResult.data)) {
           saveNotificationRows = saveNotificationResult.data as SavedPostRow[]
+        }
+        const inviteNotificationResult = await supabase.rpc('app_invite_notifications')
+        if (!inviteNotificationResult.error && Array.isArray(inviteNotificationResult.data)) {
+          inviteNotificationRows = inviteNotificationResult.data as CommunityInviteRow[]
         }
       }
 
@@ -1203,7 +1271,9 @@ export default function CommunityMapPrototype() {
       setNotifications(buildNotifications(
         (likesResult.data ?? []) as LikeRow[],
         saveNotificationRows,
+        inviteNotificationRows,
         remotePins,
+        remoteCommunities,
         userId,
       ))
       setSavedPinIds(((savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id))
@@ -1477,7 +1547,8 @@ export default function CommunityMapPrototype() {
     if (!client || !requireSignedIn()) return
 
     const slug = createSlug(name)
-    const inviteCode = newCommunityPrivacy === 'limited' ? `${slug}-${Math.random().toString(36).slice(2, 7)}` : null
+    const isLimitedCommunity = newCommunityPrivacy === 'limited'
+    const inviteCode = isLimitedCommunity ? `${slug}-${Math.random().toString(36).slice(2, 7)}` : null
     const { data, error } = await client
       .from('communities')
       .insert({
@@ -1485,7 +1556,7 @@ export default function CommunityMapPrototype() {
         name,
         description: '新しく作られたコミュニティ。',
         owner_id: activeUserId,
-        visibility: newCommunityPrivacy === 'limited' ? 'invite_only' : 'public',
+        visibility: isLimitedCommunity ? 'invite_only' : 'public',
         invite_code: inviteCode,
       })
       .select('id')
@@ -1504,8 +1575,51 @@ export default function CommunityMapPrototype() {
     setCreateCommunityOpen(false)
     await loadRemoteData(activeUserId)
     setSelectedCommunityId(data.id)
+    if (isLimitedCommunity) setInviteCommunityId(data.id)
     setActiveTab('find')
   }, [activeUserId, loadRemoteData, newCommunityName, newCommunityPrivacy, requireSignedIn])
+
+  const shareCommunityLink = useCallback(async (community: Community) => {
+    const inviteUrl = `${getAuthRedirectUrl()}?invite=${community.inviteCode ?? community.id}`
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        await navigator.share({ title: community.name, text: `${community.name} に招待されています。`, url: inviteUrl })
+        return
+      } catch {
+        // Fall back to clipboard below.
+      }
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(inviteUrl)
+      setToast('招待リンクをコピーしました。')
+    }
+  }, [])
+
+  const sendCommunityInvite = useCallback(async (communityId: string, targetUserId: string) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    const { error } = await client.rpc('app_send_community_invite', {
+      target_community_id: communityId,
+      target_user_id: targetUserId,
+    })
+
+    if (error) {
+      setToast('招待を送れませんでした。Supabaseでinvite用SQLをrunしてください。')
+      return
+    }
+
+    setInviteQuery('')
+    setToast('招待を送りました。')
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, loadRemoteData, requireSignedIn])
+
+  const acceptCommunityInvite = useCallback(async (communityId: string) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    await client.rpc('app_accept_community_invite', { target_community_id: communityId })
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, loadRemoteData, requireSignedIn])
 
   const openPostPicker = useCallback((communityId: string) => {
     setSelectedCommunityId(communityId)
@@ -1828,6 +1942,7 @@ export default function CommunityMapPrototype() {
     setNotificationsOpen(false)
     setProfileEditorOpen(false)
     setComposerFolderPanelOpen(false)
+    setInviteCommunityId(null)
     if (nextTab === 'home') {
       setHomeMode('timeline')
       setTimelineOpen(false)
@@ -2086,6 +2201,7 @@ export default function CommunityMapPrototype() {
     if (!client || !requireSignedIn()) return
     const targetFolder = folders.find((folder) => folder.id === folderId)
     const nextVisibility = values.visibility ?? targetFolder?.visibility ?? 'private'
+    const nextIsPaid = nextVisibility === 'public' ? values.isPaid ?? Boolean(targetFolder?.isPaid) : false
 
     const { error } = await client
       .from('folders')
@@ -2095,8 +2211,8 @@ export default function CommunityMapPrototype() {
         color: values.color ?? targetFolder?.color ?? COLORS[0],
         thumbnail_url: values.thumbnailUrl !== undefined ? values.thumbnailUrl || null : targetFolder?.thumbnailUrl ?? null,
         visibility: nextVisibility,
-        is_paid: values.isPaid ?? Boolean(targetFolder?.isPaid),
-        paid_from_index: values.paidFromIndex !== undefined ? values.paidFromIndex : targetFolder?.paidFromIndex ?? null,
+        is_paid: nextIsPaid,
+        paid_from_index: nextIsPaid ? values.paidFromIndex !== undefined ? values.paidFromIndex : targetFolder?.paidFromIndex ?? null : null,
       })
       .eq('id', folderId)
       .eq('user_id', activeUserId)
@@ -2104,6 +2220,14 @@ export default function CommunityMapPrototype() {
     if (error) {
       setToast(error.message)
       return
+    }
+
+    if (values.priceYen !== undefined) {
+      await client
+        .from('folders')
+        .update({ folder_price_yen: nextIsPaid ? values.priceYen ?? null : null })
+        .eq('id', folderId)
+        .eq('user_id', activeUserId)
     }
 
     if (nextVisibility === 'public' && targetFolder?.pinIds.length) {
@@ -2325,12 +2449,20 @@ export default function CommunityMapPrototype() {
               communities={filteredCommunities.filter((community) => recommendedCommunities.some((item) => item.id === community.id))}
               currentUserId={activeUserId}
               onOpen={openCommunity}
+              onShare={(communityId) => {
+                setInviteCommunityId(communityId)
+                setInviteQuery('')
+              }}
             />
             <CommunityListSection
               title="所属しているコミュニティ"
               communities={filteredCommunities.filter((community) => community.memberIds.includes(activeUserId))}
               currentUserId={activeUserId}
               onOpen={openCommunity}
+              onShare={(communityId) => {
+                setInviteCommunityId(communityId)
+                setInviteQuery('')
+              }}
             />
           </section>
         ) : (
@@ -2601,25 +2733,36 @@ export default function CommunityMapPrototype() {
                     <strong>Notifications</strong>
                     {notifications.map((notification) => {
                       const actor = usersById.get(notification.actorId)
-                      const pin = pinsById.get(notification.pinId)
+                      const pin = notification.pinId ? pinsById.get(notification.pinId) : null
+                      const community = notification.communityId ? communitiesById.get(notification.communityId) : null
                       return (
                         <button
                           key={notification.id}
                           type="button"
-                          onClick={() => {
-                            setActiveTab('myworld')
-                            setMyWorldMode('map')
-                            setMyWorldFolderId(null)
-                            setMyWorldVisibleFolderIds(myFolders.map((folder) => folder.id))
-                            setSelectedPinId(notification.pinId)
+                          onClick={async () => {
+                            setReadNotificationIds((current) => Array.from(new Set([...current, notification.id])))
+                            if (notification.type === 'invite' && notification.communityId) {
+                              await acceptCommunityInvite(notification.communityId)
+                              openCommunity(notification.communityId)
+                            } else if (notification.pinId) {
+                              setActiveTab('myworld')
+                              setMyWorldMode('map')
+                              setMyWorldFolderId(null)
+                              setMyWorldVisibleFolderIds(myFolders.map((folder) => folder.id))
+                              setSelectedPinId(notification.pinId)
+                            }
                             setNotificationsOpen(false)
                           }}
                         >
                           <img src={actor?.avatarUrl || pin?.imageUrl || EMPTY_IMAGE} alt="" />
                           <span>
                             <b>@{actor?.username ?? 'user'}</b>
-                            <small>{notification.type === 'like' ? 'あなたのpinにいいねしました。' : 'あなたのpinを保存しました。'}</small>
-                            <em>{pin?.title ?? 'memory'}</em>
+                            <small>
+                              {notification.type === 'like' && 'あなたのpinにいいねしました。'}
+                              {notification.type === 'save' && 'あなたのpinを保存しました。'}
+                              {notification.type === 'invite' && 'コミュニティに招待されました。'}
+                            </small>
+                            <em>{notification.type === 'invite' ? communityLabel(community ?? undefined) : pin?.title ?? 'memory'}</em>
                           </span>
                         </button>
                       )
@@ -2829,6 +2972,37 @@ export default function CommunityMapPrototype() {
             onSave={updateFolder}
             onDelete={deleteFolder}
           />
+        </aside>
+      )}
+
+      {inviteCommunity && (
+        <aside className={styles.modalBackdrop} onClick={() => setInviteCommunityId(null)}>
+          <div className={styles.invitePanel} onClick={(event) => event.stopPropagation()}>
+            <button className={styles.closeButton} type="button" onClick={() => setInviteCommunityId(null)}><X size={17} /></button>
+            <span>Limited Community</span>
+            <h2>{communityLabel(inviteCommunity)}</h2>
+            <p>招待リンクを共有するか、@usernameでユーザーを探して通知を送れます。</p>
+            <button className={styles.primaryButton} type="button" onClick={() => shareCommunityLink(inviteCommunity)}>
+              Share link
+            </button>
+            <div className={styles.searchBox}>
+              <Search size={18} />
+              <input value={inviteQuery} onChange={(event) => setInviteQuery(event.target.value)} placeholder="@usernameで検索" />
+            </div>
+            <div className={styles.inviteSuggestions}>
+              {inviteUserSuggestions.map((user) => (
+                <button key={user.id} type="button" onClick={() => sendCommunityInvite(inviteCommunity.id, user.id)}>
+                  <img src={user.avatarUrl} alt="" />
+                  <span>
+                    <strong>@{user.username}</strong>
+                    <small>{user.displayName}</small>
+                  </span>
+                  <b>Send</b>
+                </button>
+              ))}
+              {!inviteUserSuggestions.length && <p className={styles.muted}>該当するユーザーはいません。</p>}
+            </div>
+          </div>
         </aside>
       )}
 
@@ -3045,11 +3219,13 @@ function CommunityListSection({
   communities,
   currentUserId,
   onOpen,
+  onShare,
 }: {
   title: string
   communities: Community[]
   currentUserId: string
   onOpen: (communityId: string) => void
+  onShare: (communityId: string) => void
 }) {
   return (
     <section className={styles.contentSection}>
@@ -3065,9 +3241,16 @@ function CommunityListSection({
               {community.privacy === 'limited' && <span><Lock size={15} /> 限定公開</span>}
               {community.inviteCode && <small>招待リンク: /invite/{community.inviteCode}</small>}
             </div>
-            <button className={styles.primaryButton} type="button" onClick={() => onOpen(community.id)}>
-              {community.memberIds.includes(currentUserId) ? 'Open' : 'Join'}
-            </button>
+            <div className={styles.communityCardActions}>
+              {community.privacy === 'limited' && community.ownerId === currentUserId && (
+                <button className={styles.ghostButton} type="button" onClick={() => onShare(community.id)}>
+                  Share
+                </button>
+              )}
+              <button className={styles.primaryButton} type="button" onClick={() => onOpen(community.id)}>
+                {community.memberIds.includes(currentUserId) ? 'Open' : 'Join'}
+              </button>
+            </div>
           </article>
         ))}
       </div>
@@ -3185,7 +3368,10 @@ function FolderLibraryView({
           <div className={styles.folderPlaylistHeader}>
             <h2>{selectedFolder.name}</h2>
             <p>{selectedFolder.description || 'Description'}</p>
-            <small>{selectedFolder.visibility === 'public' ? 'Public folder' : 'Private folder'}{selectedFolder.isPaid ? ' / Paid' : ''}</small>
+            <small>
+              {selectedFolder.visibility === 'public' ? 'Public folder' : 'Private folder'}
+              {selectedFolder.isPaid ? ` / Paid${selectedFolder.priceYen ? ` ¥${selectedFolder.priceYen}` : ''}` : ''}
+            </small>
             <div className={styles.folderPlaylistActions}>
               <button className={styles.ghostButton} type="button" onClick={() => onEditFolder(selectedFolder.id)}>Edit Folder</button>
               <button className={styles.dangerButton} type="button" onClick={() => onDeleteFolder(selectedFolder.id)}>Delete Folder</button>
@@ -3270,6 +3456,14 @@ function FolderEditModal({
   const [visibility, setVisibility] = useState<Folder['visibility']>(folder.visibility)
   const [isPaid, setIsPaid] = useState(Boolean(folder.isPaid))
   const [paidFromIndex, setPaidFromIndex] = useState(String(folder.paidFromIndex ?? ''))
+  const [priceYen, setPriceYen] = useState(String(folder.priceYen ?? ''))
+
+  useEffect(() => {
+    if (visibility === 'public') return
+    setIsPaid(false)
+    setPaidFromIndex('')
+    setPriceYen('')
+  }, [visibility])
 
   const handleThumbnail = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -3291,12 +3485,14 @@ function FolderEditModal({
           color,
           thumbnailUrl,
           visibility,
-          isPaid,
-          paidFromIndex: paidFromIndex ? Number(paidFromIndex) : null,
+          isPaid: visibility === 'public' && isPaid,
+          paidFromIndex: visibility === 'public' && isPaid && paidFromIndex ? Number(paidFromIndex) : null,
+          priceYen: visibility === 'public' && isPaid && priceYen ? Number(priceYen) : null,
         })
       }}
     >
       <button className={styles.closeButton} type="button" onClick={onClose}><X size={17} /></button>
+      <button className={styles.dangerButton} type="button" onClick={() => onDelete(folder.id)}>Delete Folder</button>
       <h2>Edit Folder</h2>
       <label>
         サムネ
@@ -3321,20 +3517,27 @@ function FolderEditModal({
         />
         <b />
       </label>
-      <label className={styles.checkboxLine}>
-        <input type="checkbox" checked={isPaid} onChange={(event) => setIsPaid(event.target.checked)} />
-        有料公開
-      </label>
-      {isPaid && (
-        <label>
-          何番目のpinから有料にするか
-          <input type="number" min="1" value={paidFromIndex} onChange={(event) => setPaidFromIndex(event.target.value)} />
-        </label>
+      {visibility === 'public' && (
+        <>
+          <label className={styles.checkboxLine}>
+            <input type="checkbox" checked={isPaid} onChange={(event) => setIsPaid(event.target.checked)} />
+            有料公開にしますか？
+          </label>
+          {isPaid && (
+            <>
+              <label>
+                値段
+                <input type="number" min="0" inputMode="numeric" value={priceYen} onChange={(event) => setPriceYen(event.target.value)} placeholder="500" />
+              </label>
+              <label>
+                何番目のpinから有料にするか
+                <input type="number" min="1" value={paidFromIndex} onChange={(event) => setPaidFromIndex(event.target.value)} />
+              </label>
+            </>
+          )}
+        </>
       )}
-      <div className={styles.editorActionRow}>
-        <button className={styles.primaryButton} type="submit">Save</button>
-        <button className={styles.dangerButton} type="button" onClick={() => onDelete(folder.id)}>Delete Folder</button>
-      </div>
+      <button className={styles.primaryButton} type="submit">Save</button>
     </form>
   )
 }

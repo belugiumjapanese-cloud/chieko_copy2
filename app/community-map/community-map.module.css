@@ -1054,6 +1054,91 @@
   font-size: 0.82rem;
 }
 
+.communityCardActions {
+  display: grid;
+  gap: 8px;
+  min-width: 92px;
+}
+
+.invitePanel {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 130px);
+  padding: 16px;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  box-shadow: 0 18px 46px rgba(24, 34, 29, 0.16);
+}
+
+.invitePanel > span {
+  color: #65736b;
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.invitePanel h2,
+.invitePanel p {
+  margin: 0;
+}
+
+.invitePanel p {
+  color: #65736b;
+  line-height: 1.45;
+}
+
+.inviteSuggestions {
+  display: grid;
+  gap: 8px;
+}
+
+.inviteSuggestions button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 8px;
+  text-align: left;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.inviteSuggestions img {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.inviteSuggestions span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inviteSuggestions strong,
+.inviteSuggestions small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteSuggestions small {
+  color: #65736b;
+}
+
+.inviteSuggestions b {
+  color: #126b58;
+  font-size: 0.86rem;
+}
+
 .createPanel,
 .folderEditor,
 .composer {
