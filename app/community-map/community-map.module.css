@@ -182,7 +182,7 @@
   margin-bottom: 16px;
 }
 
-.pageHeaderRow div {
+.pageHeaderRow > div:first-child {
   display: grid;
   min-width: 0;
   gap: 6px;
@@ -1030,6 +1030,17 @@
   color: #65736b;
 }
 
+.mapLoading {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  color: #126b58;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.68)),
+    repeating-linear-gradient(0deg, transparent, transparent 63px, rgba(18, 107, 88, 0.14) 64px),
+    repeating-linear-gradient(90deg, #edf5f0, #edf5f0 63px, rgba(18, 107, 88, 0.14) 64px);
+}
+
 .marker {
   display: grid;
   grid-template-rows: auto auto;
@@ -1364,8 +1375,8 @@
 .mapFloatingAction {
   position: absolute;
   right: 18px;
-  top: 124px;
-  bottom: auto;
+  top: auto;
+  bottom: 296px;
   z-index: 22;
 }
 
@@ -1382,7 +1393,8 @@
 .mapSortControl {
   position: absolute;
   right: 18px;
-  top: 210px;
+  top: auto;
+  bottom: 210px;
   z-index: 24;
 }
 
@@ -2402,8 +2414,8 @@
 .hidePanelsButton {
   left: auto;
   right: 18px;
-  top: 296px;
-  bottom: auto;
+  top: auto;
+  bottom: 124px;
   background: #0ea5d8;
 }
 
@@ -2655,8 +2667,8 @@
 
   .mapFloatingAction {
     right: 14px;
-    top: 112px;
-    bottom: auto;
+    top: auto;
+    bottom: 284px;
   }
 
   .libraryMapControls {
@@ -2673,7 +2685,8 @@
   }
 
   .mapSortControl {
-    top: 196px;
+    top: auto;
+    bottom: 198px;
     right: 14px;
   }
 
@@ -2693,7 +2706,8 @@
   .hidePanelsButton {
     left: auto;
     right: 14px;
-    top: 280px;
+    top: auto;
+    bottom: 112px;
   }
 
   .mapPageListCollapsed .mapFloatingAction {

@@ -631,17 +631,18 @@ function PinMap({
   const initialMapViewRef = useRef<{
     center: [number, number]
     zoom: number
-  } | null>(
-    startAtCurrentLocation && currentLocation
-      ? { center: toLngLat(currentLocation) ?? DEFAULT_CENTER, zoom: compact ? 11 : 14 }
-      : null,
-  )
+  } | null>(null)
   const pinsRef = useRef(pins)
   const [mapVersion, setMapVersion] = useState(0)
   const onPinClickRef = useRef(onPinClick)
   const onMapClickRef = useRef(onMapClick)
   const onMapSurfaceClickRef = useRef(onMapSurfaceClick)
   const onVisiblePinsChangeRef = useRef(onVisiblePinsChange)
+  const currentLocationLngLat = toLngLat(currentLocation)
+  if (startAtCurrentLocation && currentLocationLngLat && !initialMapViewRef.current && !mapRef.current) {
+    initialMapViewRef.current = { center: currentLocationLngLat, zoom: compact ? 11 : 14 }
+  }
+  const canInitializeMap = !startAtCurrentLocation || Boolean(initialMapViewRef.current)
 
   const updateVisiblePins = useCallback(() => {
     const map = mapRef.current
@@ -689,7 +690,7 @@ function PinMap({
   }, [pins, updateVisiblePins])
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return
+    if (!MAPBOX_TOKEN || !canInitializeMap || !containerRef.current || mapRef.current) return
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -737,7 +738,7 @@ function PinMap({
       map.remove()
       mapRef.current = null
     }
-  }, [compact, updateVisiblePins])
+  }, [canInitializeMap, compact, updateVisiblePins])
 
   useEffect(() => {
     const map = mapRef.current
@@ -832,6 +833,15 @@ function PinMap({
       <div className={`${styles.mapFallback} ${compact ? styles.mapCompact : ''}`}>
         <MapIcon size={28} />
         <strong>Mapbox token が必要です</strong>
+      </div>
+    )
+  }
+
+  if (!canInitializeMap) {
+    return (
+      <div className={`${styles.mapCanvas} ${styles.mapLoading} ${compact ? styles.mapCompact : ''}`}>
+        <LocateFixed size={26} />
+        <strong>現在地を取得中...</strong>
       </div>
     )
   }
@@ -3238,8 +3248,25 @@ function SplitMapView({
       listInteractionRef.current = false
     }, 600)
 
-    const index = Math.min(visiblePins.length - 1, Math.max(0, Math.round(list.scrollTop / 52)))
-    const pin = visiblePins[index]
+    let pinId = ''
+    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 2) {
+      pinId = visiblePins[visiblePins.length - 1]?.id ?? ''
+    } else if (list.scrollTop <= 2) {
+      pinId = visiblePins[0]?.id ?? ''
+    } else {
+      const listRect = list.getBoundingClientRect()
+      const targetY = listRect.top + listRect.height * 0.72
+      const buttons = Array.from(list.querySelectorAll<HTMLButtonElement>('button[data-pin-id]'))
+      const closest = buttons.reduce<{ id: string; distance: number } | null>((best, button) => {
+        const rect = button.getBoundingClientRect()
+        const distance = Math.abs(rect.top + rect.height / 2 - targetY)
+        if (!best || distance < best.distance) return { id: button.dataset.pinId ?? '', distance }
+        return best
+      }, null)
+      pinId = closest?.id ?? ''
+    }
+
+    const pin = visiblePins.find((item) => item.id === pinId)
     if (!pin || pin.id === focusedPinId) return
     setFocusedPinId(pin.id)
   }, [focusedPinId, visiblePins])
@@ -3377,6 +3404,7 @@ function SplitMapView({
               {visiblePins.map((pin) => (
                 <button
                   key={pin.id}
+                  data-pin-id={pin.id}
                   className={focusedPinId === pin.id ? styles.currentVisiblePin : ''}
                   type="button"
                   onClick={() => selectListPin(pin.id)}
