@@ -718,53 +718,54 @@
 
 .pinFolderList {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
 }
 
 .pinFolderItem {
   display: grid;
-  gap: 10px;
-  padding: 10px;
-  background: #ffffff;
-  border: 1px solid #d8e2db;
-  border-radius: 8px;
-  box-shadow: 0 10px 28px rgba(24, 34, 29, 0.08);
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border-bottom: 1px solid #d8e2db;
+}
+
+.pinFolderItem:last-child {
+  border-bottom: 0;
 }
 
 .pinFolderMain {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
+  min-width: 0;
 }
 
 .pinFolderMain > button:first-child {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 28px 58px minmax(0, 1fr) 28px;
+  gap: 12px;
   align-items: center;
+  width: 100%;
   min-width: 0;
-  padding: 0;
+  min-height: 76px;
+  padding: 8px 0;
   text-align: left;
   background: transparent;
   border: 0;
   cursor: pointer;
 }
 
-.pinFolderMain > button:last-child {
-  min-height: 36px;
-  padding: 7px 10px;
-  color: #126b58;
-  font-weight: 950;
-  background: #eff7f3;
-  border: 1px solid #d8e2db;
-  border-radius: 8px;
-  cursor: pointer;
+.pinSelectCircle {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #93a29a;
+  border-radius: 50%;
 }
 
 .pinFolderMain img {
-  width: 88px;
-  height: 78px;
+  width: 58px;
+  height: 58px;
   object-fit: cover;
   border-radius: 8px;
 }
@@ -783,12 +784,22 @@
   white-space: nowrap;
 }
 
+.pinFolderMain strong {
+  color: #17221d;
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
 .pinFolderMain small,
 .pinFolderMain em {
   color: #65736b;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   font-style: normal;
   font-weight: 850;
+}
+
+.pinFolderMain svg {
+  color: #65736b;
 }
 
 .folderChipRow {
@@ -814,10 +825,10 @@
 .inlineFolderChecks {
   display: grid;
   gap: 8px;
-  padding: 10px;
+  padding: 10px 0 14px 98px;
   background: #f7faf8;
-  border: 1px solid #d8e2db;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
 }
 
 .inlineFolderChecks label {
@@ -2465,6 +2476,96 @@
 .mapFloatingAction .communityPostButton svg {
   width: 34px;
   height: 34px;
+}
+
+.folderPlaylist {
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(24, 34, 29, 0.1);
+}
+
+.folderPlaylistHeader {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #d8e2db;
+}
+
+.folderPlaylistHeader h2 {
+  margin: 0;
+  color: #17221d;
+  font-size: clamp(1.6rem, 6vw, 2.7rem);
+  line-height: 1.05;
+  text-align: center;
+}
+
+.folderPlaylistHeader p {
+  min-height: 78px;
+  margin: 0;
+  padding: 18px 2px;
+  color: #65736b;
+  font-size: clamp(1.05rem, 3.5vw, 1.4rem);
+  line-height: 1.45;
+  border-top: 1px solid #d8e2db;
+  border-bottom: 1px solid #d8e2db;
+}
+
+.profilePublishToggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 56px;
+  color: #17221d;
+  font-size: clamp(1rem, 3vw, 1.18rem);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.profilePublishToggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.profilePublishToggle b {
+  position: relative;
+  width: 66px;
+  height: 38px;
+  background: #d6d9d7;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(24, 34, 29, 0.08);
+  transition: background 0.18s ease;
+}
+
+.profilePublishToggle b::after {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 30px;
+  height: 30px;
+  content: "";
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(24, 34, 29, 0.2);
+  transition: transform 0.18s ease;
+}
+
+.profilePublishToggle input:checked + b {
+  background: #126b58;
+}
+
+.profilePublishToggle input:checked + b::after {
+  transform: translateX(28px);
+}
+
+.folderPlaylistHeader > button {
+  justify-self: end;
 }
 
 .folderPlaylistList {

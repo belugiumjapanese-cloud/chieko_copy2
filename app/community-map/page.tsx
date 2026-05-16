@@ -52,6 +52,8 @@ const GUEST_USER: DemoUser = {
   bio: '',
   followingIds: [],
   followerIds: [],
+  pinCount: 0,
+  publicFolderCount: 0,
 }
 
 function getAuthRedirectUrl() {
@@ -76,6 +78,8 @@ type DemoUser = {
   bio: string
   followingIds: string[]
   followerIds: string[]
+  pinCount: number
+  publicFolderCount: number
 }
 
 type Community = {
@@ -171,6 +175,8 @@ type ProfileRow = {
   display_name: string | null
   avatar_url: string | null
   bio: string | null
+  pin_count?: number | null
+  public_folder_count?: number | null
 }
 
 type FollowRow = {
@@ -458,6 +464,8 @@ function buildUsers(profileRows: ProfileRow[], followRows: FollowRow[]) {
     bio: profile.bio || '',
     followingIds: followRows.filter((follow) => follow.follower_id === profile.id).map((follow) => follow.following_id),
     followerIds: followRows.filter((follow) => follow.following_id === profile.id).map((follow) => follow.follower_id),
+    pinCount: profile.pin_count ?? 0,
+    publicFolderCount: profile.public_folder_count ?? 0,
   }))
 }
 
@@ -990,7 +998,9 @@ export default function CommunityMapPrototype() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   const profileRecentPins = profilePins.slice(0, 9)
   const profilePublicPins = profilePins.filter((pin) => pin.visibility === 'public')
-  const profileFolders = folders.filter((folder) => folder.ownerId === selectedProfile.id)
+  const profileFolders = folders.filter((folder) => folder.ownerId === selectedProfile.id && folder.visibility === 'public')
+  const profilePinCount = Math.max(selectedProfile.pinCount, profilePins.length)
+  const profilePublicFolderCount = Math.max(selectedProfile.publicFolderCount, profileFolders.length)
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
   const recommendedCommunities = communities.filter((community) =>
     !community.memberIds.includes(activeUserId) &&
@@ -1013,16 +1023,11 @@ export default function CommunityMapPrototype() {
     return `${community.slug} ${community.name} ${community.description}`.toLowerCase().includes(query)
   })
 
-  const findFolders = useMemo(() => {
-    return communities.map((community) => {
-      const communityPins = pins.filter((pin) => pinCommunityIds(pin).includes(community.id))
-      return {
-        community,
-        preview: communityPins[0],
-        count: communityPins.length,
-      }
-    })
-  }, [communities, pins])
+  const publicFindFolders = useMemo(() => {
+    return folders
+      .filter((folder) => folder.visibility === 'public' && folder.kind === 'my_world')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }, [folders])
 
   const tagStats = useMemo(() => tagStatsFromPins(pins), [pins])
   const activeTagQuery = activeHashtagQuery(postComposer.tags)
@@ -1063,7 +1068,7 @@ export default function CommunityMapPrototype() {
         savedPostsResult,
         activitiesResult,
       ] = await Promise.all([
-        supabase.from('profiles').select('id,username,display_name,avatar_url,bio'),
+        supabase.from('profiles').select('id,username,display_name,avatar_url,bio,pin_count,public_folder_count'),
         supabase.from('follows').select('follower_id,following_id'),
         supabase.from('app_post_cards').select('*').order('created_at', { ascending: false }).limit(500),
         supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
@@ -1110,6 +1115,8 @@ export default function CommunityMapPrototype() {
             bio: '',
             followingIds: [],
             followerIds: [],
+            pinCount: 0,
+            publicFolderCount: 0,
           },
           ...remoteUsers,
         ]
@@ -1966,17 +1973,19 @@ export default function CommunityMapPrototype() {
   const updateFolder = useCallback(async (folderId: string, values: Partial<Folder>) => {
     const client = supabase
     if (!client || !requireSignedIn()) return
+    const targetFolder = folders.find((folder) => folder.id === folderId)
+    const nextVisibility = values.visibility ?? targetFolder?.visibility ?? 'private'
 
     const { error } = await client
       .from('folders')
       .update({
-        name: values.name,
-        description: values.description ?? '',
-        color: values.color,
-        thumbnail_url: values.thumbnailUrl ?? null,
-        visibility: values.visibility ?? 'private',
-        is_paid: Boolean(values.isPaid),
-        paid_from_index: values.paidFromIndex ?? null,
+        name: values.name ?? targetFolder?.name,
+        description: values.description ?? targetFolder?.description ?? '',
+        color: values.color ?? targetFolder?.color ?? COLORS[0],
+        thumbnail_url: values.thumbnailUrl !== undefined ? values.thumbnailUrl || null : targetFolder?.thumbnailUrl ?? null,
+        visibility: nextVisibility,
+        is_paid: values.isPaid ?? Boolean(targetFolder?.isPaid),
+        paid_from_index: values.paidFromIndex !== undefined ? values.paidFromIndex : targetFolder?.paidFromIndex ?? null,
       })
       .eq('id', folderId)
       .eq('user_id', activeUserId)
@@ -1986,10 +1995,18 @@ export default function CommunityMapPrototype() {
       return
     }
 
+    if (nextVisibility === 'public' && targetFolder?.pinIds.length) {
+      await client
+        .from('posts')
+        .update({ visibility: 'public' })
+        .in('id', targetFolder.pinIds)
+        .eq('user_id', activeUserId)
+    }
+
     await loadRemoteData(activeUserId)
     setFolderEditId(null)
     setToast('フォルダーを更新しました。')
-  }, [activeUserId, loadRemoteData, requireSignedIn])
+  }, [activeUserId, folders, loadRemoteData, requireSignedIn])
 
   const renderPinCard = (pin: Pin, options?: { showAuthor?: boolean }) => {
     const owner = usersById.get(pin.ownerId)
@@ -2155,9 +2172,9 @@ export default function CommunityMapPrototype() {
             </div>
             <div className={styles.findLayout}>
               <div className={styles.findMain}>
-                <FolderShelf title="最近公開されたフォルダー" items={findFolders} onOpen={openCommunity} />
-                <FolderShelf title="ランダムなフォルダー" items={[...findFolders].reverse()} onOpen={openCommunity} />
-                <FolderShelf title="好きそうなフォルダー" items={findFolders.filter((item) => item.community.memberIds.includes(activeUserId))} onOpen={openCommunity} />
+                <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenPin={setSelectedPinId} />
+                <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenPin={setSelectedPinId} />
+                <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenPin={setSelectedPinId} />
               </div>
               <aside className={styles.communityDock}>
                 <div className={styles.sectionHeadingRow}>
@@ -2271,6 +2288,7 @@ export default function CommunityMapPrototype() {
             onCreateFolder={addFolderForPin}
             onCreateEmptyFolder={createEmptyFolder}
             onEditFolder={setFolderEditId}
+            onUpdateFolder={updateFolder}
             getMeta={(pin) => {
               const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
               return communitiesText || 'private memory'
@@ -2329,6 +2347,7 @@ export default function CommunityMapPrototype() {
             onCreateFolder={addFolderForPin}
             onCreateEmptyFolder={(name, color) => createEmptyFolder(name, color, 'to_visit')}
             onEditFolder={setFolderEditId}
+            onUpdateFolder={updateFolder}
             getMeta={getMapPinMeta}
           />
         )
@@ -2470,8 +2489,8 @@ export default function CommunityMapPrototype() {
           <div className={styles.profileStats}>
             <button type="button" onClick={() => setProfileListMode('following')}><strong>{selectedProfile.followingIds.length}</strong><span>フォロー</span></button>
             <button type="button" onClick={() => setProfileListMode('followers')}><strong>{selectedProfile.followerIds.length}</strong><span>フォロワー</span></button>
-            <button type="button" onClick={() => isMyProfile ? setActiveTab('myworld') : setProfileListMode('profile')}><strong>{profilePins.length}</strong><span>my pins</span></button>
-            <button type="button"><strong>{profileFolders.length}</strong><span>folders</span></button>
+            <button type="button" onClick={() => isMyProfile ? setActiveTab('myworld') : setProfileListMode('profile')}><strong>{profilePinCount}</strong><span>my pins</span></button>
+            <button type="button"><strong>{profilePublicFolderCount}</strong><span>folders</span></button>
           </div>
           {profileListMode !== 'profile' ? (
             <section className={styles.contentSection}>
@@ -2519,10 +2538,6 @@ export default function CommunityMapPrototype() {
                     </button>
                   ))}
                 </div>
-              </section>
-              <section className={styles.contentSection}>
-                <h2>最近投稿したピンのmap</h2>
-                <PinMap pins={profileRecentPins} selectedPinId={selectedPinId} onPinClick={setSelectedPinId} compact />
               </section>
               <section className={styles.contentSection}>
                 <h2>公開中のピンのmap</h2>
@@ -2769,24 +2784,31 @@ export default function CommunityMapPrototype() {
 
 function FolderShelf({
   title,
-  items,
-  onOpen,
+  folders,
+  pinsById,
+  onOpenPin,
 }: {
   title: string
-  items: Array<{ community: Community; preview?: Pin; count: number }>
-  onOpen: (communityId: string) => void
+  folders: Folder[]
+  pinsById: Map<string, Pin>
+  onOpenPin: (pinId: string) => void
 }) {
   return (
     <section className={styles.contentSection}>
       <h2>{title}</h2>
       <div className={styles.findGrid}>
-        {items.map(({ community, preview, count }) => (
-          <button key={`${title}-${community.id}`} type="button" onClick={() => onOpen(community.id)}>
-            {preview ? <img src={preview.imageUrl} alt="" /> : <span />}
-            <strong>{communityLabel(community)}</strong>
-            <small>{count} pins / {community.memberIds.length}人</small>
-          </button>
-        ))}
+        {folders.map((folder) => {
+          const preview = folder.thumbnailUrl || folder.pinIds.map((id) => pinsById.get(id)?.imageUrl).find(Boolean)
+          const firstPinId = folder.pinIds.find((id) => pinsById.has(id))
+          return (
+            <button key={`${title}-${folder.id}`} type="button" onClick={() => firstPinId && onOpenPin(firstPinId)}>
+              {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
+              <strong>{folder.name}</strong>
+              <small>{folder.pinIds.length} pins / public folder</small>
+            </button>
+          )
+        })}
+        {!folders.length && <p className={styles.muted}>公開folderはまだありません。</p>}
       </div>
     </section>
   )
@@ -2881,6 +2903,7 @@ function FolderLibraryView({
   onCreateFolder,
   onCreateEmptyFolder,
   onEditFolder,
+  onUpdateFolder,
   onAddMemory,
 }: {
   title: string
@@ -2898,6 +2921,7 @@ function FolderLibraryView({
   onCreateFolder: (pinId: string, name: string, color: string) => boolean
   onCreateEmptyFolder: (name: string, color: string) => Promise<boolean>
   onEditFolder: (folderId: string) => void
+  onUpdateFolder: (folderId: string, values: Partial<Folder>) => void
   onAddMemory?: () => void
 }) {
   const [newFolderName, setNewFolderName] = useState('')
@@ -2929,14 +2953,19 @@ function FolderLibraryView({
         <input value={folderSearch} onChange={(event) => onFolderSearch(event.target.value)} placeholder="pin、folderを検索" />
       </div>
       {selectedFolder ? (
-        <section className={styles.contentSection}>
-          <div className={styles.folderDetailHero}>
-            {selectedFolder.thumbnailUrl ? <img src={selectedFolder.thumbnailUrl} alt="" /> : <span style={{ backgroundColor: selectedFolder.color }} />}
-            <div>
-              <small>{selectedFolder.visibility === 'public' ? 'public' : 'private'}{selectedFolder.isPaid ? ' / paid' : ''}</small>
-              <strong>{selectedFolder.name}</strong>
-              <p>{selectedFolder.description || `${selectedPins.length} pins`}</p>
-            </div>
+        <section className={`${styles.contentSection} ${styles.folderPlaylist}`}>
+          <div className={styles.folderPlaylistHeader}>
+            <h2>{selectedFolder.name}</h2>
+            <p>{selectedFolder.description || 'Description'}</p>
+            <label className={styles.profilePublishToggle}>
+              <span>Show on My Profile and in Search</span>
+              <input
+                type="checkbox"
+                checked={selectedFolder.visibility === 'public'}
+                onChange={(event) => onUpdateFolder(selectedFolder.id, { visibility: event.target.checked ? 'public' : 'private' })}
+              />
+              <b />
+            </label>
             <button className={styles.ghostButton} type="button" onClick={() => onEditFolder(selectedFolder.id)}>Edit Folder</button>
           </div>
           <PinFolderList
@@ -3123,21 +3152,14 @@ function PinFolderList({
           <article key={pin.id} className={styles.pinFolderItem}>
             <div className={styles.pinFolderMain}>
               <button type="button" onClick={() => setOpenPinId(isOpen ? null : pin.id)}>
+                <i className={styles.pinSelectCircle} />
                 <img src={pin.imageUrl} alt="" />
                 <span>
-                  <small>{getMeta(pin)}</small>
                   <strong>{pin.title}</strong>
-                  <em>{formatShortDate(pin.createdAt)}</em>
+                  <small>{getMeta(pin)}</small>
                 </span>
+                <Menu size={22} />
               </button>
-              <button type="button" onClick={() => onOpenPin(pin.id)}>Detail</button>
-            </div>
-            <div className={styles.folderChipRow}>
-              {pinFolders.length ? pinFolders.map((folder) => (
-                <span key={folder.id} style={{ borderColor: folder.color }}>
-                  {folder.name}
-                </span>
-              )) : <span>フォルダー未設定</span>}
             </div>
             {isOpen && (
               <div className={styles.inlineFolderChecks}>
@@ -3146,6 +3168,14 @@ function PinFolderList({
                 <div className={styles.tagRow}>
                   {pin.tags.map((tag) => <b key={tag}>#{tag}</b>)}
                 </div>
+                <div className={styles.folderChipRow}>
+                  {pinFolders.length ? pinFolders.map((folder) => (
+                    <span key={folder.id} style={{ borderColor: folder.color }}>
+                      {folder.name}
+                    </span>
+                  )) : <span>フォルダー未設定</span>}
+                </div>
+                <button className={styles.ghostButton} type="button" onClick={() => onOpenPin(pin.id)}>詳細を開く</button>
                 <strong>入れるフォルダー</strong>
                 {folders.map((folder) => (
                   <label key={folder.id}>
