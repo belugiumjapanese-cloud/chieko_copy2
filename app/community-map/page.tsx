@@ -2541,6 +2541,7 @@ export default function CommunityMapPrototype() {
               const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
               return communitiesText || 'private memory'
             }}
+            onDeletePin={deletePin}
             onMapClick={manualPlacement ? confirmManualLocation : undefined}
             overlay={(
               <>
@@ -2614,6 +2615,7 @@ export default function CommunityMapPrototype() {
             panelsHidden={toVisitPanelsHidden}
             onPanelsHiddenChange={setToVisitPanelsHidden}
             getPinMeta={getMapPinMeta}
+            onDeletePin={deletePin}
             overlay={(
               <>
                 <div className={styles.mapOverlay}>
@@ -2659,7 +2661,7 @@ export default function CommunityMapPrototype() {
 
       {activeTab === 'mypage' && (
         <section className={styles.page}>
-          {!isAuthenticated ? (
+          {!activeUserId ? (
             <section className={styles.authPanel}>
               <div>
                 <span>Profile</span>
@@ -3734,6 +3736,7 @@ function SplitMapView({
   onMapSurfaceClick,
   panelsHidden = false,
   onPanelsHiddenChange,
+  onDeletePin,
   overlay,
   floatingAction,
 }: {
@@ -3749,6 +3752,7 @@ function SplitMapView({
   onMapSurfaceClick?: () => void
   panelsHidden?: boolean
   onPanelsHiddenChange?: (hidden: boolean) => void
+  onDeletePin?: (pinId: string) => void
   overlay?: ReactNode
   floatingAction?: ReactNode
 }) {
@@ -3974,6 +3978,19 @@ function SplitMapView({
                 <h2>{expandedStoryPin.title}</h2>
                 <p>{expandedStoryPin.description || '説明文なし'}</p>
                 {!!expandedStoryPin.tags.length && <span>{expandedStoryPin.tags.map((tag) => `#${tag}`).join(' ')}</span>}
+                {onDeletePin && (
+                  <button
+                    className={styles.dangerButton}
+                    type="button"
+                    onClick={() => {
+                      const pinId = expandedStoryPin.id
+                      setExpandedStoryPinId(null)
+                      onDeletePin(pinId)
+                    }}
+                  >
+                    Delete Pin
+                  </button>
+                )}
               </div>
             </aside>
           )}
