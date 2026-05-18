@@ -499,6 +499,94 @@
   border-radius: 8px;
 }
 
+.findFolderHero {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  margin: 14px 0;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(24, 34, 29, 0.08);
+}
+
+.findFolderHero img,
+.findFolderHero > span {
+  width: 86px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #dfe8e2;
+}
+
+.findFolderHero div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.findFolderHero strong {
+  font-size: 1.05rem;
+}
+
+.findFolderHero small {
+  color: #65736b;
+  font-weight: 850;
+}
+
+.findFolderPinList {
+  display: grid;
+  gap: 6px;
+}
+
+.findFolderPinList button {
+  display: grid;
+  grid-template-columns: 28px 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 66px;
+  padding: 6px 8px;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.findFolderPinList button > span {
+  color: #65736b;
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.findFolderPinList img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.findFolderPinList div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.findFolderPinList strong,
+.findFolderPinList small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.findFolderPinList small {
+  color: #65736b;
+  font-size: 0.78rem;
+}
+
 .segmented {
   display: flex;
   flex-wrap: wrap;
