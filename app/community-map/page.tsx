@@ -465,6 +465,24 @@ function uniquePinsById(pins: Pin[]) {
   })
 }
 
+function uniquePinsByMemory(pins: Pin[]) {
+  const seen = new Set<string>()
+  return pins.filter((pin) => {
+    const key = [
+      pin.ownerId,
+      pin.imageUrl,
+      pin.title.trim().toLowerCase(),
+      pin.description.trim().toLowerCase(),
+      pin.latitude.toFixed(6),
+      pin.longitude.toFixed(6),
+      pin.takenAt ?? '',
+    ].join('|')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 function profileFallbackName(id: string) {
   return `user_${id.slice(0, 8)}`
 }
@@ -512,7 +530,7 @@ function buildFolders(folderRows: AppFolderCardRow[]): Folder[] {
     isPaid: Boolean(folder.is_paid),
     paidFromIndex: folder.paid_from_index ?? null,
     priceYen: folder.folder_price_yen ?? null,
-    pinIds: folder.post_ids ?? [],
+    pinIds: Array.from(new Set(folder.post_ids ?? [])),
     visibility: folder.visibility === 'public' ? 'public' : 'private',
     createdAt: folder.created_at,
   }))
@@ -999,6 +1017,7 @@ export default function CommunityMapPrototype() {
   const [postComposer, setPostComposer] = useState<PostComposer>({ title: '', description: '', tags: '', takenAt: '', folderIds: [] })
   const [postMessage, setPostMessage] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
+  const [postSaving, setPostSaving] = useState(false)
   const [composerFolderPanelOpen, setComposerFolderPanelOpen] = useState(false)
   const [communitySubmitOpen, setCommunitySubmitOpen] = useState(false)
   const [communitySubmitPinId, setCommunitySubmitPinId] = useState<string | null>(null)
@@ -1011,6 +1030,7 @@ export default function CommunityMapPrototype() {
   const [composerFolderName, setComposerFolderName] = useState('')
   const [composerFolderColor, setComposerFolderColor] = useState(COLORS[1])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const postSubmitLockRef = useRef(false)
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
@@ -1051,11 +1071,11 @@ export default function CommunityMapPrototype() {
   const folderEditorPin = folderEditorPinId ? pinsById.get(folderEditorPinId) ?? null : null
   const folderEditTarget = folderEditId ? folders.find((folder) => folder.id === folderEditId) ?? null : null
   const myPostedPins = useMemo(
-    () => pins.filter((pin) => pin.ownerId === activeUserId),
+    () => uniquePinsByMemory(pins.filter((pin) => pin.ownerId === activeUserId)),
     [activeUserId, pins],
   )
   const savedPins = useMemo(
-    () => savedPinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin)),
+    () => uniquePinsByMemory(savedPinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin))),
     [pinsById, savedPinIds],
   )
   const toVisitPins = useMemo(
@@ -1081,7 +1101,7 @@ export default function CommunityMapPrototype() {
     )
   }, [folders])
   const publicPins = useMemo(
-    () => pins.filter((pin) => pin.visibility === 'public' && publicFolderPinIds.has(pin.id)),
+    () => uniquePinsByMemory(pins.filter((pin) => pin.visibility === 'public' && publicFolderPinIds.has(pin.id))),
     [pins, publicFolderPinIds],
   )
   const myWorldMapPins = useMemo(
@@ -1095,11 +1115,12 @@ export default function CommunityMapPrototype() {
   const profilePins = pins
     .filter((pin) => pin.ownerId === selectedProfile.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const profileUniquePins = uniquePinsByMemory(profilePins)
   const profileFolders = folders.filter((folder) => folder.ownerId === selectedProfile.id && folder.kind === 'my_world' && folder.visibility === 'public')
   const profilePublicFolderPinIds = new Set(profileFolders.flatMap((folder) => folder.pinIds))
-  const profilePublicPins = profilePins.filter((pin) => pin.visibility === 'public' && profilePublicFolderPinIds.has(pin.id))
+  const profilePublicPins = profileUniquePins.filter((pin) => pin.visibility === 'public' && profilePublicFolderPinIds.has(pin.id))
   const profileRecentPins = profilePublicPins.slice(0, 10)
-  const profilePinCount = Math.max(selectedProfile.pinCount, profilePins.length)
+  const profilePinCount = profileUniquePins.length
   const profilePublicFolderCount = Math.max(selectedProfile.publicFolderCount, profileFolders.length)
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
   const recommendedCommunities = communities.filter((community) =>
@@ -1107,7 +1128,7 @@ export default function CommunityMapPrototype() {
     (currentUser.followingIds.some((userId) => community.memberIds.includes(userId)) || community.privacy === 'public'),
   )
   const profileCommunities = communities.filter((community) => community.memberIds.includes(selectedProfile.id))
-  const homeFeedPins = uniquePinsById(
+  const homeFeedPins = uniquePinsByMemory(uniquePinsById(
     [...pins]
       .filter((pin) =>
         pin.visibility === 'public' &&
@@ -1118,7 +1139,7 @@ export default function CommunityMapPrototype() {
         ),
       )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-  )
+  ))
   const filteredCommunities = communities.filter((community) => {
     const query = communityQuery.trim().toLowerCase()
     if (!query) return true
@@ -1720,68 +1741,76 @@ export default function CommunityMapPrototype() {
     if (!postDraft?.coordinates) return
     const client = supabase
     if (!client || !requireSignedIn()) return
+    if (postSubmitLockRef.current) return
+    postSubmitLockRef.current = true
+    setPostSaving(true)
 
-    const title = postComposer.title.trim() || postDraft.imageName.replace(/\.[^.]+$/, '') || 'Untitled pin'
-    const tags = postComposer.tags
-      .split(/\s+/)
-      .map((tag) => cleanTag(tag))
-      .filter(Boolean)
+    try {
+      const title = postComposer.title.trim() || postDraft.imageName.replace(/\.[^.]+$/, '') || 'Untitled pin'
+      const tags = postComposer.tags
+        .split(/\s+/)
+        .map((tag) => cleanTag(tag))
+        .filter(Boolean)
 
-    const { data: newPost, error: postError } = await client
-      .from('posts')
-      .insert({
-        user_id: activeUserId,
-        title,
-        description: postComposer.description.trim(),
-        latitude: postDraft.coordinates.latitude,
-        longitude: postDraft.coordinates.longitude,
-        image_url: postDraft.imageUrl,
-        visibility: postDraft.communityId ? 'public' : 'private',
-        tags,
-        taken_at: postComposer.takenAt ? new Date(postComposer.takenAt).toISOString() : null,
-        source_type: 'original',
-      })
-      .select('id')
-      .single()
-
-    if (postError || !newPost) {
-      setToast(postError?.message ?? '投稿を保存できませんでした。')
-      return
-    }
-
-    const folderRows = postComposer.folderIds.map((folderId) => ({
-      folder_id: folderId,
-      post_id: newPost.id,
-      user_id: activeUserId,
-    }))
-    if (folderRows.length) {
-      const { error } = await client.from('folder_posts').insert(folderRows)
-      if (error) setToast(error.message)
-    }
-
-    if (postDraft.communityId) {
-      const { error } = await client
-        .from('community_posts')
-        .upsert({
-          community_id: postDraft.communityId,
-          post_id: newPost.id,
+      const { data: newPost, error: postError } = await client
+        .from('posts')
+        .insert({
           user_id: activeUserId,
-          title_override: title,
-          description_override: postComposer.description.trim(),
-          tags_override: tags,
-        }, { onConflict: 'community_id,post_id' })
+          title,
+          description: postComposer.description.trim(),
+          latitude: postDraft.coordinates.latitude,
+          longitude: postDraft.coordinates.longitude,
+          image_url: postDraft.imageUrl,
+          visibility: postDraft.communityId ? 'public' : 'private',
+          tags,
+          taken_at: postComposer.takenAt ? new Date(postComposer.takenAt).toISOString() : null,
+          source_type: 'original',
+        })
+        .select('id')
+        .single()
 
-      if (error) {
-        setToast(error.message)
+      if (postError || !newPost) {
+        setToast(postError?.message ?? '投稿を保存できませんでした。')
+        return
       }
-    }
 
-    await loadRemoteData(activeUserId)
-    setComposerOpen(false)
-    setComposerFolderPanelOpen(false)
-    setPostDraft(null)
-    setSelectedPinId(newPost.id)
-    setPostMessage(postDraft.communityId ? '投稿しました。' : 'My Worldに保存しました。')
+      const folderRows = Array.from(new Set(postComposer.folderIds)).map((folderId) => ({
+        folder_id: folderId,
+        post_id: newPost.id,
+        user_id: activeUserId,
+      }))
+      if (folderRows.length) {
+        const { error } = await client.from('folder_posts').insert(folderRows)
+        if (error) setToast(error.message)
+      }
+
+      if (postDraft.communityId) {
+        const { error } = await client
+          .from('community_posts')
+          .upsert({
+            community_id: postDraft.communityId,
+            post_id: newPost.id,
+            user_id: activeUserId,
+            title_override: title,
+            description_override: postComposer.description.trim(),
+            tags_override: tags,
+          }, { onConflict: 'community_id,post_id' })
+
+        if (error) {
+          setToast(error.message)
+        }
+      }
+
+      await loadRemoteData(activeUserId)
+      setComposerOpen(false)
+      setComposerFolderPanelOpen(false)
+      setPostDraft(null)
+      setSelectedPinId(newPost.id)
+      setPostMessage(postDraft.communityId ? '投稿しました。' : 'My Worldに保存しました。')
+    } finally {
+      postSubmitLockRef.current = false
+      setPostSaving(false)
+    }
   }, [activeUserId, loadRemoteData, postComposer, postDraft, requireSignedIn])
 
   const toggleLike = useCallback(async (pinId: string) => {
@@ -3212,7 +3241,9 @@ export default function CommunityMapPrototype() {
                 </div>
               )}
             </div>
-            <button className={styles.primaryButton} type="submit">{postDraft.communityId ? '投稿' : 'My Worldに保存'}</button>
+            <button className={styles.primaryButton} type="submit" disabled={postSaving}>
+              {postSaving ? 'Saving...' : postDraft.communityId ? '投稿' : 'My Worldに保存'}
+            </button>
           </form>
         </aside>
       )}
@@ -3270,7 +3301,7 @@ function FindFolderDetail({
   onBack: () => void
   onOpenPin: (pinId: string) => void
 }) {
-  const folderPins = folder.pinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin))
+  const folderPins = uniquePinsByMemory(folder.pinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin)))
 
   return (
     <section className={styles.page}>
@@ -3443,7 +3474,7 @@ function FolderLibraryView({
     return `${folder.name} ${folder.description ?? ''} ${folderPins.map((pin) => `${pin.title} ${pin.description} ${pin.tags.join(' ')}`).join(' ')}`.toLowerCase().includes(query)
   })
   const selectedFolder = selectedFolderId ? folders.find((folder) => folder.id === selectedFolderId) ?? null : null
-  const selectedPins = selectedFolder ? pins.filter((pin) => selectedFolder.pinIds.includes(pin.id)) : []
+  const selectedPins = selectedFolder ? uniquePinsByMemory(pins.filter((pin) => selectedFolder.pinIds.includes(pin.id))) : []
 
   return (
     <section className={styles.page}>
