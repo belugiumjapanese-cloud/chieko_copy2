@@ -44,10 +44,10 @@ const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2'
 const EMPTY_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23dfe8e2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23126b58%22%20opacity%3D%22.35%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23126b58%22%20opacity%3D%22.3%22/%3E%3C/svg%3E'
 
-const GUEST_USER: DemoUser = {
-  id: 'guest',
-  username: 'guest',
-  displayName: 'Guest',
+const AUTH_PLACEHOLDER_USER: DemoUser = {
+  id: 'auth',
+  username: 'signin',
+  displayName: 'Sign in / Sign up',
   avatarUrl: EMPTY_IMAGE,
   bio: '',
   followingIds: [],
@@ -1057,7 +1057,11 @@ export default function CommunityMapPrototype() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [])
 
-  const currentUser = users.find((user) => user.id === activeUserId) ?? GUEST_USER
+  const currentUser = users.find((user) => user.id === activeUserId) ?? (
+    activeUserId
+      ? { ...AUTH_PLACEHOLDER_USER, id: activeUserId, username: profileFallbackName(activeUserId), displayName: profileFallbackName(activeUserId) }
+      : AUTH_PLACEHOLDER_USER
+  )
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users])
   const communitiesById = useMemo(() => new Map(communities.map((community) => [community.id, community])), [communities])
   const pinsById = useMemo(() => new Map(pins.map((pin) => [pin.id, pin])), [pins])
@@ -2346,6 +2350,71 @@ export default function CommunityMapPrototype() {
     return `@${owner?.username ?? 'user'} / ${communityLabel(communitiesById.get(pinCommunityIds(pin)[0] ?? ''))}`
   }, [communitiesById, usersById])
 
+  const authScreen = (
+    <section className={styles.authPanel}>
+      <div>
+        <span>Account</span>
+        <h1>Sign in to keep your world</h1>
+        <p>My World、To Visit、フォルダー、いいね、コメントを自分のアカウントに保存します。</p>
+      </div>
+      <div className={styles.segmented}>
+        <button className={authMode === 'signin' ? styles.active : ''} type="button" onClick={() => setAuthMode('signin')}>Sign in</button>
+        <button className={authMode === 'signup' ? styles.active : ''} type="button" onClick={() => setAuthMode('signup')}>Sign up</button>
+      </div>
+      {authMode === 'signin' ? (
+        <form className={styles.authForm} onSubmit={signInLocalAccount}>
+          <label>
+            Email
+            <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
+          </label>
+          <label>
+            Password
+            <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} />
+          </label>
+          <button className={styles.primaryButton} type="submit">Sign in</button>
+          <div className={styles.accountGrid}>
+            {ownedAccounts.map((account) => (
+              <button key={account.id} type="button" onClick={() => switchAccount(account.id)}>
+                <img src={account.avatarUrl} alt="" />
+                <span>
+                  <strong>@{account.username}</strong>
+                  <small>{account.displayName}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </form>
+      ) : (
+        <form className={styles.authForm} onSubmit={createLocalAccount}>
+          <label>
+            Email
+            <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
+          </label>
+          <label>
+            Password
+            <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} />
+          </label>
+          <label>
+            Password again
+            <input type="password" value={authPasswordConfirm} onChange={(event) => setAuthPasswordConfirm(event.target.value)} />
+          </label>
+          <label>
+            Display name
+            <input value={authDisplayName} onChange={(event) => setAuthDisplayName(event.target.value)} />
+          </label>
+          <label>
+            Username
+            <div className={styles.usernameInput}>
+              <span>@</span>
+              <input value={authUsername} onChange={(event) => setAuthUsername(event.target.value.replace(/^@/, ''))} />
+            </div>
+          </label>
+          <button className={styles.primaryButton} type="submit">Create account and switch</button>
+        </form>
+      )}
+    </section>
+  )
+
   const showInitialLoader = remoteLoading && !remoteError && !pins.length && !folders.length && !communities.length
 
   if (showInitialLoader) {
@@ -2360,6 +2429,16 @@ export default function CommunityMapPrototype() {
           <div className={styles.bootSpinner} />
           <h1>Loading your world</h1>
           <p>Supabaseからmemoriesを読み込んでいます。</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (!activeUserId) {
+    return (
+      <main className={styles.shell}>
+        <section className={styles.page}>
+          {authScreen}
         </section>
       </main>
     )
