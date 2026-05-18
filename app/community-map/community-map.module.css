@@ -987,12 +987,16 @@
 }
 
 .pinFolderMain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
 .pinFolderMain > button:first-child {
   display: grid;
-  grid-template-columns: 28px 58px minmax(0, 1fr) 28px;
+  grid-template-columns: 28px 58px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -1049,6 +1053,28 @@
 
 .pinFolderMain svg {
   color: #65736b;
+}
+
+.pinReorderHandle {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 52px;
+  color: #65736b;
+  touch-action: none;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: grab;
+}
+
+.pinFolderDragging {
+  opacity: 0.7;
+  background: #edf7f1;
+}
+
+.pinFolderDropTarget {
+  box-shadow: inset 4px 0 0 #126b58;
 }
 
 .folderChipRow {

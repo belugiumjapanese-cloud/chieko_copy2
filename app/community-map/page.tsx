@@ -496,6 +496,15 @@ function profileFallbackName(id: string) {
   return `user_${id.slice(0, 8)}`
 }
 
+function accountFallbackUser(id: string): DemoUser {
+  return {
+    ...AUTH_PLACEHOLDER_USER,
+    id,
+    username: 'account',
+    displayName: 'Account',
+  }
+}
+
 function mapVisibility(value: string | null | undefined): Pin['visibility'] {
   return value === 'private' ? 'private' : 'public'
 }
@@ -1036,6 +1045,7 @@ export default function CommunityMapPrototype() {
   const [createCommunityOpen, setCreateCommunityOpen] = useState(false)
   const [newCommunityName, setNewCommunityName] = useState('')
   const [newCommunityPrivacy, setNewCommunityPrivacy] = useState<Privacy>('public')
+  const [profileWorldUserId, setProfileWorldUserId] = useState<string | null>(null)
   const [inviteCommunityId, setInviteCommunityId] = useState<string | null>(null)
   const [inviteQuery, setInviteQuery] = useState('')
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
@@ -1092,7 +1102,7 @@ export default function CommunityMapPrototype() {
 
   const currentUser = users.find((user) => user.id === activeUserId) ?? (
     activeUserId
-      ? { ...AUTH_PLACEHOLDER_USER, id: activeUserId, username: profileFallbackName(activeUserId), displayName: profileFallbackName(activeUserId) }
+      ? accountFallbackUser(activeUserId)
       : AUTH_PLACEHOLDER_USER
   )
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users])
@@ -1159,6 +1169,18 @@ export default function CommunityMapPrototype() {
   const profileRecentPins = profilePublicPins.slice(0, 10)
   const profilePinCount = profileUniquePins.length
   const profilePublicFolderCount = Math.max(selectedProfile.publicFolderCount, profileFolders.length)
+  const profileWorldUser = profileWorldUserId ? usersById.get(profileWorldUserId) ?? accountFallbackUser(profileWorldUserId) : null
+  const profileWorldFolders = profileWorldUserId
+    ? folders.filter((folder) => folder.ownerId === profileWorldUserId && folder.kind === 'my_world' && folder.visibility === 'public')
+    : []
+  const profileWorldPinIds = new Set(profileWorldFolders.flatMap((folder) => folder.pinIds))
+  const profileWorldPins = profileWorldUserId
+    ? uniquePinsByMemory(
+      pins
+        .filter((pin) => pin.ownerId === profileWorldUserId && pin.visibility === 'public' && profileWorldPinIds.has(pin.id))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    )
+    : []
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
   const recommendedCommunities = communities.filter((community) =>
     !community.memberIds.includes(activeUserId) &&
@@ -1308,20 +1330,10 @@ export default function CommunityMapPrototype() {
 
       let remoteUsers = buildUsers(profileRows, followRows)
       if (userId && !remoteUsers.some((user) => user.id === userId)) {
-        remoteUsers = [
-          {
-            id: userId,
-            username: profileFallbackName(userId),
-            displayName: profileFallbackName(userId),
-            avatarUrl: EMPTY_IMAGE,
-            bio: '',
-            followingIds: [],
-            followerIds: [],
-            pinCount: 0,
-            publicFolderCount: 0,
-          },
-          ...remoteUsers,
-        ]
+        remoteUsers = [accountFallbackUser(userId), ...remoteUsers]
+        await supabase
+          .from('profiles')
+          .upsert({ id: userId, display_name: 'Account' }, { onConflict: 'id' })
       }
 
       const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
@@ -1376,13 +1388,15 @@ export default function CommunityMapPrototype() {
     } catch (error) {
       console.error(error)
       setRemoteError(getErrorMessage(error, 'Supabaseからデータを取得できませんでした。'))
-      setUsers([])
-      setPins([])
-      setFolders([])
-      setCommunities([])
-      setActivities([])
-      setNotifications([])
-      setSavedPinIds([])
+      if (!userId) {
+        setUsers([])
+        setPins([])
+        setFolders([])
+        setCommunities([])
+        setActivities([])
+        setNotifications([])
+        setSavedPinIds([])
+      }
     } finally {
       setRemoteLoading(false)
     }
@@ -1413,7 +1427,8 @@ export default function CommunityMapPrototype() {
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((_event, session) => {
+    } = client.auth.onAuthStateChange((event, session) => {
+      if (!session?.user && event !== 'SIGNED_OUT') return
       const userId = session?.user.id ?? ''
       setIsAuthenticated(Boolean(userId))
       setActiveUserId(userId)
@@ -2069,6 +2084,7 @@ export default function CommunityMapPrototype() {
     setProfileEditorOpen(false)
     setComposerFolderPanelOpen(false)
     setInviteCommunityId(null)
+    setProfileWorldUserId(null)
     if (nextTab === 'home') {
       setHomeMode('timeline')
       setTimelineOpen(false)
@@ -2186,6 +2202,57 @@ export default function CommunityMapPrototype() {
     if (result.error) setToast(result.error.message)
     await loadRemoteData(activeUserId)
   }, [activeUserId, loadRemoteData, requireSignedIn])
+
+  const reorderFolderPin = useCallback(async (folderId: string, draggedPinId: string, targetPinId: string) => {
+    if (draggedPinId === targetPinId) return
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+
+    const targetFolder = folders.find((folder) => folder.id === folderId)
+    if (!targetFolder || !targetFolder.pinIds.includes(draggedPinId) || !targetFolder.pinIds.includes(targetPinId)) return
+
+    const nextPinIds = targetFolder.pinIds.filter((pinId) => pinId !== draggedPinId)
+    const targetIndex = nextPinIds.indexOf(targetPinId)
+    nextPinIds.splice(targetIndex < 0 ? nextPinIds.length : targetIndex, 0, draggedPinId)
+    const firstPin = nextPinIds[0] ? pinsById.get(nextPinIds[0]) : null
+
+    setFolders((current) =>
+      current.map((folder) =>
+        folder.id === folderId
+          ? {
+            ...folder,
+            pinIds: nextPinIds,
+            thumbnailUrl: firstPin?.imageUrl ?? folder.thumbnailUrl,
+          }
+          : folder,
+      ),
+    )
+
+    const updates = nextPinIds.map((postId, sortOrder) =>
+      client
+        .from('folder_posts')
+        .update({ sort_order: sortOrder })
+        .eq('folder_id', folderId)
+        .eq('post_id', postId)
+        .eq('user_id', activeUserId),
+    )
+    const results = await Promise.all(updates)
+    const failed = results.find((result) => result.error)
+    if (failed?.error) {
+      setToast(failed.error.message)
+      await loadRemoteData(activeUserId)
+      return
+    }
+
+    if (firstPin) {
+      const { error } = await client
+        .from('folders')
+        .update({ thumbnail_url: firstPin.imageUrl })
+        .eq('id', folderId)
+        .eq('user_id', activeUserId)
+      if (error) setToast(error.message)
+    }
+  }, [activeUserId, folders, loadRemoteData, pinsById, requireSignedIn])
 
   const toggleVisibleFolder = useCallback((
     folderId: string,
@@ -2535,6 +2602,29 @@ export default function CommunityMapPrototype() {
   return (
     <main className={`${styles.shell} ${activeTab === 'home' ? styles.homeShell : ''}`}>
       <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handlePostImage} />
+      {activeTab === 'mypage' && profileWorldUser && (
+        <SplitMapView
+          pins={profileWorldPins}
+          selectedPinId={selectedPinId}
+          seenPinIds={seenPinIds}
+          onPinClick={openPinFromMap}
+          onListFocus={openPinFromMap}
+          onMapSurfaceClick={() => setSelectedPinId(null)}
+          getPinMeta={(pin) => {
+            const folder = profileWorldFolders.find((item) => item.pinIds.includes(pin.id))
+            return folder ? `${profileWorldUser.displayName} / ${folder.name}` : profileWorldUser.displayName
+          }}
+          overlay={(
+            <div className={styles.communityMapHeader}>
+              <button type="button" onClick={() => setProfileWorldUserId(null)}><ArrowLeft size={18} /></button>
+              <div>
+                <strong>{profileWorldUser.displayName} の World</strong>
+                <span>{profileWorldPins.length} public pins / {profileWorldFolders.length} folders</span>
+              </div>
+            </div>
+          )}
+        />
+      )}
       {activeTab === 'home' && (
         <section className={styles.homePage}>
           <header className={styles.homeTopbar}>
@@ -2812,6 +2902,7 @@ export default function CommunityMapPrototype() {
             onEditFolder={setFolderEditId}
             onDeleteFolder={deleteFolder}
             onDeletePin={deletePin}
+            onReorderFolderPin={reorderFolderPin}
             getMeta={(pin) => {
               const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
               return communitiesText || 'private memory'
@@ -2873,12 +2964,13 @@ export default function CommunityMapPrototype() {
             onEditFolder={setFolderEditId}
             onDeleteFolder={deleteFolder}
             onDeletePin={deletePin}
+            onReorderFolderPin={reorderFolderPin}
             getMeta={getMapPinMeta}
           />
         )
       )}
 
-      {activeTab === 'mypage' && (
+      {activeTab === 'mypage' && !profileWorldUser && (
         <section className={styles.page}>
           {!activeUserId ? (
             <section className={styles.authPanel}>
@@ -3143,6 +3235,11 @@ export default function CommunityMapPrototype() {
               </section>
               <section className={styles.contentSection}>
                 <h2>公開中のピンのmap</h2>
+                {!isMyProfile && profilePublicPins.length > 0 && (
+                  <button className={styles.primaryButton} type="button" onClick={() => setProfileWorldUserId(selectedProfile.id)}>
+                    この人のworldに入る
+                  </button>
+                )}
                 <PinMap pins={profilePublicPins} selectedPinId={selectedPinId} onPinClick={setSelectedPinId} compact />
               </section>
               <section className={styles.contentSection}>
@@ -3640,6 +3737,7 @@ function FolderLibraryView({
   onEditFolder,
   onDeleteFolder,
   onDeletePin,
+  onReorderFolderPin,
   onAddMemory,
 }: {
   title: string
@@ -3659,6 +3757,7 @@ function FolderLibraryView({
   onEditFolder: (folderId: string) => void
   onDeleteFolder: (folderId: string) => void
   onDeletePin: (pinId: string) => void
+  onReorderFolderPin: (folderId: string, draggedPinId: string, targetPinId: string) => void
   onAddMemory?: () => void
 }) {
   const [newFolderName, setNewFolderName] = useState('')
@@ -3670,7 +3769,10 @@ function FolderLibraryView({
     return `${folder.name} ${folder.description ?? ''} ${folderPins.map((pin) => `${pin.title} ${pin.description} ${pin.tags.join(' ')}`).join(' ')}`.toLowerCase().includes(query)
   })
   const selectedFolder = selectedFolderId ? folders.find((folder) => folder.id === selectedFolderId) ?? null : null
-  const selectedPins = selectedFolder ? uniquePinsByMemory(pins.filter((pin) => selectedFolder.pinIds.includes(pin.id))) : []
+  const libraryPinsById = useMemo(() => new Map(pins.map((pin) => [pin.id, pin])), [pins])
+  const selectedPins = selectedFolder
+    ? uniquePinsByMemory(selectedFolder.pinIds.map((pinId) => libraryPinsById.get(pinId)).filter((pin): pin is Pin => Boolean(pin)))
+    : []
 
   return (
     <section className={styles.page}>
@@ -3711,6 +3813,8 @@ function FolderLibraryView({
             onToggleFolder={onToggleFolder}
             onCreateFolder={onCreateFolder}
             onDeletePin={onDeletePin}
+            folderId={selectedFolder.id}
+            onReorderPin={onReorderFolderPin}
           />
         </section>
       ) : (
@@ -3874,27 +3978,65 @@ function FolderEditModal({
 function PinFolderList({
   pins,
   folders,
+  folderId,
   getMeta,
   onOpenPin,
   onToggleFolder,
   onCreateFolder,
   onDeletePin,
+  onReorderPin,
 }: {
   pins: Pin[]
   folders: Folder[]
+  folderId: string
   getMeta: (pin: Pin) => string
   onOpenPin: (pinId: string) => void
   onToggleFolder: (pinId: string, folderId: string, checked: boolean) => void
   onCreateFolder: (pinId: string, name: string, color: string) => boolean
   onDeletePin: (pinId: string) => void
+  onReorderPin: (folderId: string, draggedPinId: string, targetPinId: string) => void
 }) {
   const [openPinId, setOpenPinId] = useState<string | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
   const [newFolderColor, setNewFolderColor] = useState(COLORS[0])
-  const sortedPins = useMemo(
-    () => [...pins].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [pins],
-  )
+  const [draggingPinId, setDraggingPinId] = useState<string | null>(null)
+  const [dragOverPinId, setDragOverPinId] = useState<string | null>(null)
+  const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dragPinRef = useRef<string | null>(null)
+  const dragOverPinRef = useRef<string | null>(null)
+  const isDraggingRef = useRef(false)
+  const sortedPins = pins
+
+  const clearDragTimer = useCallback(() => {
+    if (!dragTimerRef.current) return
+    clearTimeout(dragTimerRef.current)
+    dragTimerRef.current = null
+  }, [])
+
+  const updateDragTarget = useCallback((clientX: number, clientY: number) => {
+    if (!isDraggingRef.current) return
+    const targetElement = document
+      .elementFromPoint(clientX, clientY)
+      ?.closest<HTMLElement>('[data-folder-pin-id]')
+    const targetPinId = targetElement?.dataset.folderPinId ?? dragPinRef.current
+    dragOverPinRef.current = targetPinId ?? null
+    setDragOverPinId(targetPinId ?? null)
+  }, [])
+
+  const finishDrag = useCallback((clientX: number, clientY: number) => {
+    clearDragTimer()
+    updateDragTarget(clientX, clientY)
+    const draggedPinId = dragPinRef.current
+    const targetPinId = dragOverPinRef.current
+    if (isDraggingRef.current && draggedPinId && targetPinId && draggedPinId !== targetPinId) {
+      onReorderPin(folderId, draggedPinId, targetPinId)
+    }
+    isDraggingRef.current = false
+    dragPinRef.current = null
+    dragOverPinRef.current = null
+    setDraggingPinId(null)
+    setDragOverPinId(null)
+  }, [clearDragTimer, folderId, onReorderPin, updateDragTarget])
 
   useEffect(() => {
     if (!sortedPins.length) {
@@ -3905,6 +4047,8 @@ function PinFolderList({
       setOpenPinId(null)
     }
   }, [openPinId, sortedPins])
+
+  useEffect(() => clearDragTimer, [clearDragTimer])
 
   if (!sortedPins.length) {
     return <p className={styles.muted}>まだピンがありません。</p>
@@ -3917,7 +4061,15 @@ function PinFolderList({
         const isOpen = openPinId === pin.id
 
         return (
-          <article key={pin.id} className={styles.pinFolderItem}>
+          <article
+            key={pin.id}
+            className={[
+              styles.pinFolderItem,
+              draggingPinId === pin.id ? styles.pinFolderDragging : '',
+              dragOverPinId === pin.id && draggingPinId !== pin.id ? styles.pinFolderDropTarget : '',
+            ].filter(Boolean).join(' ')}
+            data-folder-pin-id={pin.id}
+          >
             <div className={styles.pinFolderMain}>
               <button type="button" onClick={() => setOpenPinId(isOpen ? null : pin.id)}>
                 <i className={styles.pinSelectCircle} />
@@ -3926,6 +4078,38 @@ function PinFolderList({
                   <strong>{pin.title}</strong>
                   <small>{getMeta(pin)}</small>
                 </span>
+              </button>
+              <button
+                className={styles.pinReorderHandle}
+                type="button"
+                aria-label="pinの順番を変更"
+                onPointerDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  dragPinRef.current = pin.id
+                  dragOverPinRef.current = pin.id
+                  setDragOverPinId(pin.id)
+                  event.currentTarget.setPointerCapture?.(event.pointerId)
+                  clearDragTimer()
+                  dragTimerRef.current = setTimeout(() => {
+                    isDraggingRef.current = true
+                    setDraggingPinId(pin.id)
+                  }, 260)
+                }}
+                onPointerMove={(event) => {
+                  if (!isDraggingRef.current) return
+                  event.preventDefault()
+                  updateDragTarget(event.clientX, event.clientY)
+                }}
+                onPointerUp={(event) => {
+                  event.preventDefault()
+                  finishDrag(event.clientX, event.clientY)
+                }}
+                onPointerCancel={(event) => {
+                  event.preventDefault()
+                  finishDrag(event.clientX, event.clientY)
+                }}
+              >
                 <Menu size={22} />
               </button>
             </div>
