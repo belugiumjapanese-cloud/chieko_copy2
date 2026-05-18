@@ -448,6 +448,7 @@
 }
 
 .findGrid button,
+.findFolderCard,
 .folderCard,
 .communityMiniGrid button {
   display: grid;
@@ -464,7 +465,9 @@
 }
 
 .findGrid img,
+.findFolderCard img,
 .folderCard img,
+.findFolderCard > span,
 .findGrid button > span,
 .folderCard > span {
   width: 100%;
@@ -475,15 +478,52 @@
 
 .findGrid strong,
 .findGrid small,
+.findFolderCard strong,
+.findFolderCard small,
 .folderCard strong,
 .folderCard small {
   padding: 0 10px;
 }
 
 .findGrid small,
+.findFolderCard small,
 .folderCard small {
   padding-bottom: 10px;
   color: #65736b;
+}
+
+.folderOpenButton {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.folderLikeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: calc(100% - 20px);
+  min-height: 34px;
+  margin: 0 10px 10px;
+  color: #65736b;
+  font-size: 0.84rem;
+  font-weight: 950;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.folderLikeButton.liked {
+  color: #d92d20;
+  background: #fff4f2;
+  border-color: #ffd0c9;
 }
 
 .findGrid em {
@@ -501,7 +541,7 @@
 
 .findFolderHero {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
+  grid-template-columns: 86px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 10px;
@@ -510,6 +550,12 @@
   border: 1px solid #d8e2db;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(24, 34, 29, 0.08);
+}
+
+.findFolderHero .folderLikeButton {
+  width: auto;
+  min-width: 72px;
+  margin: 0;
 }
 
 .findFolderHero img,

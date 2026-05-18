@@ -137,6 +137,8 @@ type Folder = {
   priceYen?: number | null
   pinIds: string[]
   visibility: 'private' | 'public'
+  likes: number
+  likedByMe: boolean
   createdAt: string
 }
 
@@ -170,9 +172,10 @@ type CommunityActivity = {
 
 type NotificationItem = {
   id: string
-  type: 'like' | 'save' | 'invite'
+  type: 'like' | 'save' | 'invite' | 'folder_like'
   actorId: string
   pinId?: string
+  folderId?: string
   communityId?: string
   createdAt: string
 }
@@ -263,6 +266,12 @@ type CommentRow = {
 
 type LikeRow = {
   post_id: string
+  user_id: string
+  created_at?: string | null
+}
+
+type FolderLikeRow = {
+  folder_id: string
   user_id: string
   created_at?: string | null
 }
@@ -518,7 +527,15 @@ function buildUsers(profileRows: ProfileRow[], followRows: FollowRow[]) {
   }))
 }
 
-function buildFolders(folderRows: AppFolderCardRow[]): Folder[] {
+function buildFolders(folderRows: AppFolderCardRow[], folderLikeRows: FolderLikeRow[] = [], activeUserId = ''): Folder[] {
+  const likedFolderIds = new Set(
+    activeUserId ? folderLikeRows.filter((like) => like.user_id === activeUserId).map((like) => like.folder_id) : [],
+  )
+  const likesByFolder = new Map<string, number>()
+  folderLikeRows.forEach((like) => {
+    likesByFolder.set(like.folder_id, (likesByFolder.get(like.folder_id) ?? 0) + 1)
+  })
+
   return folderRows.map((folder) => ({
     id: folder.id,
     ownerId: folder.user_id,
@@ -532,21 +549,26 @@ function buildFolders(folderRows: AppFolderCardRow[]): Folder[] {
     priceYen: folder.folder_price_yen ?? null,
     pinIds: Array.from(new Set(folder.post_ids ?? [])),
     visibility: folder.visibility === 'public' ? 'public' : 'private',
+    likes: likesByFolder.get(folder.id) ?? 0,
+    likedByMe: likedFolderIds.has(folder.id),
     createdAt: folder.created_at,
   }))
 }
 
 function buildNotifications(
   likeRows: LikeRow[],
+  folderLikeRows: FolderLikeRow[],
   saveRows: SavedPostRow[],
   inviteRows: CommunityInviteRow[],
   pins: Pin[],
+  folders: Folder[],
   communities: Community[],
   activeUserId: string,
 ): NotificationItem[] {
   if (!activeUserId) return []
 
   const myPinIds = new Set(pins.filter((pin) => pin.ownerId === activeUserId).map((pin) => pin.id))
+  const myFolderIds = new Set(folders.filter((folder) => folder.ownerId === activeUserId).map((folder) => folder.id))
   const communityIds = new Set(communities.map((community) => community.id))
   const items: NotificationItem[] = []
 
@@ -557,6 +579,17 @@ function buildNotifications(
       type: 'like',
       actorId: row.user_id,
       pinId: row.post_id,
+      createdAt: row.created_at ?? new Date().toISOString(),
+    })
+  })
+
+  folderLikeRows.forEach((row) => {
+    if (!myFolderIds.has(row.folder_id) || row.user_id === activeUserId) return
+    items.push({
+      id: `folder-like-${row.folder_id}-${row.user_id}`,
+      type: 'folder_like',
+      actorId: row.user_id,
+      folderId: row.folder_id,
       createdAt: row.created_at ?? new Date().toISOString(),
     })
   })
@@ -1264,6 +1297,14 @@ export default function CommunityMapPrototype() {
       const folderRows = (foldersResult.data ?? []) as AppFolderCardRow[]
       const postRows = (postsResult.data ?? []) as AppPostCardRow[]
       const memberRows = (membersResult.data ?? []) as CommunityMemberRow[]
+      let folderLikeRows: FolderLikeRow[] = []
+      const folderLikesResult = await supabase
+        .from('folder_likes')
+        .select('folder_id,user_id,created_at')
+        .limit(2000)
+      if (!folderLikesResult.error && Array.isArray(folderLikesResult.data)) {
+        folderLikeRows = folderLikesResult.data as FolderLikeRow[]
+      }
 
       let remoteUsers = buildUsers(profileRows, followRows)
       if (userId && !remoteUsers.some((user) => user.id === userId)) {
@@ -1283,7 +1324,7 @@ export default function CommunityMapPrototype() {
         ]
       }
 
-      const remoteFolders = buildFolders(folderRows)
+      const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
       const remotePins = buildPins(
         postRows,
         (commentsResult.data ?? []) as CommentRow[],
@@ -1298,10 +1339,15 @@ export default function CommunityMapPrototype() {
       )
       let saveNotificationRows = (saveActivityResult.data ?? []) as SavedPostRow[]
       let inviteNotificationRows: CommunityInviteRow[] = []
+      let folderLikeNotificationRows = folderLikeRows
       if (userId) {
         const saveNotificationResult = await supabase.rpc('app_save_notifications')
         if (!saveNotificationResult.error && Array.isArray(saveNotificationResult.data)) {
           saveNotificationRows = saveNotificationResult.data as SavedPostRow[]
+        }
+        const folderLikeNotificationResult = await supabase.rpc('app_folder_like_notifications')
+        if (!folderLikeNotificationResult.error && Array.isArray(folderLikeNotificationResult.data)) {
+          folderLikeNotificationRows = folderLikeNotificationResult.data as FolderLikeRow[]
         }
         const inviteNotificationResult = await supabase.rpc('app_invite_notifications')
         if (!inviteNotificationResult.error && Array.isArray(inviteNotificationResult.data)) {
@@ -1316,9 +1362,11 @@ export default function CommunityMapPrototype() {
       setActivities(buildActivities((activitiesResult.data ?? []) as AppCommunityActivityRow[]))
       setNotifications(buildNotifications(
         (likesResult.data ?? []) as LikeRow[],
+        folderLikeNotificationRows,
         saveNotificationRows,
         inviteNotificationRows,
         remotePins,
+        remoteFolders,
         remoteCommunities,
         userId,
       ))
@@ -1838,6 +1886,30 @@ export default function CommunityMapPrototype() {
     await loadRemoteData(activeUserId)
   }, [activeUserId, loadRemoteData, pinsById, requireSignedIn])
 
+  const toggleFolderLike = useCallback(async (folderId: string) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    const folder = folders.find((item) => item.id === folderId)
+    if (!folder) return
+
+    setFolders((current) =>
+      current.map((item) =>
+        item.id === folderId
+          ? { ...item, likedByMe: !item.likedByMe, likes: item.likedByMe ? Math.max(0, item.likes - 1) : item.likes + 1 }
+          : item,
+      ),
+    )
+
+    const result = folder.likedByMe
+      ? await client.from('folder_likes').delete().eq('folder_id', folderId).eq('user_id', activeUserId)
+      : await client.from('folder_likes').upsert({ folder_id: folderId, user_id: activeUserId }, { onConflict: 'folder_id,user_id' })
+
+    if (result.error) {
+      setToast(result.error.message.includes('folder_likes') ? 'Supabaseにfolder_likes SQLを追加してください。' : result.error.message)
+    }
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, folders, loadRemoteData, requireSignedIn])
+
   const addComment = useCallback(async (pinId: string) => {
     const text = commentText.trim()
     if (!text) return
@@ -2143,6 +2215,8 @@ export default function CommunityMapPrototype() {
         color,
         pinIds: [pinId],
         visibility: 'private',
+        likes: 0,
+        likedByMe: false,
         createdAt: new Date().toISOString(),
       },
       ...current,
@@ -2218,6 +2292,8 @@ export default function CommunityMapPrototype() {
         color: data.color ?? composerFolderColor,
         pinIds: [],
         visibility: mapVisibility(data.visibility),
+        likes: 0,
+        likedByMe: false,
         createdAt: data.created_at,
       },
       ...current,
@@ -2330,18 +2406,30 @@ export default function CommunityMapPrototype() {
   const renderFolderCard = (folder: Folder) => {
     const preview = folder.pinIds.map((id) => pinsById.get(id)).find(Boolean)
     return (
-      <button
+      <article
         key={folder.id}
         className={styles.folderCard}
-        type="button"
-        onClick={() => {
-          if (preview) setSelectedPinId(preview.id)
-        }}
       >
-        {preview ? <img src={preview.imageUrl} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
-        <strong>{folder.name}</strong>
-        <small>{folder.pinIds.length} pins</small>
-      </button>
+        <button
+          className={styles.folderOpenButton}
+          type="button"
+          onClick={() => {
+            if (preview) setSelectedPinId(preview.id)
+          }}
+        >
+          {preview ? <img src={preview.imageUrl} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
+          <strong>{folder.name}</strong>
+          <small>{folder.pinIds.length} pins</small>
+        </button>
+        <button
+          className={`${styles.folderLikeButton} ${folder.likedByMe ? styles.liked : ''}`}
+          type="button"
+          onClick={() => toggleFolderLike(folder.id)}
+        >
+          <Heart size={16} />
+          {folder.likes}
+        </button>
+      </article>
     )
   }
 
@@ -2616,6 +2704,7 @@ export default function CommunityMapPrototype() {
             pinsById={pinsById}
             onBack={() => setSelectedFindFolderId(null)}
             onOpenPin={setSelectedPinId}
+            onToggleLike={toggleFolderLike}
           />
         ) : (
           <section className={styles.page}>
@@ -2647,9 +2736,9 @@ export default function CommunityMapPrototype() {
               <button type="button">検索</button>
             </div>
             <div className={styles.findMain}>
-              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} />
-              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} />
-              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} />
+              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} />
+              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} />
+              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} />
             </div>
           </section>
         )
@@ -2888,6 +2977,7 @@ export default function CommunityMapPrototype() {
                     {notifications.map((notification) => {
                       const actor = usersById.get(notification.actorId)
                       const pin = notification.pinId ? pinsById.get(notification.pinId) : null
+                      const folder = notification.folderId ? folders.find((item) => item.id === notification.folderId) ?? null : null
                       const community = notification.communityId ? communitiesById.get(notification.communityId) : null
                       return (
                         <button
@@ -2904,19 +2994,24 @@ export default function CommunityMapPrototype() {
                               setMyWorldFolderId(null)
                               setMyWorldVisibleFolderIds(myFolders.map((folder) => folder.id))
                               setSelectedPinId(notification.pinId)
+                            } else if (notification.folderId) {
+                              setActiveTab('mypage')
+                              setProfileUserId(activeUserId)
+                              setProfileListMode('profile')
                             }
                             setNotificationsOpen(false)
                           }}
                         >
-                          <img src={actor?.avatarUrl || pin?.imageUrl || EMPTY_IMAGE} alt="" />
+                          <img src={actor?.avatarUrl || pin?.imageUrl || folder?.thumbnailUrl || EMPTY_IMAGE} alt="" />
                           <span>
                             <b>@{actor?.username ?? 'user'}</b>
                             <small>
                               {notification.type === 'like' && 'あなたのpinにいいねしました。'}
+                              {notification.type === 'folder_like' && 'あなたのfolderにいいねしました。'}
                               {notification.type === 'save' && 'あなたのpinを保存しました。'}
                               {notification.type === 'invite' && 'コミュニティに招待されました。'}
                             </small>
-                            <em>{notification.type === 'invite' ? communityLabel(community ?? undefined) : pin?.title ?? 'memory'}</em>
+                            <em>{notification.type === 'invite' ? communityLabel(community ?? undefined) : folder?.name ?? pin?.title ?? 'memory'}</em>
                           </span>
                         </button>
                       )
@@ -3343,11 +3438,13 @@ function FolderShelf({
   folders,
   pinsById,
   onOpenFolder,
+  onToggleLike,
 }: {
   title: string
   folders: Folder[]
   pinsById: Map<string, Pin>
   onOpenFolder: (folderId: string) => void
+  onToggleLike: (folderId: string) => void
 }) {
   return (
     <section className={styles.contentSection}>
@@ -3356,11 +3453,21 @@ function FolderShelf({
         {folders.map((folder) => {
           const preview = folder.thumbnailUrl || folder.pinIds.map((id) => pinsById.get(id)?.imageUrl).find(Boolean)
           return (
-            <button key={`${title}-${folder.id}`} type="button" onClick={() => onOpenFolder(folder.id)}>
-              {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
-              <strong>{folder.name}</strong>
-              <small>{folder.pinIds.length} pins / public folder</small>
-            </button>
+            <article key={`${title}-${folder.id}`} className={styles.findFolderCard}>
+              <button className={styles.folderOpenButton} type="button" onClick={() => onOpenFolder(folder.id)}>
+                {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
+                <strong>{folder.name}</strong>
+                <small>{folder.pinIds.length} pins / public folder</small>
+              </button>
+              <button
+                className={`${styles.folderLikeButton} ${folder.likedByMe ? styles.liked : ''}`}
+                type="button"
+                onClick={() => onToggleLike(folder.id)}
+              >
+                <Heart size={16} />
+                {folder.likes}
+              </button>
+            </article>
           )
         })}
         {!folders.length && <p className={styles.muted}>公開folderはまだありません。</p>}
@@ -3374,11 +3481,13 @@ function FindFolderDetail({
   pinsById,
   onBack,
   onOpenPin,
+  onToggleLike,
 }: {
   folder: Folder
   pinsById: Map<string, Pin>
   onBack: () => void
   onOpenPin: (pinId: string) => void
+  onToggleLike: (folderId: string) => void
 }) {
   const folderPins = uniquePinsByMemory(folder.pinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin)))
 
@@ -3405,6 +3514,14 @@ function FindFolderDetail({
           <strong>{folderPins.length} pins</strong>
           <small>{folder.isPaid ? 'Paid public folder' : 'Public folder'}</small>
         </div>
+        <button
+          className={`${styles.folderLikeButton} ${folder.likedByMe ? styles.liked : ''}`}
+          type="button"
+          onClick={() => onToggleLike(folder.id)}
+        >
+          <Heart size={16} />
+          {folder.likes}
+        </button>
       </div>
       <div className={styles.findFolderPinList}>
         {folderPins.map((pin, index) => (

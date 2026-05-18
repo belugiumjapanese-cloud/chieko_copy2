@@ -25,6 +25,59 @@ $$;
 
 grant execute on function public.app_save_notifications() to authenticated;
 
+-- Optional support for folder likes and "liked your folder" notifications.
+create table if not exists public.folder_likes (
+  folder_id uuid not null references public.folders(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (folder_id, user_id)
+);
+
+create index if not exists folder_likes_folder_idx
+on public.folder_likes (folder_id, created_at desc);
+
+create index if not exists folder_likes_user_idx
+on public.folder_likes (user_id, created_at desc);
+
+alter table public.folder_likes enable row level security;
+
+drop policy if exists "folder_likes readable" on public.folder_likes;
+create policy "folder_likes readable"
+on public.folder_likes
+for select
+using (true);
+
+drop policy if exists "folder_likes own writes" on public.folder_likes;
+create policy "folder_likes own writes"
+on public.folder_likes
+for all
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+create or replace function public.app_folder_like_notifications()
+returns table (
+  folder_id uuid,
+  user_id uuid,
+  created_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    fl.folder_id,
+    fl.user_id,
+    fl.created_at
+  from public.folder_likes fl
+  join public.folders f on f.id = fl.folder_id
+  where f.user_id = auth.uid()
+    and fl.user_id <> auth.uid()
+  order by fl.created_at desc
+  limit 200;
+$$;
+
+grant execute on function public.app_folder_like_notifications() to authenticated;
+
 -- Optional paid folder price.
 alter table public.folders
   add column if not exists folder_price_yen integer;
