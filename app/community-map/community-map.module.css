@@ -161,6 +161,71 @@
   overflow: hidden;
 }
 
+.recommendPage {
+  display: grid;
+  gap: 22px;
+  min-height: 100dvh;
+  padding: 22px 16px 104px;
+  background: #f7faf8;
+}
+
+.recommendHeroRail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 76vw);
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.recommendHeroRail::-webkit-scrollbar {
+  display: none;
+}
+
+.recommendHeroRail article {
+  position: relative;
+  min-height: 210px;
+  overflow: hidden;
+  color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(24, 34, 29, 0.18);
+}
+
+.recommendHeroRail img {
+  width: 100%;
+  height: 100%;
+  min-height: 210px;
+  object-fit: cover;
+  filter: brightness(0.72);
+}
+
+.recommendHeroRail div {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  display: grid;
+  gap: 5px;
+}
+
+.recommendHeroRail span,
+.recommendHeroRail small {
+  font-weight: 900;
+  opacity: 0.86;
+}
+
+.recommendHeroRail strong {
+  max-width: 680px;
+  font-size: clamp(1.7rem, 5vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.recommendSection {
+  display: grid;
+  gap: 12px;
+}
+
 .homeTopbar {
   display: flex;
   align-items: center;
@@ -1606,6 +1671,64 @@
   gap: 8px;
 }
 
+.dropScopeBar {
+  position: absolute;
+  top: calc(18px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 28;
+  display: flex;
+  gap: 8px;
+  padding: 4px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dropScopeBar::-webkit-scrollbar {
+  display: none;
+}
+
+.dropScopeBar button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 8px 13px;
+  color: #18231e;
+  font-weight: 950;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(24, 35, 30, 0.12);
+  border-radius: 999px;
+  box-shadow: 0 10px 26px rgba(24, 34, 29, 0.12);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.dropScopeBar button.active {
+  color: #ffffff;
+  background: #126b58;
+}
+
+.dropStatusCard {
+  position: absolute;
+  top: calc(70px + env(safe-area-inset-top));
+  left: 16px;
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(24, 35, 30, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(24, 34, 29, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.dropStatusCard span {
+  color: #65736b;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
 .placementBanner,
 .postMessage {
   top: 140px;
@@ -1639,6 +1762,24 @@
   border-radius: 999px;
   box-shadow: 0 14px 34px rgba(18, 107, 88, 0.34);
   cursor: pointer;
+}
+
+.dropPostButton {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: #ffffff;
+  background: #ef3b2d;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 16px 34px rgba(239, 59, 45, 0.32);
+  cursor: pointer;
+}
+
+.mapFloatingAction:has(.dropPostButton) {
+  right: 18px;
+  bottom: 92px;
 }
 
 .timelineList,
@@ -2036,6 +2177,22 @@
   color: #126b58;
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.mapStoryAddButton {
+  position: absolute;
+  right: 28px;
+  bottom: 30px;
+  z-index: 20;
+  min-height: 34px;
+  padding: 7px 15px;
+  color: #ffffff;
+  font-weight: 950;
+  background: #126b58;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(18, 107, 88, 0.24);
+  cursor: pointer;
 }
 
 .mapStoryDetail {
@@ -2768,6 +2925,18 @@
   background: #eff7f3;
 }
 
+.footer .dropFooterButton {
+  transform: translateY(-8px);
+  color: #ffffff;
+  background: #126b58;
+  box-shadow: 0 14px 30px rgba(18, 107, 88, 0.28);
+}
+
+.footer .dropFooterButton.active {
+  color: #ffffff;
+  background: #0f5c4b;
+}
+
 @media (min-width: 820px) {
   .findGrid,
   .folderGrid {
@@ -3007,8 +3176,8 @@
   z-index: 24;
   display: grid;
   place-items: center;
-  width: 74px;
-  height: 74px;
+  width: 58px;
+  height: 58px;
   color: #ffffff;
   border: 0;
   border-radius: 50%;

@@ -7,11 +7,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   BookmarkPlus,
-  Compass,
+  Droplet,
   EyeOff,
+  Folder,
   FolderPlus,
   Heart,
-  Home,
   LocateFixed,
   Lock,
   Map as MapIcon,
@@ -22,6 +22,7 @@ import {
   Send,
   SlidersHorizontal,
   ShieldCheck,
+  Sparkles,
   Users,
   UserRound,
   X,
@@ -39,7 +40,7 @@ mapboxgl.accessToken = MAPBOX_TOKEN
 
 const PRODUCTION_SITE_URL = 'https://map-omega-nine.vercel.app'
 const CONFIGURED_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
-const DEFAULT_CENTER: [number, number] = [139.7671, 35.6812]
+const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const EMPTY_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23dfe8e2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23126b58%22%20opacity%3D%22.35%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23126b58%22%20opacity%3D%22.3%22/%3E%3C/svg%3E'
@@ -64,8 +65,8 @@ function getAuthRedirectUrl() {
 }
 
 type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
-type HomeMode = 'timeline' | 'map'
 type LibraryMode = 'map' | 'folder'
+type DropScope = { id: string; label: string; pins: Pin[] }
 type Privacy = 'public' | 'limited'
 type ProfileListMode = 'profile' | 'following' | 'followers'
 
@@ -179,8 +180,6 @@ type NotificationItem = {
   communityId?: string
   createdAt: string
 }
-
-const arraysMatch = (a: string[], b: string[]) => a.length === b.length && a.every((value, index) => value === b[index])
 
 type ProfileRow = {
   id: string
@@ -413,20 +412,6 @@ function createSlug(value: string) {
 
 function pinCommunityIds(pin: Pin) {
   return Array.from(new Set([...(pin.postedCommunityIds ?? []), pin.communityId].filter(Boolean) as string[]))
-}
-
-function filterPinsByFolders(pins: Pin[], folders: Folder[], selectedFolderIds: string[]) {
-  if (!folders.length) return pins
-  if (!selectedFolderIds.length) return []
-
-  const selectedIds = new Set(selectedFolderIds)
-  const visiblePinIds = new Set(
-    folders
-      .filter((folder) => selectedIds.has(folder.id))
-      .flatMap((folder) => folder.pinIds),
-  )
-
-  return pins.filter((pin) => visiblePinIds.has(pin.id))
 }
 
 function tagStatsFromPins(pins: Pin[]) {
@@ -1001,12 +986,10 @@ function PinMap({
 
 export default function CommunityMapPrototype() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('myworld')
-  const [homeMode, setHomeMode] = useState<HomeMode>('timeline')
-  const [findChaosOpen, setFindChaosOpen] = useState(false)
   const [findCommunityOpen, setFindCommunityOpen] = useState(false)
   const [selectedFindFolderId, setSelectedFindFolderId] = useState<string | null>(null)
-  const [myWorldMode, setMyWorldMode] = useState<LibraryMode>('map')
-  const [toVisitMode, setToVisitMode] = useState<LibraryMode>('map')
+  const [toVisitMode, setToVisitMode] = useState<LibraryMode>('folder')
+  const [dropScopeId, setDropScopeId] = useState('follow')
   const [users, setUsers] = useState<DemoUser[]>([])
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeUserId, setActiveUserId] = useState('')
@@ -1026,9 +1009,7 @@ export default function CommunityMapPrototype() {
   const [accountCreatorOpen, setAccountCreatorOpen] = useState(false)
   const [profileDraft, setProfileDraft] = useState({ displayName: '', username: '', bio: '', avatarUrl: '' })
   const [profileSaving, setProfileSaving] = useState(false)
-  const [myWorldPanelsHidden, setMyWorldPanelsHidden] = useState(false)
-  const [toVisitPanelsHidden, setToVisitPanelsHidden] = useState(false)
-  const [myWorldFolderId, setMyWorldFolderId] = useState<string | null>(null)
+  const [myWorldPanelsHidden, setMyWorldPanelsHidden] = useState(true)
   const [toVisitFolderId, setToVisitFolderId] = useState<string | null>(null)
   const [folderEditId, setFolderEditId] = useState<string | null>(null)
   const [folderSearch, setFolderSearch] = useState('')
@@ -1052,8 +1033,6 @@ export default function CommunityMapPrototype() {
   const [folderEditorPinId, setFolderEditorPinId] = useState<string | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
   const [newFolderColor, setNewFolderColor] = useState(COLORS[0])
-  const [myWorldVisibleFolderIds, setMyWorldVisibleFolderIds] = useState<string[]>([])
-  const [toVisitVisibleFolderIds, setToVisitVisibleFolderIds] = useState<string[]>([])
   const [profileUserId, setProfileUserId] = useState('')
   const [profileListMode, setProfileListMode] = useState<ProfileListMode>('profile')
   const [postDraft, setPostDraft] = useState<PostDraft | null>(null)
@@ -1125,21 +1104,15 @@ export default function CommunityMapPrototype() {
     () => uniquePinsByMemory(savedPinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin))),
     [pinsById, savedPinIds],
   )
-  const toVisitPins = useMemo(
-    () => savedPins.filter((pin) => pin.ownerId !== activeUserId),
-    [activeUserId, savedPins],
-  )
-  const myFolders = useMemo(
-    () => folders.filter((folder) => folder.ownerId === activeUserId && folder.kind === 'my_world'),
+  const userFolders = useMemo(
+    () => folders.filter((folder) => folder.ownerId === activeUserId),
     [activeUserId, folders],
   )
-  const toVisitFolders = useMemo(
-    () => folders.filter((folder) => folder.ownerId === activeUserId && folder.kind === 'to_visit'),
-    [activeUserId, folders],
+  const folderLibraryPins = useMemo(
+    () => uniquePinsByMemory(uniquePinsById([...myPostedPins, ...savedPins])),
+    [myPostedPins, savedPins],
   )
-  const folderEditorFolders = folderEditorPin
-    ? (folderEditorPin.ownerId === activeUserId ? myFolders : toVisitFolders)
-    : myFolders
+  const folderEditorFolders = userFolders
   const publicFolderPinIds = useMemo(() => {
     return new Set(
       folders
@@ -1150,14 +1123,6 @@ export default function CommunityMapPrototype() {
   const publicPins = useMemo(
     () => uniquePinsByMemory(pins.filter((pin) => pin.visibility === 'public' && publicFolderPinIds.has(pin.id))),
     [pins, publicFolderPinIds],
-  )
-  const myWorldMapPins = useMemo(
-    () => filterPinsByFolders(myPostedPins, myFolders, myWorldVisibleFolderIds),
-    [myFolders, myPostedPins, myWorldVisibleFolderIds],
-  )
-  const toVisitMapPins = useMemo(
-    () => filterPinsByFolders(toVisitPins, toVisitFolders, toVisitVisibleFolderIds),
-    [toVisitFolders, toVisitPins, toVisitVisibleFolderIds],
   )
   const profilePins = pins
     .filter((pin) => pin.ownerId === selectedProfile.id)
@@ -1182,23 +1147,31 @@ export default function CommunityMapPrototype() {
     )
     : []
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
+  const followPins = publicPins.filter((pin) => currentUser.followingIds.includes(pin.ownerId))
+  const recommendedPins = [...publicPins].sort((a, b) => (b.likes + b.saves + b.comments.length) - (a.likes + a.saves + a.comments.length)).slice(0, 200)
+  const dropScopes: DropScope[] = [
+    { id: 'chaos', label: 'Chaos', pins: publicPins },
+    { id: 'follow', label: 'Follow', pins: followPins },
+    { id: 'recommend', label: 'Recommend', pins: recommendedPins },
+    ...joinedCommunities.map((community) => ({
+      id: `community:${community.id}`,
+      label: communityLabel(community),
+      pins: pins.filter((pin) => pinCommunityIds(pin).includes(community.id)),
+    })),
+    { id: 'myworld', label: 'My World', pins: myPostedPins },
+    ...userFolders.map((folder) => ({
+      id: `folder:${folder.id}`,
+      label: folder.name,
+      pins: folder.pinIds.map((pinId) => pinsById.get(pinId)).filter((pin): pin is Pin => Boolean(pin)),
+    })),
+  ]
+  const activeDropScope = dropScopes.find((scope) => scope.id === dropScopeId) ?? dropScopes[1] ?? dropScopes[0]
+  const dropPins = activeDropScope?.pins ?? []
   const recommendedCommunities = communities.filter((community) =>
     !community.memberIds.includes(activeUserId) &&
     (currentUser.followingIds.some((userId) => community.memberIds.includes(userId)) || community.privacy === 'public'),
   )
   const profileCommunities = communities.filter((community) => community.memberIds.includes(selectedProfile.id))
-  const homeFeedPins = uniquePinsByMemory(uniquePinsById(
-    [...pins]
-      .filter((pin) =>
-        pin.visibility === 'public' &&
-        (
-          pin.ownerId === activeUserId ||
-          currentUser.followingIds.includes(pin.ownerId) ||
-          pinCommunityIds(pin).some((id) => joinedCommunities.some((community) => community.id === id))
-        ),
-      )
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-  ))
   const filteredCommunities = communities.filter((community) => {
     const query = communityQuery.trim().toLowerCase()
     if (!query) return true
@@ -1420,6 +1393,10 @@ export default function CommunityMapPrototype() {
       setActiveUserId(userId)
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId(userId)
+      if (!userId) {
+        setRemoteLoading(false)
+        return
+      }
       await loadRemoteData(userId)
     }
 
@@ -1434,6 +1411,10 @@ export default function CommunityMapPrototype() {
       setActiveUserId(userId)
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId(userId)
+      if (!userId) {
+        setRemoteLoading(false)
+        return
+      }
       loadRemoteData(userId)
     })
 
@@ -1442,22 +1423,6 @@ export default function CommunityMapPrototype() {
       subscription.unsubscribe()
     }
   }, [loadRemoteData])
-
-  useEffect(() => {
-    const myWorldFolderIds = folders
-      .filter((folder) => folder.ownerId === activeUserId && folder.kind === 'my_world')
-      .map((folder) => folder.id)
-    const toVisitFolderIds = folders
-      .filter((folder) => folder.ownerId === activeUserId && folder.kind === 'to_visit')
-      .map((folder) => folder.id)
-    const syncByIds = (folderIds: string[]) => (current: string[]) => {
-      const next = current.length ? current.filter((id) => folderIds.includes(id)) : folderIds
-      return arraysMatch(current, next) ? current : next
-    }
-
-    setMyWorldVisibleFolderIds(syncByIds(myWorldFolderIds))
-    setToVisitVisibleFolderIds(syncByIds(toVisitFolderIds))
-  }, [activeUserId, folders])
 
   const ownedAccounts = ownedAccountIds.map((id) => usersById.get(id)).filter((user): user is DemoUser => Boolean(user))
 
@@ -1779,7 +1744,7 @@ export default function CommunityMapPrototype() {
       description: '',
       tags: '',
       takenAt,
-      folderIds: myFolders[0] ? [myFolders[0].id] : [],
+      folderIds: userFolders[0] ? [userFolders[0].id] : [],
     })
     setComposerFolderPanelOpen(false)
 
@@ -1793,7 +1758,7 @@ export default function CommunityMapPrototype() {
       if (!selectedCommunityId) setActiveTab('myworld')
       setPostMessage('位置情報がありません。map上で投稿位置を選択してください。')
     }
-  }, [myFolders, selectedCommunityId])
+  }, [selectedCommunityId, userFolders])
 
   const confirmManualLocation = useCallback((coordinates: Coordinates) => {
     if (!postDraft) return
@@ -1873,7 +1838,7 @@ export default function CommunityMapPrototype() {
       setComposerFolderPanelOpen(false)
       setPostDraft(null)
       setSelectedPinId(newPost.id)
-      setPostMessage(postDraft.communityId ? '投稿しました。' : 'My Worldに保存しました。')
+      setPostMessage(postDraft.communityId ? '投稿しました。' : 'Dropに保存しました。')
     } finally {
       postSubmitLockRef.current = false
       setPostSaving(false)
@@ -2086,30 +2051,26 @@ export default function CommunityMapPrototype() {
     setInviteCommunityId(null)
     setProfileWorldUserId(null)
     if (nextTab === 'home') {
-      setHomeMode('timeline')
       setTimelineOpen(false)
     }
     if (nextTab === 'find') {
       setSelectedCommunityId(null)
-      setFindChaosOpen(false)
       setFindCommunityOpen(false)
       setSelectedFindFolderId(null)
       setTimelineOpen(false)
       setCommunityQuery('')
       setCreateCommunityOpen(false)
     } else {
-      setFindChaosOpen(false)
       setFindCommunityOpen(false)
       setSelectedFindFolderId(null)
       setSelectedCommunityId(null)
       setTimelineOpen(false)
     }
     if (nextTab === 'myworld') {
-      setMyWorldMode('map')
-      setMyWorldFolderId(null)
+      setMyWorldPanelsHidden(true)
     }
     if (nextTab === 'tovisit') {
-      setToVisitMode('map')
+      setToVisitMode('folder')
       setToVisitFolderId(null)
     }
     if (nextTab === 'mypage') {
@@ -2174,7 +2135,6 @@ export default function CommunityMapPrototype() {
     if (!window.confirm('このfolderを削除しますか？')) return
 
     setFolderEditId(null)
-    setMyWorldFolderId((current) => (current === folderId ? null : current))
     setToVisitFolderId((current) => (current === folderId ? null : current))
     setFolders((current) => current.filter((folder) => folder.id !== folderId))
 
@@ -2271,7 +2231,7 @@ export default function CommunityMapPrototype() {
     if (!trimmedName) return false
     const client = supabase
     if (!client || !requireSignedIn()) return false
-    const folderKind: Folder['kind'] = pinsById.get(pinId)?.ownerId === activeUserId ? 'my_world' : 'to_visit'
+    const folderKind: Folder['kind'] = 'my_world'
     const tempId = createId('folder')
     setFolders((current) => [
       {
@@ -2510,7 +2470,7 @@ export default function CommunityMapPrototype() {
       <div>
         <span>Account</span>
         <h1>Sign in to keep your world</h1>
-        <p>My World、To Visit、フォルダー、いいね、コメントを自分のアカウントに保存します。</p>
+        <p>Drop、Folder、いいね、コメントを自分のアカウントに保存します。</p>
       </div>
       <div className={styles.segmented}>
         <button className={authMode === 'signin' ? styles.active : ''} type="button" onClick={() => setAuthMode('signin')}>Sign in</button>
@@ -2570,7 +2530,7 @@ export default function CommunityMapPrototype() {
     </section>
   )
 
-  const showInitialLoader = remoteLoading && !remoteError && !pins.length && !folders.length && !communities.length
+  const showInitialLoader = remoteLoading && !activeUserId
 
   if (showInitialLoader) {
     return (
@@ -2626,60 +2586,56 @@ export default function CommunityMapPrototype() {
         />
       )}
       {activeTab === 'home' && (
-        <section className={styles.homePage}>
-          <header className={styles.homeTopbar}>
-            <div>
-              <strong>Home</strong>
-              <span>{homeMode === 'timeline' ? 'Follow + Community' : 'Timeline pins on map'}</span>
-            </div>
-            <div className={styles.homeSwitch}>
-              <button className={homeMode === 'timeline' ? styles.active : ''} type="button" onClick={() => setHomeMode('timeline')}>Timeline</button>
-              <button className={homeMode === 'map' ? styles.active : ''} type="button" onClick={() => setHomeMode('map')}>Map</button>
-            </div>
+        <section className={styles.recommendPage}>
+          <header className={styles.pageHeader}>
+            <span>Recommend</span>
+            <h1>運営のおすすめと、今見てほしい場所</h1>
           </header>
-          {homeMode === 'map' ? (
-            <section className={styles.homeMapPanel}>
-              <PinMap
-                pins={homeFeedPins}
-                selectedPinId={selectedPinId}
-                seenPinIds={seenPinIds}
-                onPinClick={openPinFromMap}
-                onMapSurfaceClick={() => setSelectedPinId(null)}
-              />
-              <div className={styles.homeMapOverlay}>
-                <strong>Timeline Map</strong>
-                <span>{homeFeedPins.length} pins</span>
+          <div className={styles.recommendHeroRail}>
+            <article>
+              <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=80" alt="" />
+              <div>
+                <span>Event</span>
+                <strong>週末に歩きたい建築と街のイベント</strong>
+                <small>公式ピックアップ</small>
               </div>
-            </section>
-          ) : (
-            <section className={styles.homeFeedPanel}>
-              <div className={styles.feedList}>
-                {homeFeedPins.map((pin) => {
-                  const owner = usersById.get(pin.ownerId)
-                  const community = communitiesById.get(pinCommunityIds(pin)[0] ?? '')
-                  return (
-                    <article key={`feed-${pin.id}`} className={styles.feedCard}>
-                      <button type="button" onClick={() => setSelectedPinId(pin.id)}>
-                        <img src={pin.imageUrl} alt="" />
-                      </button>
-                      <div>
-                        <button className={styles.authorLink} type="button" onClick={() => owner && openProfile(owner.id)}>
-                          @{owner?.username ?? 'user'}
-                        </button>
-                        <span>{community ? `in ${communityLabel(community)}` : 'posted'}</span>
-                        <h2>{pin.title}</h2>
-                        <p>{pin.description || '説明文なし'}</p>
-                        <div className={styles.feedActions}>
-                          <button type="button" onClick={() => toggleLike(pin.id)}><Heart size={16} /> {pin.likes}</button>
-                          <button type="button" onClick={() => saveExternalPin(pin)}><BookmarkPlus size={16} /> To Visit</button>
-                        </div>
-                      </div>
-                    </article>
-                  )
-                })}
+            </article>
+            <article>
+              <img src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1100&q=80" alt="" />
+              <div>
+                <span>Folder Pick</span>
+                <strong>いま保存されている公開フォルダー</strong>
+                <small>{publicFindFolders.length} folders</small>
               </div>
-            </section>
-          )}
+            </article>
+          </div>
+          <section className={styles.recommendSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <h2>Pick up folders</h2>
+                <p>運営が見せたい公開フォルダーをここに出していきます。</p>
+              </div>
+            </div>
+            <FolderShelf title="Public folders" folders={publicFindFolders.slice(0, 6)} pinsById={pinsById} onOpenFolder={(folderId) => { setActiveTab('find'); setSelectedFindFolderId(folderId) }} onToggleLike={toggleFolderLike} />
+          </section>
+          <section className={styles.recommendSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <h2>Community pulse</h2>
+                <p>参加すると、自分のdropをコミュニティへ共有できます。</p>
+              </div>
+            </div>
+            <CommunityListSection
+              title="Recommended community"
+              communities={[...recommendedCommunities, ...joinedCommunities].slice(0, 6)}
+              currentUserId={activeUserId}
+              onOpen={openCommunity}
+              onShare={(communityId) => {
+                setInviteCommunityId(communityId)
+                setInviteQuery('')
+              }}
+            />
+          </section>
         </section>
       )}
 
@@ -2707,25 +2663,6 @@ export default function CommunityMapPrototype() {
             onMapClick={manualPlacement ? confirmManualLocation : undefined}
             onMapSurfaceClick={() => setSelectedPinId(null)}
             onPost={() => openPostPicker(selectedCommunity.id)}
-          />
-        ) : findChaosOpen ? (
-          <SplitMapView
-            pins={publicPins}
-            selectedPinId={selectedPinId}
-            seenPinIds={seenPinIds}
-            onPinClick={openPinFromMap}
-            onListFocus={openPinFromMap}
-            onMapSurfaceClick={() => setSelectedPinId(null)}
-            getPinMeta={getMapPinMeta}
-            overlay={(
-              <div className={styles.communityMapHeader}>
-                <button type="button" onClick={() => setFindChaosOpen(false)}><ArrowLeft size={18} /></button>
-                <div>
-                  <strong>Chaos</strong>
-                  <span>{publicPins.length} public pins</span>
-                </div>
-              </div>
-            )}
           />
         ) : findCommunityOpen ? (
           <section className={styles.page}>
@@ -2800,17 +2737,8 @@ export default function CommunityMapPrototype() {
           <section className={styles.page}>
             <header className={styles.pageHeader}>
               <span>Find</span>
-              <h1>行きたい場所と、参加したいコミュニティを探す</h1>
+              <h1>公開フォルダーとコミュニティを探す</h1>
             </header>
-            <section className={styles.chaosEntry}>
-              <div>
-                <strong>Chaos Map</strong>
-                <span>公開されている全てのピンを地図で見る</span>
-              </div>
-              <button className={styles.primaryButton} type="button" onClick={() => { setSelectedFindFolderId(null); setFindChaosOpen(true) }}>
-                Open
-              </button>
-            </section>
             <section className={styles.chaosEntry}>
               <div>
                 <strong>Join Community</strong>
@@ -2835,139 +2763,85 @@ export default function CommunityMapPrototype() {
       )}
 
       {activeTab === 'myworld' && (
-        myWorldMode === 'map' ? (
-          <SplitMapView
-            pins={myWorldMapPins}
-            selectedPinId={selectedPinId}
-            onPinClick={openPinFromMap}
-            onListFocus={openPinFromMap}
-            onMapSurfaceClick={() => setSelectedPinId(null)}
-            currentLocation={userLocation}
-            startAtCurrentLocation
-            panelsHidden={myWorldPanelsHidden}
-            onPanelsHiddenChange={setMyWorldPanelsHidden}
-            getPinMeta={(pin) => {
-              const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
-              return communitiesText || 'private memory'
-            }}
-            onDeletePin={deletePin}
-            onMapClick={manualPlacement ? confirmManualLocation : undefined}
-            overlay={(
-              <>
-                <div className={styles.mapOverlay}>
-                  <strong>My World</strong>
-                  <span>{myWorldMapPins.length} / {myPostedPins.length} memories</span>
+        <SplitMapView
+          pins={dropPins}
+          selectedPinId={selectedPinId}
+          seenPinIds={seenPinIds}
+          onPinClick={openPinFromMap}
+          onListFocus={openPinFromMap}
+          onMapSurfaceClick={() => setSelectedPinId(null)}
+          currentLocation={userLocation}
+          startAtCurrentLocation
+          panelsHidden={myWorldPanelsHidden}
+          onPanelsHiddenChange={setMyWorldPanelsHidden}
+          getPinMeta={(pin) => {
+            const owner = usersById.get(pin.ownerId)
+            return owner ? `@${owner.username}` : activeDropScope?.label ?? 'Drop'
+          }}
+          onDeletePin={deletePin}
+          onSavePin={saveExternalPin}
+          showPanelsToggle={false}
+          showSearch={false}
+          onMapClick={manualPlacement ? confirmManualLocation : undefined}
+          overlay={(
+            <>
+              <div className={styles.dropScopeBar}>
+                {dropScopes.map((scope) => (
+                  <button
+                    key={scope.id}
+                    className={activeDropScope?.id === scope.id ? styles.active : ''}
+                    type="button"
+                    onClick={() => {
+                      setDropScopeId(scope.id)
+                      setSelectedPinId(null)
+                    }}
+                  >
+                    {scope.label}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.dropStatusCard}>
+                <strong>{activeDropScope?.label ?? 'Drop'}</strong>
+                <span>{dropPins.length} drops</span>
+              </div>
+              {manualPlacement && (
+                <div className={styles.placementBanner}>
+                  map上で投稿位置をクリックしてください。
                 </div>
-                <div className={styles.libraryMapControls}>
-                  <LibraryModeSwitch value={myWorldMode} onChange={setMyWorldMode} />
-                </div>
-                <div className={styles.mapSortControl}>
-                  <MapFolderFilter
-                    title="My Folder"
-                    folders={myFolders}
-                    selectedFolderIds={myWorldVisibleFolderIds}
-                    onToggle={(folderId, checked) => toggleVisibleFolder(folderId, checked, setMyWorldVisibleFolderIds)}
-                  />
-                </div>
-                {manualPlacement && (
-                  <div className={styles.placementBanner}>
-                    map上で投稿位置をクリックしてください。
-                  </div>
-                )}
-                {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
-              </>
-            )}
-            floatingAction={(
-              <button className={styles.communityPostButton} type="button" onClick={openLibraryPicker}>
-                <Plus size={24} />
-                Add Memory
-              </button>
-            )}
-          />
-        ) : (
-          <FolderLibraryView
-            title="My World"
-            mode={myWorldMode}
-            onModeChange={setMyWorldMode}
-            pins={myPostedPins}
-            folders={myFolders}
-            selectedFolderId={myWorldFolderId}
-            onSelectFolder={setMyWorldFolderId}
-            folderSearch={folderSearch}
-            onFolderSearch={setFolderSearch}
-            onOpenPin={openPinFromMap}
-            onToggleFolder={togglePinFolder}
-            onCreateFolder={addFolderForPin}
-            onCreateEmptyFolder={createEmptyFolder}
-            onEditFolder={setFolderEditId}
-            onDeleteFolder={deleteFolder}
-            onDeletePin={deletePin}
-            onReorderFolderPin={reorderFolderPin}
-            getMeta={(pin) => {
-              const communitiesText = pinCommunityIds(pin).map((id) => communityLabel(communitiesById.get(id))).join(' / ')
-              return communitiesText || 'private memory'
-            }}
-          />
-        )
+              )}
+              {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
+            </>
+          )}
+          floatingAction={(
+            <button className={styles.dropPostButton} type="button" aria-label="dropを投稿" onClick={openLibraryPicker}>
+              <Plus size={25} />
+            </button>
+          )}
+        />
       )}
 
       {activeTab === 'tovisit' && (
-        toVisitMode === 'map' ? (
-          <SplitMapView
-            pins={toVisitMapPins}
-            selectedPinId={selectedPinId}
-            seenPinIds={seenPinIds}
-            onPinClick={openPinFromMap}
-            onListFocus={openPinFromMap}
-            onMapSurfaceClick={() => setSelectedPinId(null)}
-            currentLocation={userLocation}
-            startAtCurrentLocation
-            panelsHidden={toVisitPanelsHidden}
-            onPanelsHiddenChange={setToVisitPanelsHidden}
-            getPinMeta={getMapPinMeta}
-            onDeletePin={deletePin}
-            overlay={(
-              <>
-                <div className={styles.mapOverlay}>
-                  <strong>To Visit</strong>
-                  <span>{toVisitMapPins.length} / {toVisitPins.length} saved places</span>
-                </div>
-                <div className={styles.libraryMapControls}>
-                  <LibraryModeSwitch value={toVisitMode} onChange={setToVisitMode} />
-                </div>
-                <div className={styles.mapSortControl}>
-                  <MapFolderFilter
-                    title="My Folder"
-                    folders={toVisitFolders}
-                    selectedFolderIds={toVisitVisibleFolderIds}
-                    onToggle={(folderId, checked) => toggleVisibleFolder(folderId, checked, setToVisitVisibleFolderIds)}
-                  />
-                </div>
-              </>
-            )}
-          />
-        ) : (
-          <FolderLibraryView
-            title="To Visit"
-            mode={toVisitMode}
-            onModeChange={setToVisitMode}
-            pins={toVisitPins}
-            folders={toVisitFolders}
-            selectedFolderId={toVisitFolderId}
-            onSelectFolder={setToVisitFolderId}
-            folderSearch={folderSearch}
-            onFolderSearch={setFolderSearch}
-            onOpenPin={openPinFromMap}
-            onToggleFolder={togglePinFolder}
-            onCreateFolder={addFolderForPin}
-            onCreateEmptyFolder={(name, color) => createEmptyFolder(name, color, 'to_visit')}
-            onEditFolder={setFolderEditId}
-            onDeleteFolder={deleteFolder}
-            onDeletePin={deletePin}
-            onReorderFolderPin={reorderFolderPin}
-            getMeta={getMapPinMeta}
-          />
-        )
+        <FolderLibraryView
+          title="Folder"
+          mode={toVisitMode}
+          onModeChange={setToVisitMode}
+          pins={folderLibraryPins}
+          folders={userFolders}
+          selectedFolderId={toVisitFolderId}
+          onSelectFolder={setToVisitFolderId}
+          folderSearch={folderSearch}
+          onFolderSearch={setFolderSearch}
+          onOpenPin={openPinFromMap}
+          onToggleFolder={togglePinFolder}
+          onCreateFolder={addFolderForPin}
+          onCreateEmptyFolder={(name, color) => createEmptyFolder(name, color, 'my_world')}
+          onEditFolder={setFolderEditId}
+          onDeleteFolder={deleteFolder}
+          onDeletePin={deletePin}
+          onReorderFolderPin={reorderFolderPin}
+          showModeSwitch={false}
+          getMeta={(pin) => pin.ownerId === activeUserId ? 'My drop' : getMapPinMeta(pin)}
+        />
       )}
 
       {activeTab === 'mypage' && !profileWorldUser && (
@@ -2977,7 +2851,7 @@ export default function CommunityMapPrototype() {
               <div>
                 <span>Profile</span>
                 <h1>Sign in to keep your world</h1>
-                <p>My World、To Visit、フォルダー、いいね、コメントを自分のアカウントに保存します。</p>
+                <p>Drop、Folder、いいね、コメントを自分のアカウントに保存します。</p>
               </div>
               <div className={styles.segmented}>
                 <button className={authMode === 'signin' ? styles.active : ''} type="button" onClick={() => setAuthMode('signin')}>Sign in</button>
@@ -3082,9 +2956,7 @@ export default function CommunityMapPrototype() {
                               openCommunity(notification.communityId)
                             } else if (notification.pinId) {
                               setActiveTab('myworld')
-                              setMyWorldMode('map')
-                              setMyWorldFolderId(null)
-                              setMyWorldVisibleFolderIds(myFolders.map((folder) => folder.id))
+                              setDropScopeId('myworld')
                               setSelectedPinId(notification.pinId)
                             } else if (notification.folderId) {
                               setActiveTab('mypage')
@@ -3436,7 +3308,7 @@ export default function CommunityMapPrototype() {
           <form className={styles.composer} onSubmit={submitCommunityPost} onClick={(event) => event.stopPropagation()}>
             <button className={styles.closeButton} type="button" onClick={() => setComposerOpen(false)}><X size={17} /></button>
             <img src={postDraft.imageUrl} alt="" />
-            <strong>{postDraft.communityId ? `${communityLabel(communitiesById.get(postDraft.communityId))} に投稿` : 'My Worldに保存'}</strong>
+            <strong>{postDraft.communityId ? `${communityLabel(communitiesById.get(postDraft.communityId))} に投稿` : 'Dropする'}</strong>
             {postDraft.coordinates && (
               <div className={styles.locationSummary}>
                 <MapIcon size={18} />
@@ -3451,12 +3323,8 @@ export default function CommunityMapPrototype() {
               <input type="datetime-local" value={postComposer.takenAt} onChange={(event) => setPostComposer((current) => ({ ...current, takenAt: event.target.value }))} />
             </label>
             <label>
-              タイトル
-              <input value={postComposer.title} onChange={(event) => setPostComposer((current) => ({ ...current, title: event.target.value }))} />
-            </label>
-            <label>
-              説明文
-              <textarea value={postComposer.description} onChange={(event) => setPostComposer((current) => ({ ...current, description: event.target.value }))} />
+              一言加えて
+              <input value={postComposer.title} onChange={(event) => setPostComposer((current) => ({ ...current, title: event.target.value, description: '' }))} placeholder="この瞬間を一言で" />
             </label>
             <label>
               #
@@ -3477,7 +3345,7 @@ export default function CommunityMapPrototype() {
                 <span>Folder</span>
                 <strong>
                   {postComposer.folderIds.length
-                    ? myFolders.filter((folder) => postComposer.folderIds.includes(folder.id)).map((folder) => folder.name).join(', ')
+                    ? userFolders.filter((folder) => postComposer.folderIds.includes(folder.id)).map((folder) => folder.name).join(', ')
                     : 'フォルダーを選択'}
                 </strong>
               </button>
@@ -3485,7 +3353,7 @@ export default function CommunityMapPrototype() {
                 <div className={styles.composerFolderPanel}>
                   <div className={styles.checkboxList}>
                     <strong>入れるフォルダー</strong>
-                    {myFolders.map((folder) => (
+                    {userFolders.map((folder) => (
                       <label key={folder.id}>
                         <input
                           type="checkbox"
@@ -3502,7 +3370,7 @@ export default function CommunityMapPrototype() {
                         <span>{folder.name}</span>
                       </label>
                     ))}
-                    {!myFolders.length && <p className={styles.muted}>フォルダーはまだありません。</p>}
+                    {!userFolders.length && <p className={styles.muted}>フォルダーはまだありません。</p>}
                   </div>
                   <div className={styles.inlineCreate}>
                     <input value={composerFolderName} onChange={(event) => setComposerFolderName(event.target.value)} placeholder="新規フォルダー名" />
@@ -3513,17 +3381,17 @@ export default function CommunityMapPrototype() {
               )}
             </div>
             <button className={styles.primaryButton} type="submit" disabled={postSaving}>
-              {postSaving ? 'Saving...' : postDraft.communityId ? '投稿' : 'My Worldに保存'}
+              {postSaving ? 'Saving...' : postDraft.communityId ? '投稿' : 'Dropに保存'}
             </button>
           </form>
         </aside>
       )}
 
       <nav className={styles.footer}>
-        <button className={activeTab === 'home' ? styles.active : ''} type="button" onClick={() => switchTab('home')}><Home size={21} /><span>Home</span></button>
         <button className={activeTab === 'find' ? styles.active : ''} type="button" onClick={() => switchTab('find')}><Search size={21} /><span>Find</span></button>
-        <button className={activeTab === 'myworld' ? styles.active : ''} type="button" onClick={() => switchTab('myworld')}><Compass size={21} /><span>My World</span></button>
-        <button className={activeTab === 'tovisit' ? styles.active : ''} type="button" onClick={() => switchTab('tovisit')}><BookmarkPlus size={21} /><span>To Visit</span></button>
+        <button className={activeTab === 'home' ? styles.active : ''} type="button" onClick={() => switchTab('home')}><Sparkles size={21} /><span>Recommend</span></button>
+        <button className={`${styles.dropFooterButton} ${activeTab === 'myworld' ? styles.active : ''}`} type="button" onClick={() => switchTab('myworld')}><Droplet size={24} /><span>Drop</span></button>
+        <button className={activeTab === 'tovisit' ? styles.active : ''} type="button" onClick={() => switchTab('tovisit')}><Folder size={21} /><span>Folder</span></button>
         <button className={activeTab === 'mypage' ? styles.active : ''} type="button" onClick={() => switchTab('mypage')}><UserRound size={21} /><span>Profile</span></button>
       </nav>
     </main>
@@ -3738,6 +3606,7 @@ function FolderLibraryView({
   onDeleteFolder,
   onDeletePin,
   onReorderFolderPin,
+  showModeSwitch = true,
   onAddMemory,
 }: {
   title: string
@@ -3758,6 +3627,7 @@ function FolderLibraryView({
   onDeleteFolder: (folderId: string) => void
   onDeletePin: (pinId: string) => void
   onReorderFolderPin: (folderId: string, draggedPinId: string, targetPinId: string) => void
+  showModeSwitch?: boolean
   onAddMemory?: () => void
 }) {
   const [newFolderName, setNewFolderName] = useState('')
@@ -3783,7 +3653,7 @@ function FolderLibraryView({
         </div>
         <div className={styles.libraryHeaderActions}>
           {selectedFolder && <button className={styles.ghostButton} type="button" onClick={() => onSelectFolder(null)}><ArrowLeft size={17} />戻る</button>}
-          <LibraryModeSwitch value={mode} onChange={onModeChange} />
+          {showModeSwitch && <LibraryModeSwitch value={mode} onChange={onModeChange} />}
           {onAddMemory && <button className={styles.primaryButton} type="button" onClick={onAddMemory}><Plus size={18} /> Add Memory</button>}
         </div>
       </header>
@@ -4223,6 +4093,9 @@ function SplitMapView({
   panelsHidden = false,
   onPanelsHiddenChange,
   onDeletePin,
+  onSavePin,
+  showPanelsToggle = true,
+  showSearch = true,
   overlay,
   floatingAction,
 }: {
@@ -4239,6 +4112,9 @@ function SplitMapView({
   panelsHidden?: boolean
   onPanelsHiddenChange?: (hidden: boolean) => void
   onDeletePin?: (pinId: string) => void
+  onSavePin?: (pin: Pin) => void
+  showPanelsToggle?: boolean
+  showSearch?: boolean
   overlay?: ReactNode
   floatingAction?: ReactNode
 }) {
@@ -4413,34 +4289,38 @@ function SplitMapView({
             onVisiblePinsChange={handleVisiblePinsChange}
             flyToCoordinates={flyToCoordinates}
           />
-          <form className={styles.mapSearchBox} onSubmit={submitMapSearch}>
-            <Search size={17} />
-            <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="場所、pinを検索" />
-            {searchSuggestions.length > 0 && (
-              <div className={styles.mapSearchSuggestions}>
-                {searchSuggestions.map((pin) => (
-                  <button
-                    key={pin.id}
-                    type="button"
-                    onClick={() => {
-                      setMapSearch(pin.title)
-                      setFocusedPinId(pin.id)
-                      onListFocus?.(pin.id)
-                    }}
-                  >
-                    <img src={pin.imageUrl} alt="" />
-                    <span>{pin.title}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </form>
+          {showSearch && (
+            <form className={styles.mapSearchBox} onSubmit={submitMapSearch}>
+              <Search size={17} />
+              <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="場所、pinを検索" />
+              {searchSuggestions.length > 0 && (
+                <div className={styles.mapSearchSuggestions}>
+                  {searchSuggestions.map((pin) => (
+                    <button
+                      key={pin.id}
+                      type="button"
+                      onClick={() => {
+                        setMapSearch(pin.title)
+                        setFocusedPinId(pin.id)
+                        onListFocus?.(pin.id)
+                      }}
+                    >
+                      <img src={pin.imageUrl} alt="" />
+                      <span>{pin.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </form>
+          )}
           <button className={styles.locateButton} type="button" aria-label="現在地へ移動" onClick={moveToCurrentLocation}>
             <LocateFixed size={25} />
           </button>
-          <button className={styles.hidePanelsButton} type="button" aria-label="パネルを隠す" onClick={() => setPanelsHidden(!listCollapsed)}>
-            <EyeOff size={22} />
-          </button>
+          {showPanelsToggle && (
+            <button className={styles.hidePanelsButton} type="button" aria-label="パネルを隠す" onClick={() => setPanelsHidden(!listCollapsed)}>
+              <EyeOff size={22} />
+            </button>
+          )}
           {overlay}
           {currentMapPin && (!listCollapsed || selectedPinId) && (
             <button className={styles.mapStoryCard} type="button" onClick={() => setExpandedStoryPinId(currentMapPin.id)}>
@@ -4451,6 +4331,11 @@ function SplitMapView({
                 <p>{currentMapPin.description || '説明文なし'}</p>
                 <span>{currentMapPin.tags.map((tag) => `#${tag}`).join(' ')}</span>
               </div>
+            </button>
+          )}
+          {currentMapPin && selectedPinId && onSavePin && (
+            <button className={styles.mapStoryAddButton} type="button" onClick={() => onSavePin(currentMapPin)}>
+              追加
             </button>
           )}
           {expandedStoryPin && (
@@ -4464,6 +4349,11 @@ function SplitMapView({
                 <h2>{expandedStoryPin.title}</h2>
                 <p>{expandedStoryPin.description || '説明文なし'}</p>
                 {!!expandedStoryPin.tags.length && <span>{expandedStoryPin.tags.map((tag) => `#${tag}`).join(' ')}</span>}
+                {onSavePin && (
+                  <button className={styles.primaryButton} type="button" onClick={() => onSavePin(expandedStoryPin)}>
+                    追加
+                  </button>
+                )}
                 {onDeletePin && (
                   <button
                     className={styles.dangerButton}
