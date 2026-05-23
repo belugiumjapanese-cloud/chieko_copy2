@@ -1614,12 +1614,12 @@
   place-items: center;
   min-height: 42px;
   padding: 8px 12px;
-  color: #126b58;
+  color: #ffffff;
   font-weight: 950;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(24, 35, 30, 0.14);
+  background: rgba(8, 10, 10, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  box-shadow: 0 12px 30px rgba(24, 34, 29, 0.16);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(12px);
   cursor: pointer;
 }
@@ -1634,8 +1634,9 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  background: #f1f6f3;
-  border: 1px solid #d8e2db;
+  color: #ffffff;
+  background: rgba(8, 10, 10, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -1643,7 +1644,7 @@
 .communityMapHeader button:last-child {
   width: auto;
   padding: 0 10px;
-  color: #126b58;
+  color: #ffffff;
   font-weight: 900;
 }
 
@@ -1692,19 +1693,20 @@
   flex: 0 0 auto;
   min-height: 38px;
   padding: 8px 13px;
-  color: #18231e;
+  color: rgba(255, 255, 255, 0.72);
   font-weight: 950;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(24, 35, 30, 0.12);
+  background: rgba(8, 10, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  box-shadow: 0 10px 26px rgba(24, 34, 29, 0.12);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(12px);
   cursor: pointer;
 }
 
 .dropScopeBar button.active {
   color: #ffffff;
-  background: #126b58;
+  background: rgba(0, 0, 0, 0.94);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .dropStatusCard {
@@ -1716,15 +1718,16 @@
   gap: 2px;
   max-width: min(280px, calc(100vw - 32px));
   padding: 9px 11px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(24, 35, 30, 0.12);
+  color: #ffffff;
+  background: rgba(8, 10, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(24, 34, 29, 0.12);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(12px);
 }
 
 .dropStatusCard span {
-  color: #65736b;
+  color: rgba(255, 255, 255, 0.62);
   font-size: 0.8rem;
   font-weight: 850;
 }
@@ -1757,24 +1760,26 @@
   padding: 12px 16px;
   color: #ffffff;
   font-weight: 950;
-  background: #126b58;
-  border: 5px solid #ffffff;
+  background: rgba(8, 10, 10, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
-  box-shadow: 0 14px 34px rgba(18, 107, 88, 0.34);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   cursor: pointer;
+  backdrop-filter: blur(14px);
 }
 
 .dropPostButton {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   color: #ffffff;
-  background: #ef3b2d;
-  border: 4px solid #ffffff;
+  background: rgba(8, 10, 10, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
-  box-shadow: 0 16px 34px rgba(239, 59, 45, 0.32);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
   cursor: pointer;
+  backdrop-filter: blur(14px);
 }
 
 .mapFloatingAction:has(.dropPostButton) {
@@ -1942,16 +1947,16 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  width: 74px;
-  height: 74px;
+  width: 54px;
+  height: 54px;
   justify-content: center;
   padding: 0;
   color: #ffffff;
   font-weight: 950;
-  background: rgba(100, 104, 102, 0.9);
-  border: 1px solid rgba(24, 35, 30, 0.14);
+  background: rgba(8, 10, 10, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
-  box-shadow: 0 12px 30px rgba(24, 34, 29, 0.16);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(12px);
   cursor: pointer;
 }
@@ -2900,10 +2905,10 @@
   gap: 2px;
   min-height: 78px;
   padding: 8px 8px max(8px, env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.97);
-  border-top: 1px solid rgba(24, 35, 30, 0.12);
-  box-shadow: 0 -12px 34px rgba(24, 34, 29, 0.12);
-  backdrop-filter: blur(14px);
+  background: rgba(8, 10, 10, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -16px 34px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
 }
 
 .footer button {
@@ -2911,7 +2916,7 @@
   gap: 3px;
   place-items: center;
   min-width: 0;
-  color: #65736b;
+  color: rgba(255, 255, 255, 0.52);
   background: transparent;
   border: 0;
   border-radius: 8px;
@@ -2921,20 +2926,8 @@
 }
 
 .footer button.active {
-  color: #126b58;
-  background: #eff7f3;
-}
-
-.footer .dropFooterButton {
-  transform: translateY(-8px);
   color: #ffffff;
-  background: #126b58;
-  box-shadow: 0 14px 30px rgba(18, 107, 88, 0.28);
-}
-
-.footer .dropFooterButton.active {
-  color: #ffffff;
-  background: #0f5c4b;
+  background: transparent;
 }
 
 @media (min-width: 820px) {
@@ -3176,19 +3169,20 @@
   z-index: 24;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   color: #ffffff;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 50%;
-  box-shadow: 0 14px 34px rgba(24, 34, 29, 0.22);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   cursor: pointer;
+  backdrop-filter: blur(14px);
 }
 
 .locateButton {
   left: 18px;
   bottom: 124px;
-  background: #f59e0b;
+  background: rgba(8, 10, 10, 0.88);
 }
 
 .hidePanelsButton {
@@ -3196,7 +3190,7 @@
   right: 18px;
   top: auto;
   bottom: 124px;
-  background: #0ea5d8;
+  background: rgba(8, 10, 10, 0.88);
 }
 
 .mapPageListCollapsed .locateButton,
@@ -3215,19 +3209,19 @@
 }
 
 .mapFloatingAction .communityPostButton {
-  width: 74px;
-  height: 74px;
+  width: 54px;
+  height: 54px;
   justify-content: center;
   padding: 0;
   overflow: hidden;
   font-size: 0;
-  background: #ef3b2d;
-  box-shadow: 0 18px 38px rgba(239, 59, 45, 0.34);
+  background: rgba(8, 10, 10, 0.92);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.26);
 }
 
 .mapFloatingAction .communityPostButton svg {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
 }
 
 .folderPlaylist {

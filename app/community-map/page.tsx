@@ -3390,7 +3390,7 @@ export default function CommunityMapPrototype() {
       <nav className={styles.footer}>
         <button className={activeTab === 'find' ? styles.active : ''} type="button" onClick={() => switchTab('find')}><Search size={21} /><span>Find</span></button>
         <button className={activeTab === 'home' ? styles.active : ''} type="button" onClick={() => switchTab('home')}><Sparkles size={21} /><span>Recommend</span></button>
-        <button className={`${styles.dropFooterButton} ${activeTab === 'myworld' ? styles.active : ''}`} type="button" onClick={() => switchTab('myworld')}><Droplet size={24} /><span>Drop</span></button>
+        <button className={activeTab === 'myworld' ? styles.active : ''} type="button" onClick={() => switchTab('myworld')}><Droplet size={21} /><span>Drop</span></button>
         <button className={activeTab === 'tovisit' ? styles.active : ''} type="button" onClick={() => switchTab('tovisit')}><Folder size={21} /><span>Folder</span></button>
         <button className={activeTab === 'mypage' ? styles.active : ''} type="button" onClick={() => switchTab('mypage')}><UserRound size={21} /><span>Profile</span></button>
       </nav>
