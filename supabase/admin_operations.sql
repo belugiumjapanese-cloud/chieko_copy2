@@ -58,7 +58,7 @@ using (user_id = auth.uid());
 
 create table if not exists public.recommend_items (
   id uuid primary key default gen_random_uuid(),
-  item_type text not null default 'event' check (item_type in ('event', 'folder_pick', 'official_folder', 'post_pick', 'announcement')),
+  item_type text not null default 'event',
   title text not null,
   description text,
   image_url text,
@@ -75,8 +75,29 @@ create table if not exists public.recommend_items (
   updated_at timestamptz not null default now()
 );
 
+do $$
+begin
+  if to_regclass('public.recommend_items') is not null then
+    alter table public.recommend_items
+      drop constraint if exists recommend_items_item_type_check;
+
+    alter table public.recommend_items
+      add constraint recommend_items_item_type_check
+      check (item_type in ('event', 'folder_pick', 'official_folder', 'community_pick', 'post_pick', 'announcement'));
+  end if;
+end $$;
+
 create index if not exists recommend_items_publish_idx
 on public.recommend_items (is_published, priority, created_at desc);
+
+create index if not exists recommend_items_folder_idx
+on public.recommend_items (folder_id);
+
+create index if not exists recommend_items_community_idx
+on public.recommend_items (community_id);
+
+create index if not exists recommend_items_post_idx
+on public.recommend_items (post_id);
 
 drop trigger if exists recommend_items_set_updated_at on public.recommend_items;
 create trigger recommend_items_set_updated_at

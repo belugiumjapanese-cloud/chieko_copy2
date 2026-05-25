@@ -2,23 +2,37 @@
 
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   BarChart3,
+  Bell,
+  Compass,
+  Database,
   Eye,
   Flag,
   Folder,
   Heart,
+  LayoutDashboard,
+  ListPlus,
   LogOut,
   MapPin,
+  MessageCircle,
   RefreshCcw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import styles from './admin.module.css'
+
+type JsonRecord = Record<string, unknown>
+type SectionKey = 'dashboard' | 'recommend' | 'catalog' | 'moderation' | 'users'
+type CatalogKind = 'folders' | 'communities' | 'posts' | 'users'
 
 type AdminOverview = {
   counts: {
@@ -28,14 +42,21 @@ type AdminOverview = {
     folders: number
     publicFolders: number
     communities: number
+    likes: number
+    comments: number
+    saves: number
+    folderLikes: number
     activeUsers24h: number
     estimatedMinutes: number
   }
-  reports: Array<Record<string, any>>
-  topPosts: Array<Record<string, any>>
-  recentUsers: Array<Record<string, any>>
-  events: Array<Record<string, any>>
-  recommendItems: Array<RecommendItem>
+  reports: JsonRecord[]
+  topPosts: AdminPostCard[]
+  recentFolders: AdminFolderCard[]
+  recentCommunities: AdminCommunityCard[]
+  recentUsers: AdminUserCard[]
+  events: JsonRecord[]
+  eventStats: Array<{ event_type: string; count: number }>
+  recommendItems: RecommendItem[]
   warnings: string[]
 }
 
@@ -54,9 +75,74 @@ type RecommendItem = {
   created_at: string
 }
 
+type AdminFolderCard = {
+  id: string
+  user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  name: string
+  description?: string | null
+  color?: string | null
+  thumbnail_url?: string | null
+  preview_image_url?: string | null
+  folder_kind?: string | null
+  visibility?: string | null
+  is_paid?: boolean | null
+  pin_count?: number | null
+  post_ids?: string[] | null
+  created_at?: string | null
+}
+
+type AdminCommunityCard = {
+  id: string
+  slug?: string | null
+  name: string
+  description?: string | null
+  owner_id?: string | null
+  visibility?: string | null
+  member_count?: number | null
+  posts_count?: number | null
+  joined_by_me?: boolean | null
+  created_at?: string | null
+}
+
+type AdminPostCard = {
+  id: string
+  user_id?: string | null
+  username?: string | null
+  display_name?: string | null
+  title?: string | null
+  description?: string | null
+  image_url?: string | null
+  visibility?: string | null
+  likes_count?: number | null
+  comments_count?: number | null
+  saves_count?: number | null
+  reports_count?: number | null
+  created_at?: string | null
+}
+
+type AdminUserCard = {
+  id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  bio?: string | null
+  pin_count?: number | null
+  public_pin_count?: number | null
+  folder_count?: number | null
+  public_folder_count?: number | null
+  follower_count?: number | null
+  following_count?: number | null
+  created_at?: string | null
+}
+
+type CatalogRow = AdminFolderCard | AdminCommunityCard | AdminPostCard | AdminUserCard
+
 const emptyRecommend = {
   id: '',
-  item_type: 'event',
+  item_type: 'folder_pick',
   title: '',
   description: '',
   image_url: '',
@@ -68,6 +154,21 @@ const emptyRecommend = {
   is_published: true,
 }
 
+const sectionItems: Array<{ key: SectionKey; label: string; icon: ReactNode }> = [
+  { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+  { key: 'recommend', label: 'Recommend', icon: <Sparkles size={17} /> },
+  { key: 'catalog', label: 'Catalog', icon: <Database size={17} /> },
+  { key: 'moderation', label: 'Moderation', icon: <ShieldAlert size={17} /> },
+  { key: 'users', label: 'Users', icon: <Users size={17} /> },
+]
+
+const catalogLabels: Record<CatalogKind, string> = {
+  folders: 'Folders',
+  communities: 'Communities',
+  posts: 'Posts',
+  users: 'Users',
+}
+
 export default function AdminPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -76,7 +177,14 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [recommendForm, setRecommendForm] = useState(emptyRecommend)
-  const [query, setQuery] = useState('')
+  const [reportQuery, setReportQuery] = useState('')
+  const [section, setSection] = useState<SectionKey>('dashboard')
+  const [catalogKind, setCatalogKind] = useState<CatalogKind>('folders')
+  const [catalogQuery, setCatalogQuery] = useState('')
+  const [catalogRows, setCatalogRows] = useState<CatalogRow[]>([])
+  const [catalogWarnings, setCatalogWarnings] = useState<string[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
 
   const isConfigured = Boolean(supabase)
 
@@ -107,6 +215,27 @@ export default function AdminPage() {
     setLoading(false)
   }, [token])
 
+  const loadCatalog = useCallback(async (kind = catalogKind, search = catalogQuery, accessToken = token) => {
+    if (!accessToken) return
+    setCatalogLoading(true)
+    const params = new URLSearchParams({ kind, q: search, limit: '120' })
+    const response = await fetch(`/api/admin/catalog?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setCatalogRows([])
+      setCatalogWarnings([data.error || 'Catalogを読み込めませんでした。'])
+      setCatalogLoading(false)
+      return
+    }
+    setCatalogRows(Array.isArray(data.rows) ? data.rows : [])
+    setCatalogWarnings(Array.isArray(data.warnings) ? data.warnings : [])
+    setCatalogLoading(false)
+  }, [catalogKind, catalogQuery, token])
+
   useEffect(() => {
     if (!supabase) {
       setLoading(false)
@@ -134,11 +263,23 @@ export default function AdminPage() {
     return () => subscription.unsubscribe()
   }, [loadOverview])
 
+  useEffect(() => {
+    if (!token || (section !== 'catalog' && section !== 'recommend')) return
+    const id = window.setTimeout(() => {
+      void loadCatalog(catalogKind, catalogQuery, token)
+    }, 220)
+    return () => window.clearTimeout(id)
+  }, [catalogKind, catalogQuery, loadCatalog, section, token])
+
   const filteredReports = useMemo(() => {
-    const text = query.trim().toLowerCase()
+    const text = reportQuery.trim().toLowerCase()
     if (!text) return overview?.reports ?? []
     return (overview?.reports ?? []).filter((report) => JSON.stringify(report).toLowerCase().includes(text))
-  }, [overview?.reports, query])
+  }, [overview?.reports, reportQuery])
+
+  const sortedRecommendItems = useMemo(() => {
+    return [...(overview?.recommendItems ?? [])].sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100))
+  }, [overview?.recommendItems])
 
   const signIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -156,35 +297,65 @@ export default function AdminPage() {
 
   const saveRecommend = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!token) return
+    await upsertRecommend({
+      id: recommendForm.id || undefined,
+      item_type: recommendForm.item_type,
+      title: recommendForm.title,
+      description: recommendForm.description,
+      image_url: recommendForm.image_url,
+      target_url: recommendForm.target_url,
+      folder_id: recommendForm.folder_id,
+      post_id: recommendForm.post_id,
+      community_id: recommendForm.community_id,
+      priority: Number(recommendForm.priority) || 100,
+      is_published: recommendForm.is_published,
+    })
+    setRecommendForm(emptyRecommend)
+  }
 
+  const upsertRecommend = async (payload: Record<string, unknown>) => {
+    if (!token) return
+    setActionMessage('')
     const response = await fetch('/api/admin/recommend', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        id: recommendForm.id || undefined,
-        item_type: recommendForm.item_type,
-        title: recommendForm.title,
-        description: recommendForm.description,
-        image_url: recommendForm.image_url,
-        target_url: recommendForm.target_url,
-        folder_id: recommendForm.folder_id,
-        post_id: recommendForm.post_id,
-        community_id: recommendForm.community_id,
-        priority: Number(recommendForm.priority) || 100,
-        is_published: recommendForm.is_published,
-      }),
+      body: JSON.stringify(payload),
     })
     const data = await response.json()
     if (!response.ok) {
-      setMessage(data.error || 'Recommendを保存できませんでした。')
+      setActionMessage(data.error || 'Recommendを保存できませんでした。')
       return
     }
-    setRecommendForm(emptyRecommend)
+    setActionMessage('Recommendを更新しました。')
     await loadOverview()
+  }
+
+  const addFolderToRecommend = async (folder: AdminFolderCard, itemType: 'folder_pick' | 'official_folder') => {
+    const nextPriority = getNextPriority(sortedRecommendItems)
+    await upsertRecommend({
+      item_type: itemType,
+      title: folder.name,
+      description: folder.description || `@${folder.username ?? 'user'} / ${folder.pin_count ?? 0} pins`,
+      image_url: folder.thumbnail_url || folder.preview_image_url || '',
+      folder_id: folder.id,
+      priority: nextPriority,
+      is_published: true,
+    })
+  }
+
+  const addCommunityToRecommend = async (community: AdminCommunityCard) => {
+    const nextPriority = getNextPriority(sortedRecommendItems)
+    await upsertRecommend({
+      item_type: 'community_pick',
+      title: community.name,
+      description: community.description || `${community.member_count ?? 0} members / ${community.posts_count ?? 0} pins`,
+      community_id: community.id,
+      priority: nextPriority,
+      is_published: true,
+    })
   }
 
   const deleteRecommend = async (id: string) => {
@@ -197,7 +368,36 @@ export default function AdminPage() {
     })
     const data = await response.json()
     if (!response.ok) {
-      setMessage(data.error || 'Recommendを削除できませんでした。')
+      setActionMessage(data.error || 'Recommendを削除できませんでした。')
+      return
+    }
+    setActionMessage('Recommendから削除しました。')
+    await loadOverview()
+  }
+
+  const moveRecommend = async (id: string, direction: -1 | 1) => {
+    if (!token) return
+    const current = sortedRecommendItems
+    const index = current.findIndex((item) => item.id === id)
+    const targetIndex = index + direction
+    if (index < 0 || targetIndex < 0 || targetIndex >= current.length) return
+
+    const reordered = [...current]
+    const [item] = reordered.splice(index, 1)
+    reordered.splice(targetIndex, 0, item)
+    const items = reordered.map((recommend, order) => ({ id: recommend.id, priority: (order + 1) * 10 }))
+
+    const response = await fetch('/api/admin/recommend', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ items }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setActionMessage(data.error || '順番を更新できませんでした。')
       return
     }
     await loadOverview()
@@ -243,7 +443,7 @@ export default function AdminPage() {
         <div>
           <span>Operations</span>
           <h1>Spot Map Admin</h1>
-          <p>Recommend編集、通報確認、ユーザー・投稿・滞在シグナルの確認。</p>
+          <p>Recommend、公開フォルダー、コミュニティ、通報、利用シグナルをまとめて見る場所。</p>
         </div>
         <div>
           <button type="button" onClick={() => loadOverview()}><RefreshCcw size={17} /> Refresh</button>
@@ -251,7 +451,22 @@ export default function AdminPage() {
         </div>
       </header>
 
+      <nav className={styles.adminNav} aria-label="Admin sections">
+        {sectionItems.map((item) => (
+          <button
+            key={item.key}
+            className={section === item.key ? styles.active : ''}
+            type="button"
+            onClick={() => setSection(item.key)}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
       {message && <p className={styles.error}>{message}</p>}
+      {actionMessage && <p className={styles.notice}>{actionMessage}</p>}
       {loading && <p className={styles.notice}>Loading admin data...</p>}
       {overview?.warnings?.length ? (
         <section className={styles.warningCard}>
@@ -269,172 +484,273 @@ export default function AdminPage() {
             <Metric icon={<Users />} label="Users" value={overview.counts.users} />
             <Metric icon={<MapPin />} label="Posts" value={overview.counts.posts} caption={`${overview.counts.publicPosts} public`} />
             <Metric icon={<Folder />} label="Folders" value={overview.counts.folders} caption={`${overview.counts.publicFolders} public`} />
-            <Metric icon={<ShieldCheck />} label="Communities" value={overview.counts.communities} />
+            <Metric icon={<Compass />} label="Communities" value={overview.counts.communities} />
             <Metric icon={<Eye />} label="Active 24h" value={overview.counts.activeUsers24h} />
             <Metric icon={<BarChart3 />} label="Stay signal" value={`${overview.counts.estimatedMinutes}m`} caption="heartbeat based" />
+            <Metric icon={<Heart />} label="Post likes" value={overview.counts.likes} />
+            <Metric icon={<MessageCircle />} label="Comments" value={overview.counts.comments} />
+            <Metric icon={<ListPlus />} label="Saves" value={overview.counts.saves} />
+            <Metric icon={<Sparkles />} label="Folder likes" value={overview.counts.folderLikes} />
           </section>
 
-          <section className={styles.adminGrid}>
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <span>CMS</span>
-                  <h2>Recommend</h2>
+          {section === 'dashboard' && (
+            <section className={styles.adminGrid}>
+              <Panel eyebrow="Strategy" title="運営判断ボード" icon={<LayoutDashboard size={22} />}>
+                <div className={styles.strategyGrid}>
+                  <StrategyCard title="供給" value={`${overview.counts.publicFolders} public folders`} caption="Find / Recommend の素材量。少ない日は運営pickを増やす。" />
+                  <StrategyCard title="反応" value={`${overview.counts.saves} saves`} caption="保存数が高い投稿やフォルダーはRecommend候補。" />
+                  <StrategyCard title="健全性" value={`${overview.reports.length} reports`} caption="通報が出たらModerationで先に確認。" />
+                  <StrategyCard title="滞在" value={`${overview.counts.activeUsers24h} active`} caption="初期表示が遅い時はDrop/Recommendの取得量を見直す。" />
                 </div>
-                <Sparkles size={22} />
-              </div>
-              <form className={styles.recommendForm} onSubmit={saveRecommend}>
-                <div className={styles.twoColumns}>
-                  <label>
-                    Type
-                    <select value={recommendForm.item_type} onChange={(event) => setRecommendForm({ ...recommendForm, item_type: event.target.value })}>
-                      <option value="event">event</option>
-                      <option value="folder_pick">folder_pick</option>
-                      <option value="official_folder">official_folder</option>
-                      <option value="post_pick">post_pick</option>
-                      <option value="announcement">announcement</option>
-                    </select>
-                  </label>
-                  <label>
-                    Priority
-                    <input value={recommendForm.priority} onChange={(event) => setRecommendForm({ ...recommendForm, priority: event.target.value })} inputMode="numeric" />
-                  </label>
+                <div className={styles.codeHint}>
+                  <strong>自分を運営ユーザーにするSQL</strong>
+                  <code>{`insert into public.admin_users (user_id, role)
+values ('Supabase Auth の自分の user_id', 'owner')
+on conflict (user_id) do update set role = excluded.role;`}</code>
                 </div>
-                <label>
-                  Title
-                  <input value={recommendForm.title} onChange={(event) => setRecommendForm({ ...recommendForm, title: event.target.value })} />
-                </label>
-                <label>
-                  Description
-                  <textarea value={recommendForm.description} onChange={(event) => setRecommendForm({ ...recommendForm, description: event.target.value })} />
-                </label>
-                <label>
-                  Image URL
-                  <input value={recommendForm.image_url} onChange={(event) => setRecommendForm({ ...recommendForm, image_url: event.target.value })} />
-                </label>
-                <label>
-                  Target URL
-                  <input value={recommendForm.target_url} onChange={(event) => setRecommendForm({ ...recommendForm, target_url: event.target.value })} />
-                </label>
-                <div className={styles.threeColumns}>
-                  <label>
-                    Folder ID
-                    <input value={recommendForm.folder_id} onChange={(event) => setRecommendForm({ ...recommendForm, folder_id: event.target.value })} />
-                  </label>
-                  <label>
-                    Post ID
-                    <input value={recommendForm.post_id} onChange={(event) => setRecommendForm({ ...recommendForm, post_id: event.target.value })} />
-                  </label>
-                  <label>
-                    Community ID
-                    <input value={recommendForm.community_id} onChange={(event) => setRecommendForm({ ...recommendForm, community_id: event.target.value })} />
-                  </label>
-                </div>
-                <label className={styles.switchRow}>
-                  <input type="checkbox" checked={recommendForm.is_published} onChange={(event) => setRecommendForm({ ...recommendForm, is_published: event.target.checked })} />
-                  Published
-                </label>
-                <button type="submit">{recommendForm.id ? 'Update recommend' : 'Create recommend'}</button>
-              </form>
-              <div className={styles.itemList}>
-                {overview.recommendItems.map((item) => (
-                  <article key={item.id}>
-                    <img src={item.image_url || '/favicon.ico'} alt="" />
-                    <div>
-                      <strong>{item.title}</strong>
-                      <span>{item.item_type} / priority {item.priority ?? 100} / {item.is_published ? 'published' : 'draft'}</span>
-                    </div>
-                    <button type="button" onClick={() => setRecommendForm({
-                      id: item.id,
-                      item_type: item.item_type,
-                      title: item.title,
-                      description: item.description ?? '',
-                      image_url: item.image_url ?? '',
-                      target_url: item.target_url ?? '',
-                      folder_id: item.folder_id ?? '',
-                      post_id: item.post_id ?? '',
-                      community_id: item.community_id ?? '',
-                      priority: String(item.priority ?? 100),
-                      is_published: Boolean(item.is_published),
-                    })}>Edit</button>
-                    <button type="button" onClick={() => deleteRecommend(item.id)}>Delete</button>
-                  </article>
-                ))}
-              </div>
-            </section>
+              </Panel>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <span>Moderation</span>
-                  <h2>Reports</h2>
-                </div>
-                <Flag size={22} />
-              </div>
-              <label className={styles.searchField}>
-                <Search size={18} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="通報、ユーザー、投稿を検索" />
-              </label>
-              <div className={styles.itemList}>
-                {filteredReports.map((report) => (
-                  <article key={report.id}>
-                    <img src={report.posts?.image_url || '/favicon.ico'} alt="" />
-                    <div>
-                      <strong>{report.posts?.title ?? report.post_id}</strong>
-                      <span>@{report.profiles?.username ?? report.user_id} / {report.reason || 'reasonなし'}</span>
+              <Panel eyebrow="Pulse" title="Event breakdown" icon={<BarChart3 size={22} />}>
+                <div className={styles.eventList}>
+                  {overview.eventStats.map((event) => (
+                    <div key={event.event_type}>
+                      <span>{event.event_type}</span>
+                      <strong>{event.count}</strong>
                     </div>
-                    <small>{formatDate(report.created_at)}</small>
-                  </article>
-                ))}
-                {!filteredReports.length && <p className={styles.empty}>通報はありません。</p>}
-              </div>
-            </section>
+                  ))}
+                  {!overview.eventStats.length && <p className={styles.empty}>まだイベントログがありません。</p>}
+                </div>
+              </Panel>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <span>Content</span>
-                  <h2>Top saved posts</h2>
+              <Panel eyebrow="Fresh" title="Recent folders" icon={<Folder size={22} />}>
+                <div className={styles.itemList}>
+                  {overview.recentFolders.slice(0, 8).map((folder) => (
+                    <FolderRow
+                      key={folder.id}
+                      folder={folder}
+                      onPick={() => addFolderToRecommend(folder, 'folder_pick')}
+                      onOfficial={() => addFolderToRecommend(folder, 'official_folder')}
+                    />
+                  ))}
                 </div>
-                <Heart size={22} />
-              </div>
-              <div className={styles.itemList}>
-                {overview.topPosts.map((post) => (
-                  <article key={post.id}>
-                    <img src={post.image_url || '/favicon.ico'} alt="" />
-                    <div>
-                      <strong>{post.title || post.id}</strong>
-                      <span>{post.saves_count ?? 0} saves / {post.likes_count ?? 0} likes / {post.reports_count ?? 0} reports</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+              </Panel>
 
+              <Panel eyebrow="Fresh" title="Recent communities" icon={<Compass size={22} />}>
+                <div className={styles.itemList}>
+                  {overview.recentCommunities.slice(0, 8).map((community) => (
+                    <CommunityRow key={community.id} community={community} onPick={() => addCommunityToRecommend(community)} />
+                  ))}
+                </div>
+              </Panel>
+            </section>
+          )}
+
+          {section === 'recommend' && (
+            <section className={styles.adminGrid}>
+              <Panel eyebrow="CMS" title="Recommend queue" icon={<Sparkles size={22} />}>
+                <p className={styles.panelCopy}>
+                  アプリ内のRecommendには、運営作成フォルダー、運営ピックアップフォルダー、ピックアップコミュニティ、イベント告知がこの順番で表示されます。
+                </p>
+                <div className={styles.itemList}>
+                  {sortedRecommendItems.map((item, index) => (
+                    <RecommendRow
+                      key={item.id}
+                      item={item}
+                      onEdit={() => setRecommendForm(toRecommendForm(item))}
+                      onDelete={() => deleteRecommend(item.id)}
+                      onMoveUp={() => moveRecommend(item.id, -1)}
+                      onMoveDown={() => moveRecommend(item.id, 1)}
+                      disableUp={index === 0}
+                      disableDown={index === sortedRecommendItems.length - 1}
+                    />
+                  ))}
+                  {!sortedRecommendItems.length && <p className={styles.empty}>Recommendはまだありません。</p>}
+                </div>
+              </Panel>
+
+              <Panel eyebrow="Editor" title={recommendForm.id ? 'Edit recommend' : 'Create recommend'} icon={<ListPlus size={22} />}>
+                <form className={styles.recommendForm} onSubmit={saveRecommend}>
+                  <div className={styles.twoColumns}>
+                    <label>
+                      Type
+                      <select value={recommendForm.item_type} onChange={(event) => setRecommendForm({ ...recommendForm, item_type: event.target.value })}>
+                        <option value="folder_pick">folder_pick</option>
+                        <option value="official_folder">official_folder</option>
+                        <option value="community_pick">community_pick</option>
+                        <option value="event">event</option>
+                        <option value="post_pick">post_pick</option>
+                        <option value="announcement">announcement</option>
+                      </select>
+                    </label>
+                    <label>
+                      Priority
+                      <input value={recommendForm.priority} onChange={(event) => setRecommendForm({ ...recommendForm, priority: event.target.value })} inputMode="numeric" />
+                    </label>
+                  </div>
+                  <label>
+                    Title
+                    <input value={recommendForm.title} onChange={(event) => setRecommendForm({ ...recommendForm, title: event.target.value })} />
+                  </label>
+                  <label>
+                    Description
+                    <textarea value={recommendForm.description} onChange={(event) => setRecommendForm({ ...recommendForm, description: event.target.value })} />
+                  </label>
+                  <label>
+                    Image URL
+                    <input value={recommendForm.image_url} onChange={(event) => setRecommendForm({ ...recommendForm, image_url: event.target.value })} />
+                  </label>
+                  <label>
+                    Target URL
+                    <input value={recommendForm.target_url} onChange={(event) => setRecommendForm({ ...recommendForm, target_url: event.target.value })} />
+                  </label>
+                  <div className={styles.threeColumns}>
+                    <label>
+                      Folder ID
+                      <input value={recommendForm.folder_id} onChange={(event) => setRecommendForm({ ...recommendForm, folder_id: event.target.value })} />
+                    </label>
+                    <label>
+                      Post ID
+                      <input value={recommendForm.post_id} onChange={(event) => setRecommendForm({ ...recommendForm, post_id: event.target.value })} />
+                    </label>
+                    <label>
+                      Community ID
+                      <input value={recommendForm.community_id} onChange={(event) => setRecommendForm({ ...recommendForm, community_id: event.target.value })} />
+                    </label>
+                  </div>
+                  <label className={styles.switchRow}>
+                    <input type="checkbox" checked={recommendForm.is_published} onChange={(event) => setRecommendForm({ ...recommendForm, is_published: event.target.checked })} />
+                    Published
+                  </label>
+                  <div className={styles.formActions}>
+                    <button type="submit">{recommendForm.id ? 'Update recommend' : 'Create recommend'}</button>
+                    {recommendForm.id && <button type="button" onClick={() => setRecommendForm(emptyRecommend)}>Cancel edit</button>}
+                  </div>
+                </form>
+              </Panel>
+
+              <Panel eyebrow="Source" title="Add from app content" icon={<Database size={22} />}>
+                <CatalogControls
+                  kind={catalogKind}
+                  query={catalogQuery}
+                  onKind={setCatalogKind}
+                  onQuery={setCatalogQuery}
+                  compact
+                />
+                {catalogLoading && <p className={styles.notice}>Catalog loading...</p>}
+                {catalogWarnings.map((warning) => <p className={styles.error} key={warning}>{warning}</p>)}
+                <div className={styles.itemList}>
+                  {catalogRows.map((row) => (
+                    <CatalogRowItem
+                      key={row.id}
+                      kind={catalogKind}
+                      row={row}
+                      onPickFolder={(folder, type) => addFolderToRecommend(folder, type)}
+                      onPickCommunity={addCommunityToRecommend}
+                    />
+                  ))}
+                </div>
+              </Panel>
+            </section>
+          )}
+
+          {section === 'catalog' && (
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <div>
-                  <span>Users</span>
-                  <h2>Recent users</h2>
+                  <span>Catalog</span>
+                  <h2>アプリ内コンテンツ検索</h2>
                 </div>
-                <Users size={22} />
+                <Search size={22} />
               </div>
-              <div className={styles.itemList}>
-                {overview.recentUsers.map((user) => (
-                  <article key={user.id}>
-                    <img src={user.avatar_url || '/favicon.ico'} alt="" />
-                    <div>
-                      <strong>@{user.username ?? user.id}</strong>
-                      <span>{user.display_name ?? 'no name'} / {user.pin_count ?? 0} pins / {user.public_folder_count ?? 0} public folders</span>
-                    </div>
-                  </article>
+              <CatalogControls kind={catalogKind} query={catalogQuery} onKind={setCatalogKind} onQuery={setCatalogQuery} />
+              {catalogLoading && <p className={styles.notice}>Catalog loading...</p>}
+              {catalogWarnings.map((warning) => <p className={styles.error} key={warning}>{warning}</p>)}
+              <div className={styles.catalogTable}>
+                {catalogRows.map((row) => (
+                  <CatalogRowItem
+                    key={row.id}
+                    kind={catalogKind}
+                    row={row}
+                    onPickFolder={(folder, type) => addFolderToRecommend(folder, type)}
+                    onPickCommunity={addCommunityToRecommend}
+                    wide
+                  />
                 ))}
+                {!catalogRows.length && !catalogLoading && <p className={styles.empty}>該当するデータがありません。</p>}
               </div>
             </section>
-          </section>
+          )}
+
+          {section === 'moderation' && (
+            <section className={styles.adminGrid}>
+              <Panel eyebrow="Moderation" title="Reports" icon={<Flag size={22} />}>
+                <label className={styles.searchField}>
+                  <Search size={18} />
+                  <input value={reportQuery} onChange={(event) => setReportQuery(event.target.value)} placeholder="通報、ユーザー、投稿を検索" />
+                </label>
+                <div className={styles.itemList}>
+                  {filteredReports.map((report) => (
+                    <article key={String(report.id)}>
+                      <img src={getNestedString(report, 'posts', 'image_url') || '/favicon.ico'} alt="" />
+                      <div>
+                        <strong>{getNestedString(report, 'posts', 'title') || String(report.post_id ?? '')}</strong>
+                        <span>@{getNestedString(report, 'profiles', 'username') || String(report.user_id ?? '')} / {String(report.reason || 'reasonなし')}</span>
+                      </div>
+                      <small>{formatDate(String(report.created_at ?? ''))}</small>
+                    </article>
+                  ))}
+                  {!filteredReports.length && <p className={styles.empty}>通報はありません。</p>}
+                </div>
+              </Panel>
+
+              <Panel eyebrow="Content" title="Top saved posts" icon={<Heart size={22} />}>
+                <div className={styles.itemList}>
+                  {overview.topPosts.map((post) => (
+                    <PostRow key={post.id} post={post} />
+                  ))}
+                </div>
+              </Panel>
+            </section>
+          )}
+
+          {section === 'users' && (
+            <section className={styles.adminGrid}>
+              <Panel eyebrow="Users" title="Recent users" icon={<Users size={22} />}>
+                <div className={styles.itemList}>
+                  {overview.recentUsers.map((user) => (
+                    <UserRow key={user.id} user={user} />
+                  ))}
+                </div>
+              </Panel>
+
+              <Panel eyebrow="Notifications" title="運営が見るべき兆候" icon={<Bell size={22} />}>
+                <div className={styles.signalList}>
+                  <Signal title="初回体験" body="Sign in後に自分のprofileとmy contentを最優先で出す。空のchaos/recommend取得で待たせない。" />
+                  <Signal title="投稿供給" body="投稿数に対して公開フォルダーが少ない場合、folder化を促すUIや運営pickが必要。" />
+                  <Signal title="Recommend運用" body="保存数、folder like、通報ゼロ、画像の見栄えを基準に週次で並び替える。" />
+                  <Signal title="治安" body="reports_countが上がった投稿はRecommendから外し、必要なら非公開化する運用にする。" />
+                </div>
+              </Panel>
+            </section>
+          )}
         </>
       )}
     </main>
+  )
+}
+
+function Panel({ eyebrow, title, icon, children }: { eyebrow: string; title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <section className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <div>
+          <span>{eyebrow}</span>
+          <h2>{title}</h2>
+        </div>
+        {icon}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -451,6 +767,185 @@ function Metric({ icon, label, value, caption }: { icon: ReactNode; label: strin
   )
 }
 
+function StrategyCard({ title, value, caption }: { title: string; value: string; caption: string }) {
+  return (
+    <article className={styles.strategyCard}>
+      <span>{title}</span>
+      <strong>{value}</strong>
+      <p>{caption}</p>
+    </article>
+  )
+}
+
+function Signal({ title, body }: { title: string; body: string }) {
+  return (
+    <article>
+      <strong>{title}</strong>
+      <p>{body}</p>
+    </article>
+  )
+}
+
+function CatalogControls({ kind, query, onKind, onQuery, compact = false }: {
+  kind: CatalogKind
+  query: string
+  onKind: (kind: CatalogKind) => void
+  onQuery: (query: string) => void
+  compact?: boolean
+}) {
+  return (
+    <div className={compact ? styles.catalogControlsCompact : styles.catalogControls}>
+      <div className={styles.catalogTabs}>
+        {(Object.keys(catalogLabels) as CatalogKind[]).map((item) => (
+          <button key={item} className={kind === item ? styles.active : ''} type="button" onClick={() => onKind(item)}>
+            {catalogLabels[item]}
+          </button>
+        ))}
+      </div>
+      <label className={styles.searchField}>
+        <Search size={18} />
+        <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="名前、@username、説明文で検索" />
+      </label>
+    </div>
+  )
+}
+
+function CatalogRowItem({ kind, row, onPickFolder, onPickCommunity, wide = false }: {
+  kind: CatalogKind
+  row: CatalogRow
+  onPickFolder: (folder: AdminFolderCard, type: 'folder_pick' | 'official_folder') => void
+  onPickCommunity: (community: AdminCommunityCard) => void
+  wide?: boolean
+}) {
+  if (kind === 'folders') {
+    return (
+      <FolderRow
+        folder={row as AdminFolderCard}
+        wide={wide}
+        onPick={() => onPickFolder(row as AdminFolderCard, 'folder_pick')}
+        onOfficial={() => onPickFolder(row as AdminFolderCard, 'official_folder')}
+      />
+    )
+  }
+
+  if (kind === 'communities') {
+    return (
+      <CommunityRow
+        community={row as AdminCommunityCard}
+        wide={wide}
+        onPick={() => onPickCommunity(row as AdminCommunityCard)}
+      />
+    )
+  }
+
+  if (kind === 'posts') return <PostRow post={row as AdminPostCard} wide={wide} />
+
+  return <UserRow user={row as AdminUserCard} wide={wide} />
+}
+
+function FolderRow({ folder, onPick, onOfficial, wide = false }: {
+  folder: AdminFolderCard
+  onPick: () => void
+  onOfficial: () => void
+  wide?: boolean
+}) {
+  return (
+    <article className={wide ? styles.wideRow : ''}>
+      <img src={folder.thumbnail_url || folder.preview_image_url || '/favicon.ico'} alt="" />
+      <div>
+        <strong>{folder.name}</strong>
+        <span>@{folder.username ?? folder.user_id} / {folder.visibility ?? 'private'} / {folder.pin_count ?? folder.post_ids?.length ?? 0} pins</span>
+      </div>
+      <button type="button" onClick={onPick}>Pick</button>
+      <button type="button" onClick={onOfficial}>Official</button>
+    </article>
+  )
+}
+
+function CommunityRow({ community, onPick, wide = false }: { community: AdminCommunityCard; onPick: () => void; wide?: boolean }) {
+  return (
+    <article className={wide ? styles.wideRow : ''}>
+      <div className={styles.avatarFallback}><Compass size={20} /></div>
+      <div>
+        <strong>{community.name}</strong>
+        <span>{community.visibility ?? 'public'} / {community.member_count ?? 0} members / {community.posts_count ?? 0} pins</span>
+      </div>
+      <button type="button" onClick={onPick}>Pick</button>
+    </article>
+  )
+}
+
+function PostRow({ post, wide = false }: { post: AdminPostCard; wide?: boolean }) {
+  return (
+    <article className={wide ? styles.wideRow : ''}>
+      <img src={post.image_url || '/favicon.ico'} alt="" />
+      <div>
+        <strong>{post.title || post.id}</strong>
+        <span>{post.saves_count ?? 0} saves / {post.likes_count ?? 0} likes / {post.reports_count ?? 0} reports</span>
+      </div>
+      <small>{formatDate(post.created_at ?? '')}</small>
+    </article>
+  )
+}
+
+function UserRow({ user, wide = false }: { user: AdminUserCard; wide?: boolean }) {
+  return (
+    <article className={wide ? styles.wideRow : ''}>
+      <img src={user.avatar_url || '/favicon.ico'} alt="" />
+      <div>
+        <strong>@{user.username ?? user.id}</strong>
+        <span>{user.display_name ?? 'no name'} / {user.pin_count ?? 0} pins / {user.public_folder_count ?? 0} public folders</span>
+      </div>
+      <small>{formatDate(user.created_at ?? '')}</small>
+    </article>
+  )
+}
+
+function RecommendRow({ item, onEdit, onDelete, onMoveUp, onMoveDown, disableUp, disableDown }: {
+  item: RecommendItem
+  onEdit: () => void
+  onDelete: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  disableUp: boolean
+  disableDown: boolean
+}) {
+  return (
+    <article className={styles.recommendRow}>
+      <img src={item.image_url || '/favicon.ico'} alt="" />
+      <div>
+        <strong>{item.title}</strong>
+        <span>{item.item_type} / priority {item.priority ?? 100} / {item.is_published ? 'published' : 'draft'}</span>
+      </div>
+      <button type="button" onClick={onMoveUp} disabled={disableUp}><ArrowUp size={16} /></button>
+      <button type="button" onClick={onMoveDown} disabled={disableDown}><ArrowDown size={16} /></button>
+      <button type="button" onClick={onEdit}>Edit</button>
+      <button type="button" onClick={onDelete}><Trash2 size={16} /></button>
+    </article>
+  )
+}
+
+function toRecommendForm(item: RecommendItem) {
+  return {
+    id: item.id,
+    item_type: item.item_type,
+    title: item.title,
+    description: item.description ?? '',
+    image_url: item.image_url ?? '',
+    target_url: item.target_url ?? '',
+    folder_id: item.folder_id ?? '',
+    post_id: item.post_id ?? '',
+    community_id: item.community_id ?? '',
+    priority: String(item.priority ?? 100),
+    is_published: Boolean(item.is_published),
+  }
+}
+
+function getNextPriority(items: RecommendItem[]) {
+  const maxPriority = items.reduce((max, item) => Math.max(max, item.priority ?? 0), 0)
+  return maxPriority + 10
+}
+
 function formatDate(value?: string) {
   if (!value) return ''
   return new Intl.DateTimeFormat('ja-JP', {
@@ -459,4 +954,12 @@ function formatDate(value?: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+function getNestedString(row: JsonRecord, parent: string, child: string) {
+  const value = row[parent]
+  if (!value || typeof value !== 'object') return ''
+  const nested = value as JsonRecord
+  const result = nested[child]
+  return typeof result === 'string' ? result : ''
 }

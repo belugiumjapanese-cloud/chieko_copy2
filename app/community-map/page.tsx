@@ -474,6 +474,24 @@ function uniquePinsById(pins: Pin[]) {
   })
 }
 
+function uniqueFoldersById(folders: Folder[]) {
+  const seen = new Set<string>()
+  return folders.filter((folder) => {
+    if (seen.has(folder.id)) return false
+    seen.add(folder.id)
+    return true
+  })
+}
+
+function uniqueCommunitiesById(communities: Community[]) {
+  const seen = new Set<string>()
+  return communities.filter((community) => {
+    if (seen.has(community.id)) return false
+    seen.add(community.id)
+    return true
+  })
+}
+
 function uniquePinsByMemory(pins: Pin[]) {
   const seen = new Set<string>()
   return pins.filter((pin) => {
@@ -1147,6 +1165,7 @@ export default function CommunityMapPrototype() {
   )
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users])
   const communitiesById = useMemo(() => new Map(communities.map((community) => [community.id, community])), [communities])
+  const foldersById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders])
   const pinsById = useMemo(() => new Map(pins.map((pin) => [pin.id, pin])), [pins])
   const selectedPin = selectedPinId ? pinsById.get(selectedPinId) ?? null : null
   const selectedCommunity = selectedCommunityId ? communitiesById.get(selectedCommunityId) ?? null : null
@@ -2763,6 +2782,18 @@ export default function CommunityMapPrototype() {
           created_at: new Date().toISOString(),
         },
       ]
+  const recommendedFolderItems = recommendItems.filter((item) => item.folder_id && ['folder_pick', 'official_folder'].includes(item.item_type))
+  const recommendedCommunityItems = recommendItems.filter((item) => item.community_id && item.item_type === 'community_pick')
+  const recommendedFoldersFromAdmin = uniqueFoldersById(
+    recommendedFolderItems
+      .map((item) => item.folder_id ? foldersById.get(item.folder_id) : null)
+      .filter((folder): folder is Folder => Boolean(folder)),
+  )
+  const recommendedCommunitiesFromAdmin = uniqueCommunitiesById(
+    recommendedCommunityItems
+      .map((item) => item.community_id ? communitiesById.get(item.community_id) : null)
+      .filter((community): community is Community => Boolean(community)),
+  )
 
   const authScreen = (
     <section className={styles.authPanel}>
@@ -2910,7 +2941,13 @@ export default function CommunityMapPrototype() {
                 <p>運営が見せたい公開フォルダーをここに出していきます。</p>
               </div>
             </div>
-            <FolderShelf title="Public folders" folders={publicFindFolders.slice(0, 6)} pinsById={pinsById} onOpenFolder={(folderId) => { setActiveTab('find'); setSelectedFindFolderId(folderId) }} onToggleLike={toggleFolderLike} />
+            <FolderShelf
+              title={recommendedFoldersFromAdmin.length ? 'Official / picked folders' : 'Public folders'}
+              folders={(recommendedFoldersFromAdmin.length ? recommendedFoldersFromAdmin : publicFindFolders).slice(0, 8)}
+              pinsById={pinsById}
+              onOpenFolder={(folderId) => { setActiveTab('find'); setSelectedFindFolderId(folderId) }}
+              onToggleLike={toggleFolderLike}
+            />
           </section>
           <section className={styles.recommendSection}>
             <div className={styles.sectionHeadingRow}>
@@ -2921,7 +2958,7 @@ export default function CommunityMapPrototype() {
             </div>
             <CommunityListSection
               title="Recommended community"
-              communities={[...recommendedCommunities, ...joinedCommunities].slice(0, 6)}
+              communities={(recommendedCommunitiesFromAdmin.length ? recommendedCommunitiesFromAdmin : [...recommendedCommunities, ...joinedCommunities]).slice(0, 8)}
               currentUserId={activeUserId}
               onOpen={openCommunity}
               onShare={(communityId) => {

@@ -51,7 +51,9 @@
 .adminHeader button,
 .authCard button,
 .recommendForm button,
-.itemList button {
+.itemList button,
+.adminNav button,
+.catalogTabs button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,6 +66,38 @@
   border: 0;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.adminNav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 8px 0 16px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  background: linear-gradient(180deg, #080a0a 72%, rgba(8, 10, 10, 0));
+}
+
+.adminNav button,
+.catalogTabs button {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.adminNav button.active,
+.catalogTabs button.active {
+  color: #080a0a;
+  background: #f7f7f2;
+}
+
+.adminNav button:disabled,
+.itemList button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .authCard {
@@ -215,6 +249,12 @@
   font-size: 1.35rem;
 }
 
+.panelCopy {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  line-height: 1.55;
+}
+
 .recommendForm {
   display: grid;
   gap: 10px;
@@ -252,12 +292,41 @@
   align-items: center;
 }
 
+.catalogControls,
+.catalogControlsCompact {
+  display: grid;
+  gap: 10px;
+}
+
+.catalogControls {
+  grid-template-columns: auto minmax(260px, 1fr);
+  align-items: center;
+}
+
+.catalogTabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.catalogTable {
+  display: grid;
+  gap: 8px;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .itemList {
   display: grid;
   gap: 8px;
 }
 
-.itemList article {
+.itemList article,
+.catalogTable article {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr) auto auto;
   gap: 10px;
@@ -269,7 +338,9 @@
   border-radius: 8px;
 }
 
-.itemList img {
+.itemList img,
+.catalogTable img,
+.avatarFallback {
   width: 54px;
   height: 54px;
   object-fit: cover;
@@ -277,14 +348,22 @@
   border-radius: 8px;
 }
 
-.itemList div {
+.avatarFallback {
+  display: grid;
+  place-items: center;
+}
+
+.itemList div,
+.catalogTable div {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
 .itemList strong,
-.itemList span {
+.itemList span,
+.catalogTable strong,
+.catalogTable span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -292,12 +371,95 @@
 
 .itemList span,
 .itemList small,
+.catalogTable span,
+.catalogTable small,
 .empty {
   color: rgba(255, 255, 255, 0.6);
 }
 
 .empty {
   margin: 0;
+}
+
+.recommendRow {
+  grid-template-columns: 54px minmax(0, 1fr) auto auto auto auto !important;
+}
+
+.wideRow {
+  grid-template-columns: 64px minmax(0, 1fr) auto auto !important;
+}
+
+.strategyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.strategyCard {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: #080a0a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.strategyCard span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.8rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.strategyCard strong {
+  font-size: 1.35rem;
+}
+
+.strategyCard p,
+.signalList p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.64);
+  line-height: 1.5;
+}
+
+.codeHint {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.codeHint code {
+  display: block;
+  padding: 12px;
+  overflow-x: auto;
+  color: #d9fff4;
+  white-space: pre;
+  background: #050606;
+  border-radius: 8px;
+}
+
+.eventList,
+.signalList {
+  display: grid;
+  gap: 8px;
+}
+
+.eventList div,
+.signalList article {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  background: #080a0a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.signalList article {
+  display: grid;
 }
 
 @media (max-width: 980px) {
@@ -320,7 +482,15 @@
     grid-template-columns: 1fr;
   }
 
-  .itemList article {
+  .catalogControls,
+  .strategyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .itemList article,
+  .catalogTable article,
+  .recommendRow,
+  .wideRow {
     grid-template-columns: 48px minmax(0, 1fr);
   }
 }
