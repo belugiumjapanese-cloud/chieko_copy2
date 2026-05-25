@@ -507,6 +507,40 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function getSignInErrorMessage(error: unknown) {
+  const message = getErrorMessage(error, '')
+  if (/invalid login credentials|user not found|invalid email or password/i.test(message)) {
+    return 'メールアドレスまたはパスワードが間違っています。'
+  }
+  if (/email not confirmed/i.test(message)) {
+    return 'メール確認が完了していません。メール内のURLを開いてからログインしてください。'
+  }
+  return message || 'ログインできませんでした。'
+}
+
+type AuthUserLike = {
+  id: string
+  email?: string
+  user_metadata?: Record<string, unknown> | null
+}
+
+async function ensureProfileForAuthUser(client: NonNullable<typeof supabase>, user: AuthUserLike) {
+  const displayNameFromMeta = typeof user.user_metadata?.display_name === 'string' ? user.user_metadata.display_name.trim() : ''
+  const displayName = displayNameFromMeta || user.email?.split('@')[0] || 'Account'
+  const { error } = await client
+    .from('profiles')
+    .upsert(
+      {
+        id: user.id,
+        username: profileFallbackName(user.id),
+        display_name: displayName,
+      },
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
+
+  if (error) throw error
+}
+
 function buildUsers(profileRows: ProfileRow[], followRows: FollowRow[]) {
   return profileRows.map((profile) => ({
     id: profile.id,
@@ -1002,6 +1036,7 @@ export default function CommunityMapPrototype() {
   const [authPasswordConfirm, setAuthPasswordConfirm] = useState('')
   const [authDisplayName, setAuthDisplayName] = useState('')
   const [authUsername, setAuthUsername] = useState('')
+  const [authError, setAuthError] = useState('')
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([])
@@ -1388,15 +1423,17 @@ export default function CommunityMapPrototype() {
     const boot = async () => {
       const { data } = await client.auth.getSession()
       if (!mounted) return
-      const userId = data.session?.user.id ?? ''
+      const user = data.session?.user
+      const userId = user?.id ?? ''
       setIsAuthenticated(Boolean(userId))
       setActiveUserId(userId)
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId(userId)
-      if (!userId) {
+      if (!user) {
         setRemoteLoading(false)
         return
       }
+      await ensureProfileForAuthUser(client, user)
       await loadRemoteData(userId)
     }
 
@@ -1406,16 +1443,23 @@ export default function CommunityMapPrototype() {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
       if (!session?.user && event !== 'SIGNED_OUT') return
-      const userId = session?.user.id ?? ''
+      const user = session?.user
+      const userId = user?.id ?? ''
       setIsAuthenticated(Boolean(userId))
       setActiveUserId(userId)
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId(userId)
-      if (!userId) {
+      if (!user) {
         setRemoteLoading(false)
         return
       }
-      loadRemoteData(userId)
+      void ensureProfileForAuthUser(client, user)
+        .then(() => loadRemoteData(userId))
+        .catch((error) => {
+          console.error(error)
+          setRemoteError(getErrorMessage(error, 'プロフィールの準備に失敗しました。'))
+          loadRemoteData(userId)
+        })
     })
 
     return () => {
@@ -1442,6 +1486,7 @@ export default function CommunityMapPrototype() {
     setAuthPasswordConfirm('')
     setAuthDisplayName('')
     setAuthUsername('')
+    setAuthError('')
   }, [])
 
   const requireSignedIn = useCallback(() => {
@@ -1471,15 +1516,19 @@ export default function CommunityMapPrototype() {
     const displayName = authDisplayName.trim() || email.split('@')[0] || 'new user'
     const username = authUsername.trim().replace(/^@/, '')
     const client = supabase
+    setAuthError('')
     if (!client) {
+      setAuthError('Supabaseが未設定です。')
       setToast('Supabaseが未設定です。')
       return
     }
     if (!email || !authPassword.trim()) {
+      setAuthError('メールアドレスとパスワードを入れてください。')
       setToast('メールアドレスとパスワードを入れてください。')
       return
     }
     if (authPassword !== authPasswordConfirm) {
+      setAuthError('確認用パスワードが一致していません。')
       setToast('確認用パスワードが一致していません。')
       return
     }
@@ -1498,12 +1547,20 @@ export default function CommunityMapPrototype() {
       })
       .then(async ({ data, error }) => {
         if (error) {
-          setToast(error.message)
+          const message = getErrorMessage(error, 'アカウントを作成できませんでした。')
+          setAuthError(message)
+          setToast(message)
           return
         }
         resetAuthForm()
         setAccountCreatorOpen(false)
         if (data.session?.user.id) {
+          setIsAuthenticated(true)
+          setActiveUserId(data.session.user.id)
+          setOwnedAccountIds([data.session.user.id])
+          setProfileUserId(data.session.user.id)
+          setProfileListMode('profile')
+          await ensureProfileForAuthUser(client, data.session.user)
           const profileUpdate: Record<string, string> = { display_name: displayName }
           if (username) profileUpdate.username = username
           await client.from('profiles').update(profileUpdate).eq('id', data.session.user.id)
@@ -1513,30 +1570,52 @@ export default function CommunityMapPrototype() {
         }
         setToast('確認メールを送りました。メール内のURLから登録を完了してください。')
       })
+      .catch((error) => {
+        const message = getErrorMessage(error, 'アカウントを作成できませんでした。')
+        setAuthError(message)
+        setToast(message)
+      })
   }, [authDisplayName, authEmail, authPassword, authPasswordConfirm, authUsername, loadRemoteData, resetAuthForm])
 
   const signInLocalAccount = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const email = authEmail.trim().toLowerCase()
     const client = supabase
+    setAuthError('')
     if (!client) {
+      setAuthError('Supabaseが未設定です。')
       setToast('Supabaseが未設定です。')
       return
     }
     if (!email || !authPassword.trim()) {
+      setAuthError('メールアドレスとパスワードを入れてください。')
       setToast('メールアドレスとパスワードを入れてください。')
       return
     }
 
     client.auth.signInWithPassword({ email, password: authPassword }).then(async ({ data, error }) => {
       if (error) {
-        setToast(error.message)
+        const message = getSignInErrorMessage(error)
+        setAuthError(message)
+        setToast(message)
         return
       }
+      setIsAuthenticated(true)
+      setActiveUserId(data.user.id)
+      setOwnedAccountIds([data.user.id])
+      setProfileUserId(data.user.id)
+      setProfileListMode('profile')
+      setSelectedPinId(null)
+      await ensureProfileForAuthUser(client, data.user)
       resetAuthForm()
       await loadRemoteData(data.user.id)
       setToast('ログインしました。')
     })
+      .catch((error) => {
+        const message = getSignInErrorMessage(error)
+        setAuthError(message)
+        setToast(message)
+      })
   }, [authEmail, authPassword, loadRemoteData, resetAuthForm])
 
   const handleProfileAvatar = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
@@ -2473,9 +2552,10 @@ export default function CommunityMapPrototype() {
         <p>Drop、Folder、いいね、コメントを自分のアカウントに保存します。</p>
       </div>
       <div className={styles.segmented}>
-        <button className={authMode === 'signin' ? styles.active : ''} type="button" onClick={() => setAuthMode('signin')}>Sign in</button>
-        <button className={authMode === 'signup' ? styles.active : ''} type="button" onClick={() => setAuthMode('signup')}>Sign up</button>
+        <button className={authMode === 'signin' ? styles.active : ''} type="button" onClick={() => { setAuthMode('signin'); setAuthError('') }}>Sign in</button>
+        <button className={authMode === 'signup' ? styles.active : ''} type="button" onClick={() => { setAuthMode('signup'); setAuthError('') }}>Sign up</button>
       </div>
+      {authError && <p className={styles.authError}>{authError}</p>}
       {authMode === 'signin' ? (
         <form className={styles.authForm} onSubmit={signInLocalAccount}>
           <label>
