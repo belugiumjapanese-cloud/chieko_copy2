@@ -181,6 +181,21 @@ type NotificationItem = {
   createdAt: string
 }
 
+type RecommendItem = {
+  id: string
+  item_type: string
+  title: string
+  description: string | null
+  image_url: string | null
+  target_url: string | null
+  folder_id: string | null
+  post_id: string | null
+  community_id: string | null
+  priority: number | null
+  is_published: boolean | null
+  created_at: string
+}
+
 type ProfileRow = {
   id: string
   username: string | null
@@ -553,6 +568,16 @@ function buildUsers(profileRows: ProfileRow[], followRows: FollowRow[]) {
     pinCount: profile.pin_count ?? 0,
     publicFolderCount: profile.public_folder_count ?? 0,
   }))
+}
+
+function mergeById<T extends { id: string }>(base: T[], incoming: T[]) {
+  const merged = new Map(base.map((item) => [item.id, item]))
+  incoming.forEach((item) => merged.set(item.id, item))
+  return Array.from(merged.values())
+}
+
+function uniqueRowsById<T extends { id: string }>(rows: T[]) {
+  return mergeById([], rows)
 }
 
 function buildFolders(folderRows: AppFolderCardRow[], folderLikeRows: FolderLikeRow[] = [], activeUserId = ''): Folder[] {
@@ -1052,6 +1077,7 @@ export default function CommunityMapPrototype() {
   const [pins, setPins] = useState<Pin[]>([])
   const [activities, setActivities] = useState<CommunityActivity[]>([])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [recommendItems, setRecommendItems] = useState<RecommendItem[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [savedPinIds, setSavedPinIds] = useState<string[]>([])
   const [seenPinIds, setSeenPinIds] = useState<string[]>([])
@@ -1259,6 +1285,118 @@ export default function CommunityMapPrototype() {
       .slice(0, 6)
   }, [activeTagQuery, tagStats])
 
+  const loadPriorityRemoteData = useCallback(async (userId: string) => {
+    if (!supabase) {
+      setRemoteLoading(false)
+      setRemoteError('Supabaseの環境変数が未設定です。')
+      return
+    }
+
+    setRemoteError('')
+
+    try {
+      const [
+        profileResult,
+        followsResult,
+        myPostsResult,
+        myFoldersResult,
+        savedPostsResult,
+        myLikesResult,
+      ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id,username,display_name,avatar_url,bio,pin_count,public_folder_count')
+          .eq('id', userId),
+        supabase
+          .from('follows')
+          .select('follower_id,following_id')
+          .or(`follower_id.eq.${userId},following_id.eq.${userId}`),
+        supabase
+          .from('app_post_cards')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(120),
+        supabase
+          .from('app_folder_cards')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(80),
+        supabase
+          .from('saved_posts')
+          .select('post_id')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(120),
+        supabase
+          .from('post_likes')
+          .select('post_id,user_id,created_at')
+          .eq('user_id', userId)
+          .limit(500),
+      ])
+
+      const failed = [profileResult, followsResult, myPostsResult, myFoldersResult, savedPostsResult, myLikesResult]
+        .find((result) => result.error)
+      if (failed?.error) throw failed.error
+
+      let profileRows = (profileResult.data ?? []) as ProfileRow[]
+      if (!profileRows.some((profile) => profile.id === userId)) {
+        const fallback = accountFallbackUser(userId)
+        profileRows = [{
+          id: userId,
+          username: fallback.username,
+          display_name: fallback.displayName,
+          avatar_url: fallback.avatarUrl,
+          bio: fallback.bio,
+          pin_count: 0,
+          public_folder_count: 0,
+        }]
+      }
+
+      const savedRows = (savedPostsResult.data ?? []) as SavedPostRow[]
+      const savedIds = savedRows.map((row) => row.post_id).filter(Boolean).slice(0, 80)
+      let savedPostRows: AppPostCardRow[] = []
+      if (savedIds.length) {
+        const savedPostResult = await supabase
+          .from('app_post_cards')
+          .select('*')
+          .in('id', savedIds)
+        if (!savedPostResult.error && Array.isArray(savedPostResult.data)) {
+          savedPostRows = savedPostResult.data as AppPostCardRow[]
+        }
+      }
+
+      const priorityUsers = buildUsers(profileRows, (followsResult.data ?? []) as FollowRow[])
+      const priorityFolders = buildFolders((myFoldersResult.data ?? []) as AppFolderCardRow[], [], userId)
+      const priorityPins = buildPins(
+        uniqueRowsById([
+          ...((myPostsResult.data ?? []) as AppPostCardRow[]),
+          ...savedPostRows,
+        ]),
+        [],
+        (myLikesResult.data ?? []) as LikeRow[],
+        userId,
+        priorityFolders,
+      )
+
+      setUsers((current) => mergeById(current.filter((user) => user.id !== AUTH_PLACEHOLDER_USER.id), priorityUsers))
+      setFolders(priorityFolders)
+      setPins(priorityPins)
+      setSavedPinIds(savedIds)
+      setOwnedAccountIds([userId])
+      setProfileUserId((current) => current || userId)
+      setRemoteLoading(false)
+    } catch (error) {
+      console.error(error)
+      setRemoteError(getErrorMessage(error, '最初のユーザー情報を取得できませんでした。'))
+      setUsers((current) => mergeById(current, [accountFallbackUser(userId)]))
+      setOwnedAccountIds([userId])
+      setProfileUserId((current) => current || userId)
+      setRemoteLoading(false)
+    }
+  }, [])
+
   const loadRemoteData = useCallback(async (userId: string) => {
     if (!supabase) {
       setRemoteLoading(false)
@@ -1336,6 +1474,18 @@ export default function CommunityMapPrototype() {
         folderLikeRows = folderLikesResult.data as FolderLikeRow[]
       }
 
+      let remoteRecommendItems: RecommendItem[] = []
+      const recommendResult = await supabase
+        .from('recommend_items')
+        .select('id,item_type,title,description,image_url,target_url,folder_id,post_id,community_id,priority,is_published,created_at')
+        .eq('is_published', true)
+        .order('priority', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(30)
+      if (!recommendResult.error && Array.isArray(recommendResult.data)) {
+        remoteRecommendItems = recommendResult.data as RecommendItem[]
+      }
+
       let remoteUsers = buildUsers(profileRows, followRows)
       if (userId && !remoteUsers.some((user) => user.id === userId)) {
         remoteUsers = [accountFallbackUser(userId), ...remoteUsers]
@@ -1380,6 +1530,7 @@ export default function CommunityMapPrototype() {
       setPins(remotePins)
       setCommunities(remoteCommunities)
       setActivities(buildActivities((activitiesResult.data ?? []) as AppCommunityActivityRow[]))
+      setRecommendItems(remoteRecommendItems)
       setNotifications(buildNotifications(
         (likesResult.data ?? []) as LikeRow[],
         folderLikeNotificationRows,
@@ -1434,7 +1585,8 @@ export default function CommunityMapPrototype() {
         return
       }
       await ensureProfileForAuthUser(client, user)
-      await loadRemoteData(userId)
+      await loadPriorityRemoteData(userId)
+      void loadRemoteData(userId)
     }
 
     boot()
@@ -1454,7 +1606,10 @@ export default function CommunityMapPrototype() {
         return
       }
       void ensureProfileForAuthUser(client, user)
-        .then(() => loadRemoteData(userId))
+        .then(async () => {
+          await loadPriorityRemoteData(userId)
+          void loadRemoteData(userId)
+        })
         .catch((error) => {
           console.error(error)
           setRemoteError(getErrorMessage(error, 'プロフィールの準備に失敗しました。'))
@@ -1466,9 +1621,39 @@ export default function CommunityMapPrototype() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [loadRemoteData])
+  }, [loadPriorityRemoteData, loadRemoteData])
 
   const ownedAccounts = ownedAccountIds.map((id) => usersById.get(id)).filter((user): user is DemoUser => Boolean(user))
+
+  const logAppEvent = useCallback((eventType: string, metadata: Record<string, unknown> = {}) => {
+    if (!supabase || !activeUserId) return
+    void supabase
+      .from('app_events')
+      .insert({
+        user_id: activeUserId,
+        event_type: eventType,
+        metadata,
+      })
+      .then(({ error }) => {
+        if (error && !/app_events/i.test(error.message)) {
+          console.warn(error.message)
+        }
+      })
+  }, [activeUserId])
+
+  useEffect(() => {
+    if (!activeUserId) return
+    logAppEvent('session_start', { entry_tab: activeTab })
+    const interval = window.setInterval(() => {
+      logAppEvent('session_heartbeat', { active_tab: activeTab })
+    }, 60_000)
+    return () => window.clearInterval(interval)
+  }, [activeTab, activeUserId, logAppEvent])
+
+  useEffect(() => {
+    if (!activeUserId) return
+    logAppEvent('tab_view', { tab: activeTab })
+  }, [activeTab, activeUserId, logAppEvent])
 
   useEffect(() => {
     if (!isMyProfile) return
@@ -1564,7 +1749,8 @@ export default function CommunityMapPrototype() {
           const profileUpdate: Record<string, string> = { display_name: displayName }
           if (username) profileUpdate.username = username
           await client.from('profiles').update(profileUpdate).eq('id', data.session.user.id)
-          await loadRemoteData(data.session.user.id)
+          await loadPriorityRemoteData(data.session.user.id)
+          void loadRemoteData(data.session.user.id)
           setToast('アカウントを作成しました。')
           return
         }
@@ -1575,7 +1761,7 @@ export default function CommunityMapPrototype() {
         setAuthError(message)
         setToast(message)
       })
-  }, [authDisplayName, authEmail, authPassword, authPasswordConfirm, authUsername, loadRemoteData, resetAuthForm])
+  }, [authDisplayName, authEmail, authPassword, authPasswordConfirm, authUsername, loadPriorityRemoteData, loadRemoteData, resetAuthForm])
 
   const signInLocalAccount = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1607,8 +1793,9 @@ export default function CommunityMapPrototype() {
       setProfileListMode('profile')
       setSelectedPinId(null)
       await ensureProfileForAuthUser(client, data.user)
+      await loadPriorityRemoteData(data.user.id)
       resetAuthForm()
-      await loadRemoteData(data.user.id)
+      void loadRemoteData(data.user.id)
       setToast('ログインしました。')
     })
       .catch((error) => {
@@ -1616,7 +1803,7 @@ export default function CommunityMapPrototype() {
         setAuthError(message)
         setToast(message)
       })
-  }, [authEmail, authPassword, loadRemoteData, resetAuthForm])
+  }, [authEmail, authPassword, loadPriorityRemoteData, loadRemoteData, resetAuthForm])
 
   const handleProfileAvatar = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -2544,6 +2731,39 @@ export default function CommunityMapPrototype() {
     return `@${owner?.username ?? 'user'} / ${communityLabel(communitiesById.get(pinCommunityIds(pin)[0] ?? ''))}`
   }, [communitiesById, usersById])
 
+  const recommendHeroItems = recommendItems.length
+    ? recommendItems
+    : [
+        {
+          id: 'fallback-event',
+          item_type: 'event',
+          title: '週末に歩きたい建築と街のイベント',
+          description: '公式ピックアップ',
+          image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=80',
+          target_url: null,
+          folder_id: null,
+          post_id: null,
+          community_id: null,
+          priority: 1,
+          is_published: true,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'fallback-folder',
+          item_type: 'folder_pick',
+          title: 'いま保存されている公開フォルダー',
+          description: `${publicFindFolders.length} folders`,
+          image_url: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1100&q=80',
+          target_url: null,
+          folder_id: null,
+          post_id: null,
+          community_id: null,
+          priority: 2,
+          is_published: true,
+          created_at: new Date().toISOString(),
+        },
+      ]
+
   const authScreen = (
     <section className={styles.authPanel}>
       <div>
@@ -2672,22 +2892,16 @@ export default function CommunityMapPrototype() {
             <h1>運営のおすすめと、今見てほしい場所</h1>
           </header>
           <div className={styles.recommendHeroRail}>
-            <article>
-              <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=80" alt="" />
-              <div>
-                <span>Event</span>
-                <strong>週末に歩きたい建築と街のイベント</strong>
-                <small>公式ピックアップ</small>
-              </div>
-            </article>
-            <article>
-              <img src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1100&q=80" alt="" />
-              <div>
-                <span>Folder Pick</span>
-                <strong>いま保存されている公開フォルダー</strong>
-                <small>{publicFindFolders.length} folders</small>
-              </div>
-            </article>
+            {recommendHeroItems.map((item) => (
+              <article key={item.id}>
+                <img src={item.image_url || EMPTY_IMAGE} alt="" />
+                <div>
+                  <span>{item.item_type.replace(/_/g, ' ')}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.description || '公式ピックアップ'}</small>
+                </div>
+              </article>
+            ))}
           </div>
           <section className={styles.recommendSection}>
             <div className={styles.sectionHeadingRow}>

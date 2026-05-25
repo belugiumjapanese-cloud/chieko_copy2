@@ -1,0 +1,326 @@
+.adminShell {
+  min-height: 100dvh;
+  padding: 24px;
+  color: #f7f7f2;
+  background: #080a0a;
+}
+
+.adminHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.adminHeader span,
+.panelHeader span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.adminHeader h1,
+.adminHeader p,
+.panel h2,
+.authCard h1,
+.authCard p {
+  margin: 0;
+}
+
+.adminHeader h1 {
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 0.95;
+}
+
+.adminHeader p,
+.authCard p {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.adminHeader > div:last-child {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.adminHeader button,
+.authCard button,
+.recommendForm button,
+.itemList button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: #080a0a;
+  font-weight: 950;
+  background: #f7f7f2;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.authCard {
+  display: grid;
+  gap: 14px;
+  width: min(520px, calc(100vw - 32px));
+  padding: 22px;
+  margin: 8vh auto;
+  color: #f7f7f2;
+  background: #111514;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.38);
+}
+
+.authCard label,
+.recommendForm label {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 900;
+}
+
+.authCard input,
+.recommendForm input,
+.recommendForm textarea,
+.recommendForm select,
+.searchField input {
+  min-height: 42px;
+  min-width: 0;
+  padding: 10px;
+  color: #f7f7f2;
+  background: #080a0a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  outline: 0;
+}
+
+.recommendForm textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.error,
+.notice,
+.warningCard {
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  font-weight: 900;
+  border-radius: 8px;
+}
+
+.error {
+  color: #ffdbd6;
+  background: rgba(180, 35, 24, 0.28);
+  border: 1px solid rgba(255, 147, 135, 0.28);
+}
+
+.notice {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.warningCard {
+  display: flex;
+  gap: 10px;
+  color: #ffe9bd;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.warningCard div {
+  display: grid;
+  gap: 4px;
+}
+
+.warningCard span {
+  font-size: 0.82rem;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.metricCard {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 96px;
+  padding: 14px;
+  background: #111514;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.metricCard > span {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.metricCard div {
+  display: grid;
+  gap: 2px;
+}
+
+.metricCard strong {
+  font-size: 1.55rem;
+}
+
+.metricCard small,
+.metricCard em {
+  color: rgba(255, 255, 255, 0.62);
+  font-style: normal;
+  font-weight: 850;
+}
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+  padding: 16px;
+  background: #111514;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelHeader h2 {
+  font-size: 1.35rem;
+}
+
+.recommendForm {
+  display: grid;
+  gap: 10px;
+}
+
+.twoColumns,
+.threeColumns {
+  display: grid;
+  gap: 10px;
+}
+
+.twoColumns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.threeColumns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.switchRow {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+}
+
+.switchRow input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.searchField {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.itemList {
+  display: grid;
+  gap: 8px;
+}
+
+.itemList article {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 66px;
+  padding: 8px;
+  background: #080a0a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.itemList img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.itemList div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.itemList strong,
+.itemList span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemList span,
+.itemList small,
+.empty {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.empty {
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .adminShell {
+    padding: 14px;
+  }
+
+  .adminHeader,
+  .adminGrid {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .twoColumns,
+  .threeColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .itemList article {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+}
