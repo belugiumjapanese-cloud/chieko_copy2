@@ -315,6 +315,52 @@ type AppCommunityActivityRow = {
   created_at: string
 }
 
+type DirectPostRow = {
+  id: string
+  user_id: string
+  title: string | null
+  description: string | null
+  latitude: number
+  longitude: number
+  image_url: string | null
+  visibility: 'public' | 'private' | 'followers'
+  tags: string[] | null
+  taken_at: string | null
+  likes_count: number | null
+  comments_count: number | null
+  saves_count: number | null
+  reports_count: number | null
+  created_at: string
+}
+
+type DirectFolderRow = {
+  id: string
+  user_id: string
+  folder_kind?: 'my_world' | 'to_visit' | null
+  name: string
+  description?: string | null
+  color: string | null
+  visibility: 'public' | 'private' | 'followers'
+  is_paid?: boolean | null
+  paid_from_index?: number | null
+  folder_price_yen?: number | null
+  thumbnail_url?: string | null
+  created_at: string
+}
+
+type DirectCommunityRow = {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  owner_id: string
+  visibility: 'public' | 'invite_only' | 'private'
+  invite_code: string | null
+  member_count: number | null
+  posts_count: number | null
+  created_at: string
+}
+
 function toLngLat(value: Coordinates | null | undefined): [number, number] | null {
   if (!value || !Number.isFinite(value.longitude) || !Number.isFinite(value.latitude)) return null
   return [value.longitude, value.latitude]
@@ -600,6 +646,66 @@ function uniqueRowsById<T extends { id: string }>(rows: T[]) {
 
 function resultError(result: { error: { message: string } | null }) {
   return result.error?.message ?? ''
+}
+
+function directFoldersToCards(rows: DirectFolderRow[]): AppFolderCardRow[] {
+  return rows.map((folder) => ({
+    id: folder.id,
+    user_id: folder.user_id,
+    folder_kind: folder.folder_kind ?? 'my_world',
+    name: folder.name,
+    description: folder.description ?? '',
+    color: folder.color || COLORS[0],
+    visibility: folder.visibility,
+    is_paid: folder.is_paid ?? false,
+    paid_from_index: folder.paid_from_index ?? null,
+    folder_price_yen: folder.folder_price_yen ?? null,
+    preview_image_url: null,
+    thumbnail_url: folder.thumbnail_url ?? null,
+    created_at: folder.created_at,
+    post_ids: [],
+  }))
+}
+
+function directCommunitiesToCards(rows: DirectCommunityRow[], memberRows: CommunityMemberRow[], activeUserId: string): AppCommunityCardRow[] {
+  return rows.map((community) => ({
+    id: community.id,
+    slug: community.slug,
+    name: community.name,
+    description: community.description ?? '',
+    owner_id: community.owner_id,
+    visibility: community.visibility,
+    invite_code: community.invite_code,
+    member_count: community.member_count,
+    posts_count: community.posts_count,
+    joined_by_me: Boolean(activeUserId && memberRows.some((member) => member.community_id === community.id && member.user_id === activeUserId)),
+    created_at: community.created_at,
+  }))
+}
+
+function directPostsToCards(rows: DirectPostRow[]): AppPostCardRow[] {
+  return rows.map((post) => ({
+    id: post.id,
+    user_id: post.user_id,
+    username: null,
+    display_name: null,
+    avatar_url: null,
+    title: post.title,
+    description: post.description,
+    latitude: post.latitude,
+    longitude: post.longitude,
+    image_url: post.image_url,
+    visibility: post.visibility,
+    tags: post.tags,
+    taken_at: post.taken_at,
+    likes_count: post.likes_count,
+    comments_count: post.comments_count,
+    saves_count: post.saves_count,
+    reports_count: post.reports_count,
+    created_at: post.created_at,
+    folder_ids: [],
+    community_ids: [],
+  }))
 }
 
 function buildFolders(folderRows: AppFolderCardRow[], folderLikeRows: FolderLikeRow[] = [], activeUserId = ''): Folder[] {
@@ -1444,59 +1550,20 @@ export default function CommunityMapPrototype() {
       return
     }
 
-    setRemoteLoading(true)
+    setRemoteLoading((current) => current && !userId)
     setRemoteError('')
 
     try {
-      const [
-        profilesResult,
-        followsResult,
-        foldersResult,
-        communitiesResult,
-        membersResult,
-      ] = await Promise.all([
+      const [profilesResult, followsResult] = await Promise.all([
         supabase.from('profiles').select('id,username,display_name,avatar_url,bio,pin_count,public_folder_count'),
         supabase.from('follows').select('follower_id,following_id'),
-        supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
-        supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('community_members').select('community_id,user_id'),
       ])
 
-      const criticalResults = [
-        profilesResult,
-        followsResult,
-        foldersResult,
-        communitiesResult,
-        membersResult,
-      ]
-
-      const failed = criticalResults.find((result) => result.error)
-      if (failed?.error) throw failed.error
+      if (profilesResult.error) throw profilesResult.error
+      if (followsResult.error) console.warn(followsResult.error.message)
 
       const profileRows = (profilesResult.data ?? []) as ProfileRow[]
-      const followRows = (followsResult.data ?? []) as FollowRow[]
-      const folderRows = (foldersResult.data ?? []) as AppFolderCardRow[]
-      const memberRows = (membersResult.data ?? []) as CommunityMemberRow[]
-      let folderLikeRows: FolderLikeRow[] = []
-      const folderLikesResult = await supabase
-        .from('folder_likes')
-        .select('folder_id,user_id,created_at')
-        .limit(2000)
-      if (!folderLikesResult.error && Array.isArray(folderLikesResult.data)) {
-        folderLikeRows = folderLikesResult.data as FolderLikeRow[]
-      }
-
-      let remoteRecommendItems: RecommendItem[] = []
-      const recommendResult = await supabase
-        .from('recommend_items')
-        .select('id,item_type,title,description,image_url,target_url,folder_id,post_id,community_id,priority,is_published,created_at')
-        .eq('is_published', true)
-        .order('priority', { ascending: true })
-        .order('created_at', { ascending: false })
-        .limit(30)
-      if (!recommendResult.error && Array.isArray(recommendResult.data)) {
-        remoteRecommendItems = recommendResult.data as RecommendItem[]
-      }
+      const followRows = (followsResult.error ? [] : followsResult.data ?? []) as FollowRow[]
 
       let remoteUsers = buildUsers(profileRows, followRows)
       if (userId && !remoteUsers.some((user) => user.id === userId)) {
@@ -1506,20 +1573,102 @@ export default function CommunityMapPrototype() {
           .upsert({ id: userId, display_name: 'Account' }, { onConflict: 'id' })
       }
 
-      const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
-      const remoteCommunities = buildCommunities(
-        (communitiesResult.data ?? []) as AppCommunityCardRow[],
-        memberRows,
-        userId,
-      )
-
       setUsers(remoteUsers)
-      setFolders(remoteFolders)
-      setCommunities(remoteCommunities)
-      setRecommendItems(remoteRecommendItems)
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId((current) => (current && remoteUsers.some((user) => user.id === current) ? current : userId))
       setRemoteLoading(false)
+
+      const [
+        foldersResult,
+        communitiesResult,
+        membersResult,
+        folderLikesResult,
+        recommendResult,
+      ] = await Promise.all([
+        supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
+        supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('community_members').select('community_id,user_id'),
+        supabase.from('folder_likes').select('folder_id,user_id,created_at').limit(2000),
+        supabase
+          .from('recommend_items')
+          .select('id,item_type,title,description,image_url,target_url,folder_id,post_id,community_id,priority,is_published,created_at')
+          .eq('is_published', true)
+          .order('priority', { ascending: true })
+          .order('created_at', { ascending: false })
+          .limit(30),
+      ])
+
+      let memberRows = (membersResult.error ? [] : membersResult.data ?? []) as CommunityMemberRow[]
+      if (membersResult.error) console.warn(membersResult.error.message)
+
+      let folderRows = (foldersResult.error ? [] : foldersResult.data ?? []) as AppFolderCardRow[]
+      if (foldersResult.error) {
+        console.warn(foldersResult.error.message)
+        const directFoldersResult = await supabase
+          .from('folders')
+          .select('id,user_id,folder_kind,name,description,color,visibility,is_paid,paid_from_index,folder_price_yen,thumbnail_url,created_at')
+          .order('created_at', { ascending: false })
+          .limit(300)
+        if (!directFoldersResult.error && Array.isArray(directFoldersResult.data)) {
+          folderRows = directFoldersToCards(directFoldersResult.data as DirectFolderRow[])
+          const directFolderIds = folderRows.map((folder) => folder.id)
+          if (directFolderIds.length) {
+            const directFolderPostsResult = await supabase
+              .from('folder_posts')
+              .select('folder_id,post_id,sort_order,created_at')
+              .in('folder_id', directFolderIds)
+              .order('sort_order', { ascending: true })
+              .order('created_at', { ascending: true })
+            if (!directFolderPostsResult.error && Array.isArray(directFolderPostsResult.data)) {
+              const postIdsByFolder = new Map<string, string[]>()
+              ;(directFolderPostsResult.data as Array<{ folder_id: string; post_id: string }>).forEach((row) => {
+                const ids = postIdsByFolder.get(row.folder_id) ?? []
+                ids.push(row.post_id)
+                postIdsByFolder.set(row.folder_id, ids)
+              })
+              folderRows = folderRows.map((folder) => ({
+                ...folder,
+                post_ids: postIdsByFolder.get(folder.id) ?? [],
+              }))
+            } else if (directFolderPostsResult.error) {
+              console.warn(directFolderPostsResult.error.message)
+            }
+          }
+        } else if (directFoldersResult.error) {
+          console.warn(directFoldersResult.error.message)
+        }
+      }
+
+      let communityRows = (communitiesResult.error ? [] : communitiesResult.data ?? []) as AppCommunityCardRow[]
+      if (communitiesResult.error) {
+        console.warn(communitiesResult.error.message)
+        const directCommunitiesResult = await supabase
+          .from('communities')
+          .select('id,slug,name,description,owner_id,visibility,invite_code,member_count,posts_count,created_at')
+          .order('created_at', { ascending: false })
+          .limit(200)
+        if (!directCommunitiesResult.error && Array.isArray(directCommunitiesResult.data)) {
+          communityRows = directCommunitiesToCards(directCommunitiesResult.data as DirectCommunityRow[], memberRows, userId)
+        } else if (directCommunitiesResult.error) {
+          console.warn(directCommunitiesResult.error.message)
+        }
+      }
+
+      const folderLikeRows = (!folderLikesResult.error && Array.isArray(folderLikesResult.data)
+        ? folderLikesResult.data
+        : []) as FolderLikeRow[]
+      if (folderLikesResult.error) console.warn(folderLikesResult.error.message)
+
+      const remoteRecommendItems = (!recommendResult.error && Array.isArray(recommendResult.data)
+        ? recommendResult.data
+        : []) as RecommendItem[]
+      if (recommendResult.error) console.warn(recommendResult.error.message)
+
+      const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
+      const remoteCommunities = buildCommunities(communityRows, memberRows, userId)
+      setFolders(remoteFolders)
+      setCommunities(remoteCommunities)
+      setRecommendItems(remoteRecommendItems)
 
       const [
         postsResult,
@@ -1539,9 +1688,20 @@ export default function CommunityMapPrototype() {
         supabase.from('app_community_activity').select('*').order('created_at', { ascending: false }).limit(300),
       ])
 
+      let postRowsForCards = (postsResult.data ?? []) as AppPostCardRow[]
       if (postsResult.error) {
         console.warn(postsResult.error.message)
-        return
+        const directPostsResult = await supabase
+          .from('posts')
+          .select('id,user_id,title,description,latitude,longitude,image_url,visibility,tags,taken_at,likes_count,comments_count,saves_count,reports_count,created_at')
+          .order('created_at', { ascending: false })
+          .limit(300)
+        if (directPostsResult.error || !Array.isArray(directPostsResult.data)) {
+          if (directPostsResult.error) console.warn(directPostsResult.error.message)
+          return
+        }
+
+        postRowsForCards = directPostsToCards(directPostsResult.data as DirectPostRow[])
       }
 
       ;[commentsResult, likesResult, savedPostsResult, saveActivityResult, activitiesResult].forEach((result) => {
@@ -1550,7 +1710,7 @@ export default function CommunityMapPrototype() {
       })
 
       const remotePins = buildPins(
-        (postsResult.data ?? []) as AppPostCardRow[],
+        postRowsForCards,
         (commentsResult.error ? [] : commentsResult.data ?? []) as CommentRow[],
         (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
         userId,
