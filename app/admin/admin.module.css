@@ -141,6 +141,12 @@
   resize: vertical;
 }
 
+.recommendForm input[type="color"] {
+  width: 100%;
+  min-height: 48px;
+  padding: 4px;
+}
+
 .error,
 .notice,
 .warningCard {
@@ -220,6 +226,65 @@
   color: rgba(255, 255, 255, 0.62);
   font-style: normal;
   font-weight: 850;
+}
+
+.pendingBar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  margin: 0 0 18px;
+  background: #16211e;
+  border: 1px solid rgba(109, 255, 212, 0.24);
+  border-radius: 8px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.24);
+}
+
+.pendingBar > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.pendingBar span {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pendingBar strong {
+  white-space: nowrap;
+}
+
+.pendingBar > button,
+.pendingChips button {
+  min-height: 38px;
+  padding: 8px 12px;
+  color: #06110f;
+  font-weight: 950;
+  background: #b7ffe7;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pendingBar > button:disabled {
+  opacity: 0.5;
+}
+
+.pendingChips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.pendingChips button {
+  flex: 0 0 auto;
+  color: #dffcf3;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .adminGrid {
@@ -320,6 +385,61 @@
   gap: 8px;
 }
 
+.creatorHero {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(18, 107, 88, 0.72), rgba(255, 255, 255, 0.06)),
+    #080a0a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.creatorHero strong {
+  font-size: 1.45rem;
+}
+
+.creatorHero p {
+  max-width: 62ch;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+}
+
+.selectedPinList {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px;
+  overflow-x: auto;
+  background: #080a0a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.selectedPinList span,
+.selectedPinList button {
+  flex: 0 0 auto;
+}
+
+.selectedPinList span {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 950;
+}
+
+.selectedPinList button {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: #f7f7f2;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .itemList {
   display: grid;
   gap: 8px;
@@ -387,6 +507,16 @@
 
 .wideRow {
   grid-template-columns: 64px minmax(0, 1fr) auto auto !important;
+}
+
+.selectedAction {
+  color: #06110f !important;
+  background: #9ff4d9 !important;
+}
+
+.selectedContentRow {
+  border-color: rgba(109, 255, 212, 0.42) !important;
+  box-shadow: inset 3px 0 0 #9ff4d9;
 }
 
 .strategyGrid {
@@ -484,6 +614,10 @@
 
   .catalogControls,
   .strategyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pendingBar {
     grid-template-columns: 1fr;
   }
 

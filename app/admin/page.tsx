@@ -31,7 +31,7 @@ import { supabase } from '../../lib/supabase'
 import styles from './admin.module.css'
 
 type JsonRecord = Record<string, unknown>
-type SectionKey = 'dashboard' | 'recommend' | 'catalog' | 'moderation' | 'users'
+type SectionKey = 'dashboard' | 'recommend' | 'studio' | 'catalog' | 'moderation' | 'users'
 type CatalogKind = 'folders' | 'communities' | 'posts' | 'users'
 
 type AdminOverview = {
@@ -140,6 +140,28 @@ type AdminUserCard = {
 
 type CatalogRow = AdminFolderCard | AdminCommunityCard | AdminPostCard | AdminUserCard
 
+type PendingRecommend = {
+  key: string
+  item_type: string
+  title: string
+  description: string
+  image_url: string
+  target_url: string
+  folder_id: string
+  post_id: string
+  community_id: string
+  is_published: boolean
+  sourceLabel: string
+}
+
+type OfficialFolderForm = {
+  name: string
+  description: string
+  color: string
+  visibility: 'public' | 'private'
+  addToRecommend: boolean
+}
+
 const emptyRecommend = {
   id: '',
   item_type: 'folder_pick',
@@ -157,6 +179,7 @@ const emptyRecommend = {
 const sectionItems: Array<{ key: SectionKey; label: string; icon: ReactNode }> = [
   { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
   { key: 'recommend', label: 'Recommend', icon: <Sparkles size={17} /> },
+  { key: 'studio', label: 'Folder Studio', icon: <Folder size={17} /> },
   { key: 'catalog', label: 'Catalog', icon: <Database size={17} /> },
   { key: 'moderation', label: 'Moderation', icon: <ShieldAlert size={17} /> },
   { key: 'users', label: 'Users', icon: <Users size={17} /> },
@@ -185,6 +208,20 @@ export default function AdminPage() {
   const [catalogWarnings, setCatalogWarnings] = useState<string[]>([])
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
+  const [pendingRecommendItems, setPendingRecommendItems] = useState<PendingRecommend[]>([])
+  const [savingPendingRecommend, setSavingPendingRecommend] = useState(false)
+  const [officialFolderForm, setOfficialFolderForm] = useState<OfficialFolderForm>({
+    name: '',
+    description: '',
+    color: '#126b58',
+    visibility: 'public',
+    addToRecommend: true,
+  })
+  const [officialFolderPostQuery, setOfficialFolderPostQuery] = useState('')
+  const [officialFolderPostRows, setOfficialFolderPostRows] = useState<AdminPostCard[]>([])
+  const [officialFolderPostIds, setOfficialFolderPostIds] = useState<string[]>([])
+  const [officialFolderPostLoading, setOfficialFolderPostLoading] = useState(false)
+  const [officialFolderSaving, setOfficialFolderSaving] = useState(false)
 
   const isConfigured = Boolean(supabase)
 
@@ -271,6 +308,34 @@ export default function AdminPage() {
     return () => window.clearTimeout(id)
   }, [catalogKind, catalogQuery, loadCatalog, section, token])
 
+  const loadOfficialFolderPosts = useCallback(async (search = officialFolderPostQuery, accessToken = token) => {
+    if (!accessToken) return
+    setOfficialFolderPostLoading(true)
+    const params = new URLSearchParams({ kind: 'posts', q: search, limit: '120' })
+    const response = await fetch(`/api/admin/catalog?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setActionMessage(data.error || '投稿候補を読み込めませんでした。')
+      setOfficialFolderPostRows([])
+      setOfficialFolderPostLoading(false)
+      return
+    }
+    setOfficialFolderPostRows(Array.isArray(data.rows) ? data.rows : [])
+    setOfficialFolderPostLoading(false)
+  }, [officialFolderPostQuery, token])
+
+  useEffect(() => {
+    if (!token || section !== 'studio') return
+    const id = window.setTimeout(() => {
+      void loadOfficialFolderPosts(officialFolderPostQuery, token)
+    }, 220)
+    return () => window.clearTimeout(id)
+  }, [loadOfficialFolderPosts, officialFolderPostQuery, section, token])
+
   const filteredReports = useMemo(() => {
     const text = reportQuery.trim().toLowerCase()
     if (!text) return overview?.reports ?? []
@@ -280,6 +345,13 @@ export default function AdminPage() {
   const sortedRecommendItems = useMemo(() => {
     return [...(overview?.recommendItems ?? [])].sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100))
   }, [overview?.recommendItems])
+  const queuedRecommendKeys = useMemo(() => new Set(pendingRecommendItems.map((item) => item.key)), [pendingRecommendItems])
+  const selectedOfficialFolderPosts = useMemo(
+    () => officialFolderPostIds
+      .map((postId) => officialFolderPostRows.find((post) => post.id === postId))
+      .filter((post): post is AdminPostCard => Boolean(post)),
+    [officialFolderPostIds, officialFolderPostRows],
+  )
 
   const signIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -333,29 +405,144 @@ export default function AdminPage() {
     await loadOverview()
   }
 
-  const addFolderToRecommend = async (folder: AdminFolderCard, itemType: 'folder_pick' | 'official_folder') => {
-    const nextPriority = getNextPriority(sortedRecommendItems)
-    await upsertRecommend({
+  const queueRecommend = (item: PendingRecommend) => {
+    setPendingRecommendItems((current) => {
+      if (current.some((queued) => queued.key === item.key)) return current
+      return [...current, item]
+    })
+    setActionMessage(`${item.title} をRecommendの保存待ちに入れました。Save picksで反映されます。`)
+  }
+
+  const addFolderToRecommend = (folder: AdminFolderCard, itemType: 'folder_pick' | 'official_folder') => {
+    queueRecommend({
+      key: `${itemType}:folder:${folder.id}`,
       item_type: itemType,
       title: folder.name,
       description: folder.description || `@${folder.username ?? 'user'} / ${folder.pin_count ?? 0} pins`,
       image_url: folder.thumbnail_url || folder.preview_image_url || '',
+      target_url: '',
       folder_id: folder.id,
-      priority: nextPriority,
+      post_id: '',
+      community_id: '',
       is_published: true,
+      sourceLabel: itemType === 'official_folder' ? 'Official folder' : 'Picked folder',
     })
   }
 
-  const addCommunityToRecommend = async (community: AdminCommunityCard) => {
-    const nextPriority = getNextPriority(sortedRecommendItems)
-    await upsertRecommend({
+  const addCommunityToRecommend = (community: AdminCommunityCard) => {
+    queueRecommend({
+      key: `community_pick:community:${community.id}`,
       item_type: 'community_pick',
       title: community.name,
       description: community.description || `${community.member_count ?? 0} members / ${community.posts_count ?? 0} pins`,
+      image_url: '',
+      target_url: '',
+      folder_id: '',
+      post_id: '',
       community_id: community.id,
-      priority: nextPriority,
       is_published: true,
+      sourceLabel: 'Picked community',
     })
+  }
+
+  const savePendingRecommendItems = async () => {
+    if (!token || !pendingRecommendItems.length) return
+    setSavingPendingRecommend(true)
+    setActionMessage('')
+    const nextPriority = getNextPriority(sortedRecommendItems)
+
+    for (const [index, item] of pendingRecommendItems.entries()) {
+      const response = await fetch('/api/admin/recommend', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          item_type: item.item_type,
+          title: item.title,
+          description: item.description,
+          image_url: item.image_url,
+          target_url: item.target_url,
+          folder_id: item.folder_id,
+          post_id: item.post_id,
+          community_id: item.community_id,
+          priority: nextPriority + (index * 10),
+          is_published: item.is_published,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setActionMessage(data.error || `${item.title} を保存できませんでした。`)
+        setSavingPendingRecommend(false)
+        return
+      }
+    }
+
+    setPendingRecommendItems([])
+    setSavingPendingRecommend(false)
+    setActionMessage('選択した項目をRecommendに保存しました。')
+    await loadOverview()
+  }
+
+  const toggleOfficialFolderPost = (postId: string) => {
+    setOfficialFolderPostIds((current) => (
+      current.includes(postId)
+        ? current.filter((id) => id !== postId)
+        : [...current, postId]
+    ))
+  }
+
+  const saveOfficialFolder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!token) return
+    setOfficialFolderSaving(true)
+    setActionMessage('')
+
+    const response = await fetch('/api/admin/folders', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...officialFolderForm,
+        post_ids: officialFolderPostIds,
+      }),
+    })
+    const data = await response.json()
+
+    if (!response.ok) {
+      setActionMessage(data.error || '運営フォルダーを作成できませんでした。')
+      setOfficialFolderSaving(false)
+      return
+    }
+
+    const folder = data.folder as AdminFolderCard
+    if (officialFolderForm.addToRecommend) {
+      await upsertRecommend({
+        item_type: 'official_folder',
+        title: folder.name,
+        description: folder.description || `${officialFolderPostIds.length} pins`,
+        image_url: folder.thumbnail_url || '',
+        folder_id: folder.id,
+        priority: getNextPriority(sortedRecommendItems),
+        is_published: true,
+      })
+    } else {
+      setActionMessage('運営フォルダーを作成しました。')
+      await loadOverview()
+    }
+
+    setOfficialFolderForm({
+      name: '',
+      description: '',
+      color: '#126b58',
+      visibility: 'public',
+      addToRecommend: true,
+    })
+    setOfficialFolderPostIds([])
+    setOfficialFolderSaving(false)
   }
 
   const deleteRecommend = async (id: string) => {
@@ -492,6 +679,29 @@ export default function AdminPage() {
             <Metric icon={<ListPlus />} label="Saves" value={overview.counts.saves} />
             <Metric icon={<Sparkles />} label="Folder likes" value={overview.counts.folderLikes} />
           </section>
+
+          {pendingRecommendItems.length ? (
+            <section className={styles.pendingBar}>
+              <div>
+                <span>Recommend picks</span>
+                <strong>{pendingRecommendItems.length} items waiting</strong>
+              </div>
+              <div className={styles.pendingChips}>
+                {pendingRecommendItems.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setPendingRecommendItems((current) => current.filter((queued) => queued.key !== item.key))}
+                  >
+                    {item.sourceLabel}: {item.title}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={savePendingRecommendItems} disabled={savingPendingRecommend}>
+                {savingPendingRecommend ? 'Saving...' : 'Save picks'}
+              </button>
+            </section>
+          ) : null}
 
           {section === 'dashboard' && (
             <section className={styles.adminGrid}>
@@ -646,8 +856,81 @@ on conflict (user_id) do update set role = excluded.role;`}</code>
                       row={row}
                       onPickFolder={(folder, type) => addFolderToRecommend(folder, type)}
                       onPickCommunity={addCommunityToRecommend}
+                      queuedKeys={queuedRecommendKeys}
                     />
                   ))}
+                </div>
+              </Panel>
+            </section>
+          )}
+
+          {section === 'studio' && (
+            <section className={styles.adminGrid}>
+              <Panel eyebrow="Create" title="Official folder studio" icon={<Folder size={22} />}>
+                <div className={styles.creatorHero}>
+                  <strong>運営フォルダーを作る</strong>
+                  <p>下の投稿候補からpinを選び、名前と説明を書いて保存します。公開にすればFindやRecommendの素材になります。</p>
+                </div>
+                <form className={styles.recommendForm} onSubmit={saveOfficialFolder}>
+                  <label>
+                    Folder name
+                    <input value={officialFolderForm.name} onChange={(event) => setOfficialFolderForm({ ...officialFolderForm, name: event.target.value })} placeholder="例: Brussels night architecture" />
+                  </label>
+                  <label>
+                    Description
+                    <textarea value={officialFolderForm.description} onChange={(event) => setOfficialFolderForm({ ...officialFolderForm, description: event.target.value })} placeholder="このフォルダーを見た人が保存したくなる一言" />
+                  </label>
+                  <div className={styles.twoColumns}>
+                    <label>
+                      Color
+                      <input type="color" value={officialFolderForm.color} onChange={(event) => setOfficialFolderForm({ ...officialFolderForm, color: event.target.value })} />
+                    </label>
+                    <label>
+                      Visibility
+                      <select value={officialFolderForm.visibility} onChange={(event) => setOfficialFolderForm({ ...officialFolderForm, visibility: event.target.value as OfficialFolderForm['visibility'] })}>
+                        <option value="public">public</option>
+                        <option value="private">private</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className={styles.switchRow}>
+                    <input
+                      type="checkbox"
+                      checked={officialFolderForm.addToRecommend}
+                      onChange={(event) => setOfficialFolderForm({ ...officialFolderForm, addToRecommend: event.target.checked })}
+                    />
+                    SaveしたあとRecommendにも載せる
+                  </label>
+                  <div className={styles.selectedPinList}>
+                    <span>{officialFolderPostIds.length} pins selected</span>
+                    {selectedOfficialFolderPosts.map((post) => (
+                      <button key={post.id} type="button" onClick={() => toggleOfficialFolderPost(post.id)}>
+                        {post.title || post.id}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="submit" disabled={officialFolderSaving}>
+                    {officialFolderSaving ? 'Saving folder...' : 'Save official folder'}
+                  </button>
+                </form>
+              </Panel>
+
+              <Panel eyebrow="Pins" title="Add pins to folder" icon={<MapPin size={22} />}>
+                <label className={styles.searchField}>
+                  <Search size={18} />
+                  <input value={officialFolderPostQuery} onChange={(event) => setOfficialFolderPostQuery(event.target.value)} placeholder="投稿タイトル、説明、@usernameで検索" />
+                </label>
+                {officialFolderPostLoading && <p className={styles.notice}>Post loading...</p>}
+                <div className={styles.itemList}>
+                  {officialFolderPostRows.map((post) => (
+                    <PostSelectRow
+                      key={post.id}
+                      post={post}
+                      selected={officialFolderPostIds.includes(post.id)}
+                      onToggle={() => toggleOfficialFolderPost(post.id)}
+                    />
+                  ))}
+                  {!officialFolderPostRows.length && !officialFolderPostLoading && <p className={styles.empty}>候補になる投稿がありません。</p>}
                 </div>
               </Panel>
             </section>
@@ -673,6 +956,7 @@ on conflict (user_id) do update set role = excluded.role;`}</code>
                     row={row}
                     onPickFolder={(folder, type) => addFolderToRecommend(folder, type)}
                     onPickCommunity={addCommunityToRecommend}
+                    queuedKeys={queuedRecommendKeys}
                     wide
                   />
                 ))}
@@ -810,30 +1094,36 @@ function CatalogControls({ kind, query, onKind, onQuery, compact = false }: {
   )
 }
 
-function CatalogRowItem({ kind, row, onPickFolder, onPickCommunity, wide = false }: {
+function CatalogRowItem({ kind, row, onPickFolder, onPickCommunity, queuedKeys, wide = false }: {
   kind: CatalogKind
   row: CatalogRow
   onPickFolder: (folder: AdminFolderCard, type: 'folder_pick' | 'official_folder') => void
   onPickCommunity: (community: AdminCommunityCard) => void
+  queuedKeys?: Set<string>
   wide?: boolean
 }) {
   if (kind === 'folders') {
+    const folder = row as AdminFolderCard
     return (
       <FolderRow
-        folder={row as AdminFolderCard}
+        folder={folder}
         wide={wide}
-        onPick={() => onPickFolder(row as AdminFolderCard, 'folder_pick')}
-        onOfficial={() => onPickFolder(row as AdminFolderCard, 'official_folder')}
+        picked={queuedKeys?.has(`folder_pick:folder:${folder.id}`)}
+        officialPicked={queuedKeys?.has(`official_folder:folder:${folder.id}`)}
+        onPick={() => onPickFolder(folder, 'folder_pick')}
+        onOfficial={() => onPickFolder(folder, 'official_folder')}
       />
     )
   }
 
   if (kind === 'communities') {
+    const community = row as AdminCommunityCard
     return (
       <CommunityRow
-        community={row as AdminCommunityCard}
+        community={community}
         wide={wide}
-        onPick={() => onPickCommunity(row as AdminCommunityCard)}
+        picked={queuedKeys?.has(`community_pick:community:${community.id}`)}
+        onPick={() => onPickCommunity(community)}
       />
     )
   }
@@ -843,11 +1133,13 @@ function CatalogRowItem({ kind, row, onPickFolder, onPickCommunity, wide = false
   return <UserRow user={row as AdminUserCard} wide={wide} />
 }
 
-function FolderRow({ folder, onPick, onOfficial, wide = false }: {
+function FolderRow({ folder, onPick, onOfficial, wide = false, picked = false, officialPicked = false }: {
   folder: AdminFolderCard
   onPick: () => void
   onOfficial: () => void
   wide?: boolean
+  picked?: boolean
+  officialPicked?: boolean
 }) {
   return (
     <article className={wide ? styles.wideRow : ''}>
@@ -856,13 +1148,17 @@ function FolderRow({ folder, onPick, onOfficial, wide = false }: {
         <strong>{folder.name}</strong>
         <span>@{folder.username ?? folder.user_id} / {folder.visibility ?? 'private'} / {folder.pin_count ?? folder.post_ids?.length ?? 0} pins</span>
       </div>
-      <button type="button" onClick={onPick}>Pick</button>
-      <button type="button" onClick={onOfficial}>Official</button>
+      <button className={picked ? styles.selectedAction : ''} type="button" onClick={onPick} disabled={picked}>
+        {picked ? 'Picked' : 'Pick'}
+      </button>
+      <button className={officialPicked ? styles.selectedAction : ''} type="button" onClick={onOfficial} disabled={officialPicked}>
+        {officialPicked ? 'Official picked' : 'Official'}
+      </button>
     </article>
   )
 }
 
-function CommunityRow({ community, onPick, wide = false }: { community: AdminCommunityCard; onPick: () => void; wide?: boolean }) {
+function CommunityRow({ community, onPick, wide = false, picked = false }: { community: AdminCommunityCard; onPick: () => void; wide?: boolean; picked?: boolean }) {
   return (
     <article className={wide ? styles.wideRow : ''}>
       <div className={styles.avatarFallback}><Compass size={20} /></div>
@@ -870,7 +1166,9 @@ function CommunityRow({ community, onPick, wide = false }: { community: AdminCom
         <strong>{community.name}</strong>
         <span>{community.visibility ?? 'public'} / {community.member_count ?? 0} members / {community.posts_count ?? 0} pins</span>
       </div>
-      <button type="button" onClick={onPick}>Pick</button>
+      <button className={picked ? styles.selectedAction : ''} type="button" onClick={onPick} disabled={picked}>
+        {picked ? 'Picked' : 'Pick'}
+      </button>
     </article>
   )
 }
@@ -884,6 +1182,21 @@ function PostRow({ post, wide = false }: { post: AdminPostCard; wide?: boolean }
         <span>{post.saves_count ?? 0} saves / {post.likes_count ?? 0} likes / {post.reports_count ?? 0} reports</span>
       </div>
       <small>{formatDate(post.created_at ?? '')}</small>
+    </article>
+  )
+}
+
+function PostSelectRow({ post, selected, onToggle }: { post: AdminPostCard; selected: boolean; onToggle: () => void }) {
+  return (
+    <article className={selected ? styles.selectedContentRow : ''}>
+      <img src={post.image_url || '/favicon.ico'} alt="" />
+      <div>
+        <strong>{post.title || post.id}</strong>
+        <span>@{post.username ?? post.user_id ?? 'user'} / {post.visibility ?? 'private'} / {post.saves_count ?? 0} saves</span>
+      </div>
+      <button className={selected ? styles.selectedAction : ''} type="button" onClick={onToggle}>
+        {selected ? 'Added' : 'Add'}
+      </button>
     </article>
   )
 }
