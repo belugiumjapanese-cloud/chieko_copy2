@@ -598,6 +598,10 @@ function uniqueRowsById<T extends { id: string }>(rows: T[]) {
   return mergeById([], rows)
 }
 
+function resultError(result: { error: { message: string } | null }) {
+  return result.error?.message ?? ''
+}
+
 function buildFolders(folderRows: AppFolderCardRow[], folderLikeRows: FolderLikeRow[] = [], activeUserId = ''): Folder[] {
   const likedFolderIds = new Set(
     activeUserId ? folderLikeRows.filter((like) => like.user_id === activeUserId).map((like) => like.folder_id) : [],
@@ -1314,14 +1318,7 @@ export default function CommunityMapPrototype() {
     setRemoteError('')
 
     try {
-      const [
-        profileResult,
-        followsResult,
-        myPostsResult,
-        myFoldersResult,
-        savedPostsResult,
-        myLikesResult,
-      ] = await Promise.all([
+      const [profileResult, followsResult] = await Promise.all([
         supabase
           .from('profiles')
           .select('id,username,display_name,avatar_url,bio,pin_count,public_folder_count')
@@ -1330,6 +1327,38 @@ export default function CommunityMapPrototype() {
           .from('follows')
           .select('follower_id,following_id')
           .or(`follower_id.eq.${userId},following_id.eq.${userId}`),
+      ])
+
+      const failed = [profileResult, followsResult].find((result) => result.error)
+      if (failed?.error) throw failed.error
+
+      let profileRows = (profileResult.data ?? []) as ProfileRow[]
+      if (!profileRows.some((profile) => profile.id === userId)) {
+        const fallback = accountFallbackUser(userId)
+        profileRows = [{
+          id: userId,
+          username: fallback.username,
+          display_name: fallback.displayName,
+          avatar_url: fallback.avatarUrl,
+          bio: fallback.bio,
+          pin_count: 0,
+          public_folder_count: 0,
+        }]
+      }
+
+      const priorityUsers = buildUsers(profileRows, (followsResult.data ?? []) as FollowRow[])
+      setUsers((current) => mergeById(current.filter((user) => user.id !== AUTH_PLACEHOLDER_USER.id), priorityUsers))
+      setOwnedAccountIds([userId])
+      setProfileUserId((current) => current || userId)
+      setRemoteLoading(false)
+
+      void (async () => {
+        const [
+          myPostsResult,
+          myFoldersResult,
+          savedPostsResult,
+          myLikesResult,
+        ] = await Promise.all([
         supabase
           .from('app_post_cards')
           .select('*')
@@ -1353,59 +1382,44 @@ export default function CommunityMapPrototype() {
           .select('post_id,user_id,created_at')
           .eq('user_id', userId)
           .limit(500),
-      ])
+        ])
 
-      const failed = [profileResult, followsResult, myPostsResult, myFoldersResult, savedPostsResult, myLikesResult]
-        .find((result) => result.error)
-      if (failed?.error) throw failed.error
-
-      let profileRows = (profileResult.data ?? []) as ProfileRow[]
-      if (!profileRows.some((profile) => profile.id === userId)) {
-        const fallback = accountFallbackUser(userId)
-        profileRows = [{
-          id: userId,
-          username: fallback.username,
-          display_name: fallback.displayName,
-          avatar_url: fallback.avatarUrl,
-          bio: fallback.bio,
-          pin_count: 0,
-          public_folder_count: 0,
-        }]
-      }
-
-      const savedRows = (savedPostsResult.data ?? []) as SavedPostRow[]
-      const savedIds = savedRows.map((row) => row.post_id).filter(Boolean).slice(0, 80)
-      let savedPostRows: AppPostCardRow[] = []
-      if (savedIds.length) {
-        const savedPostResult = await supabase
-          .from('app_post_cards')
-          .select('*')
-          .in('id', savedIds)
-        if (!savedPostResult.error && Array.isArray(savedPostResult.data)) {
-          savedPostRows = savedPostResult.data as AppPostCardRow[]
+        const personalFailed = [myPostsResult, myFoldersResult, savedPostsResult, myLikesResult]
+          .find((result) => result.error)
+        if (personalFailed?.error) {
+          console.warn(personalFailed.error.message)
+          return
         }
-      }
 
-      const priorityUsers = buildUsers(profileRows, (followsResult.data ?? []) as FollowRow[])
-      const priorityFolders = buildFolders((myFoldersResult.data ?? []) as AppFolderCardRow[], [], userId)
-      const priorityPins = buildPins(
-        uniqueRowsById([
-          ...((myPostsResult.data ?? []) as AppPostCardRow[]),
-          ...savedPostRows,
-        ]),
-        [],
-        (myLikesResult.data ?? []) as LikeRow[],
-        userId,
-        priorityFolders,
-      )
+        const savedRows = (savedPostsResult.data ?? []) as SavedPostRow[]
+        const savedIds = savedRows.map((row) => row.post_id).filter(Boolean).slice(0, 80)
+        let savedPostRows: AppPostCardRow[] = []
+        if (savedIds.length) {
+          const savedPostResult = await supabase
+            .from('app_post_cards')
+            .select('*')
+            .in('id', savedIds)
+          if (!savedPostResult.error && Array.isArray(savedPostResult.data)) {
+            savedPostRows = savedPostResult.data as AppPostCardRow[]
+          }
+        }
 
-      setUsers((current) => mergeById(current.filter((user) => user.id !== AUTH_PLACEHOLDER_USER.id), priorityUsers))
-      setFolders(priorityFolders)
-      setPins(priorityPins)
-      setSavedPinIds(savedIds)
-      setOwnedAccountIds([userId])
-      setProfileUserId((current) => current || userId)
-      setRemoteLoading(false)
+        const priorityFolders = buildFolders((myFoldersResult.data ?? []) as AppFolderCardRow[], [], userId)
+        const priorityPins = buildPins(
+          uniqueRowsById([
+            ...((myPostsResult.data ?? []) as AppPostCardRow[]),
+            ...savedPostRows,
+          ]),
+          [],
+          (myLikesResult.data ?? []) as LikeRow[],
+          userId,
+          priorityFolders,
+        )
+
+        setFolders((current) => mergeById(current, priorityFolders))
+        setPins((current) => mergeById(current, priorityPins))
+        setSavedPinIds(savedIds)
+      })()
     } catch (error) {
       console.error(error)
       setRemoteError(getErrorMessage(error, '最初のユーザー情報を取得できませんでした。'))
@@ -1437,52 +1451,31 @@ export default function CommunityMapPrototype() {
       const [
         profilesResult,
         followsResult,
-        postsResult,
         foldersResult,
         communitiesResult,
         membersResult,
-        commentsResult,
-        likesResult,
-        savedPostsResult,
-        saveActivityResult,
-        activitiesResult,
       ] = await Promise.all([
         supabase.from('profiles').select('id,username,display_name,avatar_url,bio,pin_count,public_folder_count'),
         supabase.from('follows').select('follower_id,following_id'),
-        supabase.from('app_post_cards').select('*').order('created_at', { ascending: false }).limit(500),
         supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
         supabase.from('community_members').select('community_id,user_id'),
-        supabase.from('post_comments').select('id,post_id,user_id,body,created_at').order('created_at', { ascending: true }).limit(1000),
-        supabase.from('post_likes').select('post_id,user_id,created_at').limit(2000),
-        userId
-          ? supabase.from('saved_posts').select('post_id').eq('user_id', userId)
-          : Promise.resolve({ data: [] as SavedPostRow[], error: null }),
-        supabase.from('saved_posts').select('post_id,user_id,created_at').limit(2000),
-        supabase.from('app_community_activity').select('*').order('created_at', { ascending: false }).limit(500),
       ])
 
-      const results = [
+      const criticalResults = [
         profilesResult,
         followsResult,
-        postsResult,
         foldersResult,
         communitiesResult,
         membersResult,
-        commentsResult,
-        likesResult,
-        savedPostsResult,
-        saveActivityResult,
-        activitiesResult,
       ]
 
-      const failed = results.find((result) => result.error)
+      const failed = criticalResults.find((result) => result.error)
       if (failed?.error) throw failed.error
 
       const profileRows = (profilesResult.data ?? []) as ProfileRow[]
       const followRows = (followsResult.data ?? []) as FollowRow[]
       const folderRows = (foldersResult.data ?? []) as AppFolderCardRow[]
-      const postRows = (postsResult.data ?? []) as AppPostCardRow[]
       const memberRows = (membersResult.data ?? []) as CommunityMemberRow[]
       let folderLikeRows: FolderLikeRow[] = []
       const folderLikesResult = await supabase
@@ -1514,19 +1507,56 @@ export default function CommunityMapPrototype() {
       }
 
       const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
-      const remotePins = buildPins(
-        postRows,
-        (commentsResult.data ?? []) as CommentRow[],
-        (likesResult.data ?? []) as LikeRow[],
-        userId,
-        remoteFolders,
-      )
       const remoteCommunities = buildCommunities(
         (communitiesResult.data ?? []) as AppCommunityCardRow[],
         memberRows,
         userId,
       )
-      let saveNotificationRows = (saveActivityResult.data ?? []) as SavedPostRow[]
+
+      setUsers(remoteUsers)
+      setFolders(remoteFolders)
+      setCommunities(remoteCommunities)
+      setRecommendItems(remoteRecommendItems)
+      setOwnedAccountIds(userId ? [userId] : [])
+      setProfileUserId((current) => (current && remoteUsers.some((user) => user.id === current) ? current : userId))
+      setRemoteLoading(false)
+
+      const [
+        postsResult,
+        commentsResult,
+        likesResult,
+        savedPostsResult,
+        saveActivityResult,
+        activitiesResult,
+      ] = await Promise.all([
+        supabase.from('app_post_cards').select('*').order('created_at', { ascending: false }).limit(300),
+        supabase.from('post_comments').select('id,post_id,user_id,body,created_at').order('created_at', { ascending: true }).limit(600),
+        supabase.from('post_likes').select('post_id,user_id,created_at').limit(1200),
+        userId
+          ? supabase.from('saved_posts').select('post_id').eq('user_id', userId)
+          : Promise.resolve({ data: [] as SavedPostRow[], error: null }),
+        supabase.from('saved_posts').select('post_id,user_id,created_at').limit(1200),
+        supabase.from('app_community_activity').select('*').order('created_at', { ascending: false }).limit(300),
+      ])
+
+      if (postsResult.error) {
+        console.warn(postsResult.error.message)
+        return
+      }
+
+      ;[commentsResult, likesResult, savedPostsResult, saveActivityResult, activitiesResult].forEach((result) => {
+        const message = resultError(result)
+        if (message) console.warn(message)
+      })
+
+      const remotePins = buildPins(
+        (postsResult.data ?? []) as AppPostCardRow[],
+        (commentsResult.error ? [] : commentsResult.data ?? []) as CommentRow[],
+        (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
+        userId,
+        remoteFolders,
+      )
+      let saveNotificationRows = (saveActivityResult.error ? [] : saveActivityResult.data ?? []) as SavedPostRow[]
       let inviteNotificationRows: CommunityInviteRow[] = []
       let folderLikeNotificationRows = folderLikeRows
       if (userId) {
@@ -1544,14 +1574,10 @@ export default function CommunityMapPrototype() {
         }
       }
 
-      setUsers(remoteUsers)
-      setFolders(remoteFolders)
       setPins(remotePins)
-      setCommunities(remoteCommunities)
-      setActivities(buildActivities((activitiesResult.data ?? []) as AppCommunityActivityRow[]))
-      setRecommendItems(remoteRecommendItems)
+      setActivities(buildActivities((activitiesResult.error ? [] : activitiesResult.data ?? []) as AppCommunityActivityRow[]))
       setNotifications(buildNotifications(
-        (likesResult.data ?? []) as LikeRow[],
+        (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
         folderLikeNotificationRows,
         saveNotificationRows,
         inviteNotificationRows,
@@ -1560,9 +1586,7 @@ export default function CommunityMapPrototype() {
         remoteCommunities,
         userId,
       ))
-      setSavedPinIds(((savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id))
-      setOwnedAccountIds(userId ? [userId] : [])
-      setProfileUserId((current) => (current && remoteUsers.some((user) => user.id === current) ? current : userId))
+      setSavedPinIds(((savedPostsResult.error ? [] : savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id))
     } catch (error) {
       console.error(error)
       setRemoteError(getErrorMessage(error, 'Supabaseからデータを取得できませんでした。'))
