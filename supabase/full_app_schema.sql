@@ -119,6 +119,7 @@ create table if not exists public.communities (
   slug text not null unique,
   name text not null,
   description text not null default '',
+  thumbnail_url text,
   owner_id uuid not null references public.profiles(id) on delete cascade,
   visibility text not null default 'public' check (visibility in ('public', 'invite_only', 'private')),
   invite_code text unique,

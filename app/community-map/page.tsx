@@ -65,7 +65,7 @@ function getAuthRedirectUrl() {
 }
 
 type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
-type LibraryMode = 'map' | 'folder'
+type LibraryMode = 'folder' | 'pin'
 type DropScope = { id: string; label: string; pins: Pin[] }
 type Privacy = 'public' | 'limited'
 type ProfileListMode = 'profile' | 'following' | 'followers'
@@ -88,6 +88,7 @@ type Community = {
   slug: string
   name: string
   description: string
+  thumbnailUrl?: string
   privacy: Privacy
   ownerId: string
   memberIds: string[]
@@ -144,12 +145,16 @@ type Folder = {
 }
 
 type PostDraft = {
+  id: string
   communityId?: string | null
   imageUrl: string
   imageName: string
   coordinates: Coordinates | null
   locationSource: 'gps' | 'manual' | 'manual-pending'
   takenAt?: string
+  title: string
+  tags: string
+  folderIds: string[]
 }
 
 type PostComposer = {
@@ -256,6 +261,8 @@ type AppCommunityCardRow = {
   slug: string
   name: string
   description: string | null
+  thumbnail_url?: string | null
+  preview_image_url?: string | null
   owner_id: string
   visibility: 'public' | 'invite_only' | 'private'
   invite_code: string | null
@@ -353,6 +360,7 @@ type DirectCommunityRow = {
   slug: string
   name: string
   description: string | null
+  thumbnail_url?: string | null
   owner_id: string
   visibility: 'public' | 'invite_only' | 'private'
   invite_code: string | null
@@ -673,6 +681,8 @@ function directCommunitiesToCards(rows: DirectCommunityRow[], memberRows: Commun
     slug: community.slug,
     name: community.name,
     description: community.description ?? '',
+    thumbnail_url: community.thumbnail_url ?? null,
+    preview_image_url: null,
     owner_id: community.owner_id,
     visibility: community.visibility,
     invite_code: community.invite_code,
@@ -815,6 +825,7 @@ function buildCommunities(communityRows: AppCommunityCardRow[], memberRows: Comm
       slug: community.slug,
       name: community.name,
       description: community.description || '',
+      thumbnailUrl: community.thumbnail_url || community.preview_image_url || undefined,
       privacy: mapCommunityPrivacy(community.visibility),
       ownerId: community.owner_id,
       memberIds,
@@ -1225,6 +1236,7 @@ export default function CommunityMapPrototype() {
   const [profileUserId, setProfileUserId] = useState('')
   const [profileListMode, setProfileListMode] = useState<ProfileListMode>('profile')
   const [postDraft, setPostDraft] = useState<PostDraft | null>(null)
+  const [postDrafts, setPostDrafts] = useState<PostDraft[]>([])
   const [postComposer, setPostComposer] = useState<PostComposer>({ title: '', description: '', tags: '', takenAt: '', folderIds: [] })
   const [postMessage, setPostMessage] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
@@ -1241,6 +1253,7 @@ export default function CommunityMapPrototype() {
   const [composerFolderName, setComposerFolderName] = useState('')
   const [composerFolderColor, setComposerFolderColor] = useState(COLORS[1])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const communityThumbInputRef = useRef<HTMLInputElement | null>(null)
   const postSubmitLockRef = useRef(false)
 
   useEffect(() => {
@@ -1644,13 +1657,28 @@ export default function CommunityMapPrototype() {
         console.warn(communitiesResult.error.message)
         const directCommunitiesResult = await supabase
           .from('communities')
-          .select('id,slug,name,description,owner_id,visibility,invite_code,member_count,posts_count,created_at')
+          .select('id,slug,name,description,thumbnail_url,owner_id,visibility,invite_code,member_count,posts_count,created_at')
           .order('created_at', { ascending: false })
           .limit(200)
-        if (!directCommunitiesResult.error && Array.isArray(directCommunitiesResult.data)) {
-          communityRows = directCommunitiesToCards(directCommunitiesResult.data as DirectCommunityRow[], memberRows, userId)
-        } else if (directCommunitiesResult.error) {
-          console.warn(directCommunitiesResult.error.message)
+        let directCommunityData = Array.isArray(directCommunitiesResult.data)
+          ? directCommunitiesResult.data as DirectCommunityRow[]
+          : []
+        let directCommunityError = directCommunitiesResult.error
+        if (directCommunitiesResult.error?.message.toLowerCase().includes('thumbnail_url')) {
+          const fallbackCommunitiesResult = await supabase
+            .from('communities')
+            .select('id,slug,name,description,owner_id,visibility,invite_code,member_count,posts_count,created_at')
+            .order('created_at', { ascending: false })
+            .limit(200)
+          directCommunityData = Array.isArray(fallbackCommunitiesResult.data)
+            ? fallbackCommunitiesResult.data as DirectCommunityRow[]
+            : []
+          directCommunityError = fallbackCommunitiesResult.error
+        }
+        if (!directCommunityError) {
+          communityRows = directCommunitiesToCards(directCommunityData, memberRows, userId)
+        } else {
+          console.warn(directCommunityError.message)
         }
       }
 
@@ -2122,6 +2150,37 @@ export default function CommunityMapPrototype() {
     setActiveTab('find')
   }, [activeUserId, loadRemoteData, newCommunityName, newCommunityPrivacy, requireSignedIn])
 
+  const handleCommunityThumbnail = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !selectedCommunityId) return
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+
+    try {
+      const image = await getDisplayImage(file)
+      setCommunities((current) =>
+        current.map((community) =>
+          community.id === selectedCommunityId
+            ? { ...community, thumbnailUrl: image.imageUrl }
+            : community,
+        ),
+      )
+      const { error } = await client
+        .from('communities')
+        .update({ thumbnail_url: image.imageUrl })
+        .eq('id', selectedCommunityId)
+
+      if (error) {
+        setToast('community thumbnail用SQLをrunしてください。')
+        await loadRemoteData(activeUserId)
+      }
+    } catch (error) {
+      console.warn('コミュニティサムネを更新できませんでした。', error)
+      setToast('サムネ画像を更新できませんでした。')
+    }
+  }, [activeUserId, loadRemoteData, requireSignedIn, selectedCommunityId])
+
   const shareCommunityLink = useCallback(async (community: Community) => {
     const inviteUrl = `${getAuthRedirectUrl()}?invite=${community.inviteCode ?? community.id}`
     if (typeof navigator !== 'undefined' && 'share' in navigator) {
@@ -2180,47 +2239,85 @@ export default function CommunityMapPrototype() {
     if (!requireSignedIn()) return
     setSelectedCommunityId(null)
     setPostDraft(null)
+    setPostDrafts([])
     setPostMessage('')
     setComposerOpen(false)
     setManualPlacement(false)
     fileInputRef.current?.click()
   }, [requireSignedIn])
 
+  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'tags' | 'takenAt' | 'folderIds'>>) => {
+    setPostDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, ...values } : draft))
+    setPostDraft((current) => current?.id === draftId ? { ...current, ...values } : current)
+  }, [])
+
   const applyTagSuggestion = useCallback((tag: string) => {
-    setPostComposer((current) => ({ ...current, tags: replaceActiveHashtag(current.tags, tag) }))
+    setPostComposer((current) => {
+      const tags = replaceActiveHashtag(current.tags, tag)
+      if (postDraft) updateDraftComposer(postDraft.id, { tags })
+      return { ...current, tags }
+    })
+  }, [postDraft, updateDraftComposer])
+
+  const activatePostDraft = useCallback((draft: PostDraft) => {
+    setPostDraft(draft)
+    setPostComposer({
+      title: draft.title,
+      description: '',
+      tags: draft.tags,
+      takenAt: draft.takenAt ?? '',
+      folderIds: draft.folderIds,
+    })
+    setComposerFolderPanelOpen(false)
+    if (draft.coordinates) {
+      setManualPlacement(false)
+      setComposerOpen(true)
+      return
+    }
+    setComposerOpen(false)
+    setManualPlacement(true)
+    setPostMessage('この画像は位置情報がありません。map上で投稿位置を選択してください。')
   }, [])
 
   const handlePostImage = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (!file) return
+    if (!files.length) return
 
     setPostMessage('画像を読み込んでいます。')
-    const image = await getDisplayImage(file)
-    const [gps, takenAt] = await Promise.all([getGpsFromImage(file), getTakenAtFromImage(file)])
-    const draft: PostDraft = {
-      communityId: selectedCommunityId,
-      imageUrl: image.imageUrl,
-      imageName: image.imageName,
-      coordinates: gps,
-      locationSource: gps ? 'gps' : 'manual-pending',
-      takenAt,
-    }
+    const drafts = await Promise.all(files.map(async (file) => {
+      const image = await getDisplayImage(file)
+      const [gps, takenAt] = await Promise.all([getGpsFromImage(file), getTakenAtFromImage(file)])
+      const title = image.imageName.replace(/\.[^.]+$/, '')
+      return {
+        id: createId('draft'),
+        communityId: selectedCommunityId,
+        imageUrl: image.imageUrl,
+        imageName: image.imageName,
+        coordinates: gps,
+        locationSource: gps ? 'gps' : 'manual-pending',
+        takenAt,
+        title,
+        tags: '',
+        folderIds: userFolders[0] ? [userFolders[0].id] : [],
+      } satisfies PostDraft
+    }))
 
-    setPostDraft(draft)
+    setPostDrafts(drafts)
+    const firstDraft = drafts[0]
+    setPostDraft(firstDraft)
     setPostComposer({
-      title: image.imageName.replace(/\.[^.]+$/, ''),
+      title: firstDraft.title,
       description: '',
-      tags: '',
-      takenAt,
-      folderIds: userFolders[0] ? [userFolders[0].id] : [],
+      tags: firstDraft.tags,
+      takenAt: firstDraft.takenAt ?? '',
+      folderIds: firstDraft.folderIds,
     })
-    setComposerFolderPanelOpen(false)
 
-    if (gps) {
+    if (firstDraft.coordinates) {
       setManualPlacement(false)
       setComposerOpen(true)
-      setPostMessage(`位置情報を取得しました。緯度 ${gps.latitude.toFixed(5)} / 経度 ${gps.longitude.toFixed(5)}`)
+      setPostMessage(`${drafts.filter((draft) => draft.coordinates).length}/${drafts.length}枚の位置情報を取得しました。`)
     } else {
       setComposerOpen(false)
       setManualPlacement(true)
@@ -2231,7 +2328,9 @@ export default function CommunityMapPrototype() {
 
   const confirmManualLocation = useCallback((coordinates: Coordinates) => {
     if (!postDraft) return
-    setPostDraft({ ...postDraft, coordinates, locationSource: 'manual' })
+    const nextDraft = { ...postDraft, coordinates, locationSource: 'manual' as const }
+    setPostDraft(nextDraft)
+    setPostDrafts((current) => current.map((draft) => draft.id === postDraft.id ? nextDraft : draft))
     setManualPlacement(false)
     setComposerOpen(true)
     setPostMessage(`map上で位置を確定しました。緯度 ${coordinates.latitude.toFixed(5)} / 経度 ${coordinates.longitude.toFixed(5)}`)
@@ -2243,62 +2342,93 @@ export default function CommunityMapPrototype() {
     const client = supabase
     if (!client || !requireSignedIn()) return
     if (postSubmitLockRef.current) return
+
+    const syncedDrafts = (postDrafts.length ? postDrafts : [postDraft]).map((draft) =>
+      draft.id === postDraft.id
+        ? {
+            ...draft,
+            title: postComposer.title,
+            tags: postComposer.tags,
+            takenAt: postComposer.takenAt,
+            folderIds: postComposer.folderIds,
+          }
+        : draft,
+    )
+    const draftMissingLocation = syncedDrafts.find((draft) => !draft.coordinates)
+    if (draftMissingLocation) {
+      activatePostDraft(draftMissingLocation)
+      setPostMessage('位置情報がない画像があります。map上で位置を指定してください。')
+      return
+    }
+    const draftMissingFolder = syncedDrafts.find((draft) => draft.folderIds.length === 0)
+    if (draftMissingFolder) {
+      activatePostDraft(draftMissingFolder)
+      setComposerFolderPanelOpen(true)
+      setPostMessage('各画像に最低1つのFolderを選択してください。')
+      return
+    }
+
     postSubmitLockRef.current = true
     setPostSaving(true)
 
     try {
-      const title = postComposer.title.trim() || postDraft.imageName.replace(/\.[^.]+$/, '') || 'Untitled pin'
-      const tags = postComposer.tags
-        .split(/\s+/)
-        .map((tag) => cleanTag(tag))
-        .filter(Boolean)
+      let lastPostId = ''
+      for (const draft of syncedDrafts) {
+        if (!draft.coordinates) continue
+        const title = draft.title.trim() || draft.imageName.replace(/\.[^.]+$/, '') || 'Untitled pin'
+        const tags = draft.tags
+          .split(/\s+/)
+          .map((tag) => cleanTag(tag))
+          .filter(Boolean)
 
-      const { data: newPost, error: postError } = await client
-        .from('posts')
-        .insert({
-          user_id: activeUserId,
-          title,
-          description: postComposer.description.trim(),
-          latitude: postDraft.coordinates.latitude,
-          longitude: postDraft.coordinates.longitude,
-          image_url: postDraft.imageUrl,
-          visibility: postDraft.communityId ? 'public' : 'private',
-          tags,
-          taken_at: postComposer.takenAt ? new Date(postComposer.takenAt).toISOString() : null,
-          source_type: 'original',
-        })
-        .select('id')
-        .single()
-
-      if (postError || !newPost) {
-        setToast(postError?.message ?? '投稿を保存できませんでした。')
-        return
-      }
-
-      const folderRows = Array.from(new Set(postComposer.folderIds)).map((folderId) => ({
-        folder_id: folderId,
-        post_id: newPost.id,
-        user_id: activeUserId,
-      }))
-      if (folderRows.length) {
-        const { error } = await client.from('folder_posts').insert(folderRows)
-        if (error) setToast(error.message)
-      }
-
-      if (postDraft.communityId) {
-        const { error } = await client
-          .from('community_posts')
-          .upsert({
-            community_id: postDraft.communityId,
-            post_id: newPost.id,
+        const { data: newPost, error: postError } = await client
+          .from('posts')
+          .insert({
             user_id: activeUserId,
-            title_override: title,
-            description_override: postComposer.description.trim(),
-            tags_override: tags,
-          }, { onConflict: 'community_id,post_id' })
+            title,
+            description: '',
+            latitude: draft.coordinates.latitude,
+            longitude: draft.coordinates.longitude,
+            image_url: draft.imageUrl,
+            visibility: draft.communityId ? 'public' : 'private',
+            tags,
+            taken_at: draft.takenAt ? new Date(draft.takenAt).toISOString() : null,
+            source_type: 'original',
+          })
+          .select('id')
+          .single()
 
-        if (error) {
-          setToast(error.message)
+        if (postError || !newPost) {
+          setToast(postError?.message ?? '投稿を保存できませんでした。')
+          return
+        }
+
+        lastPostId = newPost.id
+        const folderRows = Array.from(new Set(draft.folderIds)).map((folderId) => ({
+          folder_id: folderId,
+          post_id: newPost.id,
+          user_id: activeUserId,
+        }))
+        if (folderRows.length) {
+          const { error } = await client.from('folder_posts').insert(folderRows)
+          if (error) setToast(error.message)
+        }
+
+        if (draft.communityId) {
+          const { error } = await client
+            .from('community_posts')
+            .upsert({
+              community_id: draft.communityId,
+              post_id: newPost.id,
+              user_id: activeUserId,
+              title_override: title,
+              description_override: '',
+              tags_override: tags,
+            }, { onConflict: 'community_id,post_id' })
+
+          if (error) {
+            setToast(error.message)
+          }
         }
       }
 
@@ -2306,13 +2436,14 @@ export default function CommunityMapPrototype() {
       setComposerOpen(false)
       setComposerFolderPanelOpen(false)
       setPostDraft(null)
-      setSelectedPinId(newPost.id)
-      setPostMessage(postDraft.communityId ? '投稿しました。' : 'Dropに保存しました。')
+      setPostDrafts([])
+      setSelectedPinId(lastPostId || null)
+      setPostMessage(syncedDrafts.some((draft) => draft.communityId) ? '投稿しました。' : 'Dropに保存しました。')
     } finally {
       postSubmitLockRef.current = false
       setPostSaving(false)
     }
-  }, [activeUserId, loadRemoteData, postComposer, postDraft, requireSignedIn])
+  }, [activeUserId, activatePostDraft, loadRemoteData, postComposer, postDraft, postDrafts, requireSignedIn])
 
   const toggleLike = useCallback(async (pinId: string) => {
     const client = supabase
@@ -2794,10 +2925,14 @@ export default function CommunityMapPrototype() {
       },
       ...current,
     ])
-    setPostComposer((current) => ({ ...current, folderIds: Array.from(new Set([...current.folderIds, data.id])) }))
+    setPostComposer((current) => {
+      const folderIds = Array.from(new Set([...current.folderIds, data.id]))
+      if (postDraft) updateDraftComposer(postDraft.id, { folderIds })
+      return { ...current, folderIds }
+    })
     setComposerFolderName('')
     setComposerFolderColor(COLORS[(COLORS.indexOf(composerFolderColor) + 1) % COLORS.length])
-  }, [activeUserId, composerFolderColor, composerFolderName, requireSignedIn])
+  }, [activeUserId, composerFolderColor, composerFolderName, postDraft, requireSignedIn, updateDraftComposer])
 
   const createEmptyFolder = useCallback(async (name: string, color: string, kind: Folder['kind'] = 'my_world') => {
     const trimmedName = name.trim()
@@ -3076,7 +3211,8 @@ export default function CommunityMapPrototype() {
 
   return (
     <main className={`${styles.shell} ${activeTab === 'home' ? styles.homeShell : ''}`}>
-      <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handlePostImage} />
+      <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" multiple onChange={handlePostImage} />
+      <input ref={communityThumbInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handleCommunityThumbnail} />
       {activeTab === 'mypage' && profileWorldUser && (
         <SplitMapView
           pins={profileWorldPins}
@@ -3173,6 +3309,8 @@ export default function CommunityMapPrototype() {
             getPinMeta={getMapPinMeta}
             onToggleTimeline={() => setTimelineOpen((value) => !value)}
             onOpenProfile={openProfile}
+            canEditThumbnail={selectedCommunity.ownerId === activeUserId}
+            onEditThumbnail={() => communityThumbInputRef.current?.click()}
             onChatText={setCommunityChatText}
             onSendChat={addCommunityChat}
             onMapClick={manualPlacement ? confirmManualLocation : undefined}
@@ -3337,7 +3475,7 @@ export default function CommunityMapPrototype() {
 
       {activeTab === 'tovisit' && (
         <FolderLibraryView
-          title="Folder"
+          title="Library"
           mode={toVisitMode}
           onModeChange={setToVisitMode}
           pins={folderLibraryPins}
@@ -3354,7 +3492,8 @@ export default function CommunityMapPrototype() {
           onDeleteFolder={deleteFolder}
           onDeletePin={deletePin}
           onReorderFolderPin={reorderFolderPin}
-          showModeSwitch={false}
+          currentUserId={activeUserId}
+          showModeSwitch
           getMeta={(pin) => pin.ownerId === activeUserId ? 'My drop' : getMapPinMeta(pin)}
         />
       )}
@@ -3822,7 +3961,58 @@ export default function CommunityMapPrototype() {
         <aside className={styles.modalBackdrop} onClick={() => setComposerOpen(false)}>
           <form className={styles.composer} onSubmit={submitCommunityPost} onClick={(event) => event.stopPropagation()}>
             <button className={styles.closeButton} type="button" onClick={() => setComposerOpen(false)}><X size={17} /></button>
-            <img src={postDraft.imageUrl} alt="" />
+            {postDrafts.length > 1 && (
+              <div className={styles.composerDraftRail}>
+                {postDrafts.map((draft, index) => (
+                  <button
+                    key={draft.id}
+                    className={draft.id === postDraft.id ? styles.active : ''}
+                    type="button"
+                    onClick={() => {
+                      updateDraftComposer(postDraft.id, {
+                        title: postComposer.title,
+                        tags: postComposer.tags,
+                        takenAt: postComposer.takenAt,
+                        folderIds: postComposer.folderIds,
+                      })
+                      activatePostDraft(draft.id === postDraft.id ? {
+                        ...draft,
+                        title: postComposer.title,
+                        tags: postComposer.tags,
+                        takenAt: postComposer.takenAt,
+                        folderIds: postComposer.folderIds,
+                      } : draft)
+                    }}
+                  >
+                    <img src={draft.imageUrl} alt="" />
+                    <span>{index + 1}</span>
+                    {!draft.coordinates && <b>位置未設定</b>}
+                    {!draft.folderIds.length && <em>Folder</em>}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className={styles.composerImageWrap}>
+              <img src={postDraft.imageUrl} alt="" />
+              {postDrafts.length > 1 && (
+                <button
+                  type="button"
+                  aria-label="この画像を外す"
+                  onClick={() => {
+                    const nextDrafts = postDrafts.filter((draft) => draft.id !== postDraft.id)
+                    setPostDrafts(nextDrafts)
+                    if (!nextDrafts.length) {
+                      setPostDraft(null)
+                      setComposerOpen(false)
+                      return
+                    }
+                    activatePostDraft(nextDrafts[0])
+                  }}
+                >
+                  <X size={17} />
+                </button>
+              )}
+            </div>
             <strong>{postDraft.communityId ? `${communityLabel(communitiesById.get(postDraft.communityId))} に投稿` : 'Dropする'}</strong>
             {postDraft.coordinates && (
               <div className={styles.locationSummary}>
@@ -3835,15 +4025,39 @@ export default function CommunityMapPrototype() {
             )}
             <label>
               撮影日時
-              <input type="datetime-local" value={postComposer.takenAt} onChange={(event) => setPostComposer((current) => ({ ...current, takenAt: event.target.value }))} />
+              <input
+                type="datetime-local"
+                value={postComposer.takenAt}
+                onChange={(event) => {
+                  const takenAt = event.target.value
+                  setPostComposer((current) => ({ ...current, takenAt }))
+                  updateDraftComposer(postDraft.id, { takenAt })
+                }}
+              />
             </label>
             <label>
               一言加えて
-              <input value={postComposer.title} onChange={(event) => setPostComposer((current) => ({ ...current, title: event.target.value, description: '' }))} placeholder="この瞬間を一言で" />
+              <input
+                value={postComposer.title}
+                onChange={(event) => {
+                  const title = event.target.value
+                  setPostComposer((current) => ({ ...current, title, description: '' }))
+                  updateDraftComposer(postDraft.id, { title })
+                }}
+                placeholder="この瞬間を一言で"
+              />
             </label>
             <label>
               #
-              <input value={postComposer.tags} onChange={(event) => setPostComposer((current) => ({ ...current, tags: event.target.value }))} placeholder="#facade #coffee" />
+              <input
+                value={postComposer.tags}
+                onChange={(event) => {
+                  const tags = event.target.value
+                  setPostComposer((current) => ({ ...current, tags }))
+                  updateDraftComposer(postDraft.id, { tags })
+                }}
+                placeholder="#facade #coffee"
+              />
             </label>
             {tagSuggestions.length > 0 && (
               <div className={styles.tagSuggestions}>
@@ -3873,14 +4087,15 @@ export default function CommunityMapPrototype() {
                         <input
                           type="checkbox"
                           checked={postComposer.folderIds.includes(folder.id)}
-                          onChange={(event) =>
-                            setPostComposer((current) => ({
-                              ...current,
-                              folderIds: event.target.checked
+                          onChange={(event) => {
+                            setPostComposer((current) => {
+                              const folderIds = event.target.checked
                                 ? [...current.folderIds, folder.id]
-                                : current.folderIds.filter((id) => id !== folder.id),
-                            }))
-                          }
+                                : current.folderIds.filter((id) => id !== folder.id)
+                              updateDraftComposer(postDraft.id, { folderIds })
+                              return { ...current, folderIds }
+                            })
+                          }}
                         />
                         <span>{folder.name}</span>
                       </label>
@@ -3906,7 +4121,7 @@ export default function CommunityMapPrototype() {
         <button className={activeTab === 'find' ? styles.active : ''} type="button" onClick={() => switchTab('find')}><Search size={21} /><span>Find</span></button>
         <button className={activeTab === 'home' ? styles.active : ''} type="button" onClick={() => switchTab('home')}><Sparkles size={21} /><span>Recommend</span></button>
         <button className={activeTab === 'myworld' ? styles.active : ''} type="button" onClick={() => switchTab('myworld')}><Droplet size={21} /><span>Drop</span></button>
-        <button className={activeTab === 'tovisit' ? styles.active : ''} type="button" onClick={() => switchTab('tovisit')}><Folder size={21} /><span>Folder</span></button>
+        <button className={activeTab === 'tovisit' ? styles.active : ''} type="button" onClick={() => switchTab('tovisit')}><Folder size={21} /><span>Library</span></button>
         <button className={activeTab === 'mypage' ? styles.active : ''} type="button" onClick={() => switchTab('mypage')}><UserRound size={21} /><span>Profile</span></button>
       </nav>
     </main>
@@ -4039,6 +4254,9 @@ function CommunityListSection({
       <div className={styles.communityList}>
         {communities.map((community) => (
           <article key={community.id} className={styles.communityCard}>
+            <div className={styles.communityThumb}>
+              {community.thumbnailUrl ? <img src={community.thumbnailUrl} alt="" /> : <span>{community.name.slice(0, 1)}</span>}
+            </div>
             <div>
               <strong>{communityLabel(community)}</strong>
               <h2>{community.name}</h2>
@@ -4073,8 +4291,8 @@ function LibraryModeSwitch({
 }) {
   return (
     <div className={styles.libraryModeSwitch}>
-      <button className={value === 'map' ? styles.active : ''} type="button" onClick={() => onChange('map')}>Map</button>
       <button className={value === 'folder' ? styles.active : ''} type="button" onClick={() => onChange('folder')}>Folder</button>
+      <button className={value === 'pin' ? styles.active : ''} type="button" onClick={() => onChange('pin')}>Pin</button>
     </div>
   )
 }
@@ -4121,6 +4339,7 @@ function FolderLibraryView({
   onDeleteFolder,
   onDeletePin,
   onReorderFolderPin,
+  currentUserId,
   showModeSwitch = true,
   onAddMemory,
 }: {
@@ -4142,6 +4361,7 @@ function FolderLibraryView({
   onDeleteFolder: (folderId: string) => void
   onDeletePin: (pinId: string) => void
   onReorderFolderPin: (folderId: string, draggedPinId: string, targetPinId: string) => void
+  currentUserId: string
   showModeSwitch?: boolean
   onAddMemory?: () => void
 }) {
@@ -4158,6 +4378,24 @@ function FolderLibraryView({
   const selectedPins = selectedFolder
     ? uniquePinsByMemory(selectedFolder.pinIds.map((pinId) => libraryPinsById.get(pinId)).filter((pin): pin is Pin => Boolean(pin)))
     : []
+  const ownedPins = pins.filter((pin) => pin.ownerId === currentUserId)
+  const savedExternalPins = pins.filter((pin) => pin.ownerId !== currentUserId)
+  const pinFolders = (pinId: string) => folders.filter((folder) => folder.pinIds.includes(pinId))
+  const renderLibraryPin = (pin: Pin) => (
+    <article key={pin.id} className={styles.libraryPinRow}>
+      <button type="button" onClick={() => onOpenPin(pin.id)}>
+        <img src={pin.imageUrl} alt="" />
+        <span>
+          <strong>{pin.title}</strong>
+          <small>{getMeta(pin)}</small>
+          <em>{pinFolders(pin.id).map((folder) => folder.name).join(', ') || 'Folder未分類'}</em>
+        </span>
+      </button>
+      <button className={styles.ghostButton} type="button" onClick={() => onOpenPin(pin.id)}>
+        詳細
+      </button>
+    </article>
+  )
 
   return (
     <section className={styles.page}>
@@ -4176,7 +4414,24 @@ function FolderLibraryView({
         <Search size={18} />
         <input value={folderSearch} onChange={(event) => onFolderSearch(event.target.value)} placeholder="pin、folderを検索" />
       </div>
-      {selectedFolder ? (
+      {mode === 'pin' && !selectedFolder ? (
+        <section className={styles.contentSection}>
+          <div className={styles.pinLibraryGroups}>
+            <section>
+              <h2>My Pins</h2>
+              <p>自分がDropしたpin</p>
+              <div>{ownedPins.map(renderLibraryPin)}</div>
+              {!ownedPins.length && <p className={styles.muted}>自分のpinはまだありません。</p>}
+            </section>
+            <section>
+              <h2>Saved Pins</h2>
+              <p>他の人から保存したpin</p>
+              <div>{savedExternalPins.map(renderLibraryPin)}</div>
+              {!savedExternalPins.length && <p className={styles.muted}>保存したpinはまだありません。</p>}
+            </section>
+          </div>
+        </section>
+      ) : selectedFolder ? (
         <section className={`${styles.contentSection} ${styles.folderPlaylist}`}>
           <div className={styles.folderPlaylistHeader}>
             <h2>{selectedFolder.name}</h2>
@@ -4932,6 +5187,8 @@ function CommunityMapView({
   getPinMeta,
   onToggleTimeline,
   onOpenProfile,
+  canEditThumbnail = false,
+  onEditThumbnail,
   onChatText,
   onSendChat,
   onMapClick,
@@ -4954,6 +5211,8 @@ function CommunityMapView({
   getPinMeta?: (pin: Pin) => string
   onToggleTimeline: () => void
   onOpenProfile: (userId: string) => void
+  canEditThumbnail?: boolean
+  onEditThumbnail?: () => void
   onChatText: (value: string) => void
   onSendChat: () => void
   onMapClick?: (coordinates: Coordinates) => void
@@ -5026,6 +5285,7 @@ function CommunityMapView({
           <div className={styles.communityMapActions}>
             <button type="button" onClick={onBack}><ArrowLeft size={18} /></button>
             <button type="button" onClick={onToggleTimeline}>Timeline</button>
+            {canEditThumbnail && <button type="button" onClick={onEditThumbnail}>Thumb</button>}
           </div>
           {manualPlacement && (
             <div className={styles.placementBanner}>

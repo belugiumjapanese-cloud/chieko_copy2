@@ -6,6 +6,9 @@
 alter table public.folders
   add column if not exists thumbnail_url text;
 
+alter table public.communities
+  add column if not exists thumbnail_url text;
+
 alter table public.folders
   add column if not exists folder_kind text not null default 'my_world';
 
@@ -336,6 +339,7 @@ select
   c.slug,
   c.name,
   c.description,
+  c.thumbnail_url,
   c.owner_id,
   pr.username as owner_username,
   pr.display_name as owner_display_name,
