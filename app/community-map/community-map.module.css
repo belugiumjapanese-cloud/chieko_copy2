@@ -449,6 +449,110 @@
   background: #ffffff;
 }
 
+.communitySpotlight {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(8, 10, 10, 0.92), rgba(18, 107, 88, 0.86)),
+    url("https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1200&q=80") center/cover;
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(24, 34, 29, 0.16);
+}
+
+.communitySpotlightHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.communitySpotlightHeader span,
+.communitySpotlightHeader p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 850;
+}
+
+.communitySpotlightHeader h2 {
+  margin: 3px 0 6px;
+  font-size: clamp(1.55rem, 5vw, 2.6rem);
+  line-height: 1;
+}
+
+.communitySearchInline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 6px 8px 6px 12px;
+  color: #17221d;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+}
+
+.communitySearchInline input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.communitySearchInline button {
+  min-height: 34px;
+  padding: 7px 10px;
+  color: #ffffff;
+  font-weight: 950;
+  background: #126b58;
+  border: 0;
+  border-radius: 8px;
+}
+
+.communitySpotlightGrid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(176px, 220px);
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.communitySpotlightGrid::-webkit-scrollbar {
+  display: none;
+}
+
+.communitySpotlightGrid button {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-height: 174px;
+  padding: 10px;
+  overflow: hidden;
+  color: #ffffff;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.communitySpotlightGrid img {
+  width: 100%;
+  height: 86px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.communitySpotlightGrid span,
+.communitySpotlightGrid small {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
 .ghostButton {
   color: #126b58;
   background: #ffffff;
@@ -1505,6 +1609,7 @@
 }
 
 .createPanel input,
+.createPanel select,
 .composer input,
 .composer textarea,
 .composer select,
@@ -1516,8 +1621,66 @@
   border-radius: 8px;
 }
 
+.createPanel select,
 .composer select {
   color: #18231e;
+}
+
+.communityTypeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.communityTypeGrid button {
+  display: grid;
+  gap: 6px;
+  min-height: 132px;
+  padding: 12px;
+  color: #18231e;
+  text-align: left;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.communityTypeGrid button.active {
+  color: #ffffff;
+  background: #126b58;
+  border-color: #126b58;
+}
+
+.communityTypeGrid span,
+.communityTypeGrid small {
+  color: inherit;
+  opacity: 0.78;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.communityRulePanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #f7faf8;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+}
+
+.checkLine {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 9px !important;
+  color: #18231e !important;
+}
+
+.checkLine input {
+  width: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: #126b58;
 }
 
 .composer textarea {
@@ -1792,7 +1955,7 @@
 
 .dropScopeBar {
   position: absolute;
-  top: calc(18px + env(safe-area-inset-top));
+  top: calc(76px + env(safe-area-inset-top));
   left: 12px;
   right: 12px;
   z-index: 28;
@@ -1829,7 +1992,7 @@
 
 .dropStatusCard {
   position: absolute;
-  top: calc(70px + env(safe-area-inset-top));
+  top: calc(130px + env(safe-area-inset-top));
   left: 16px;
   z-index: 20;
   display: grid;
@@ -1852,7 +2015,7 @@
 
 .placementBanner,
 .postMessage {
-  top: 140px;
+  top: calc(184px + env(safe-area-inset-top));
   left: 16px;
   width: min(430px, calc(100vw - 32px));
   padding: 10px 12px;
@@ -1902,7 +2065,7 @@
 
 .mapFloatingAction:has(.dropPostButton) {
   right: 18px;
-  top: calc(82px + env(safe-area-inset-top));
+  top: calc(136px + env(safe-area-inset-top));
   bottom: auto;
 }
 
@@ -2011,7 +2174,7 @@
 .mapFloatingAction {
   position: absolute;
   right: 18px;
-  top: calc(82px + env(safe-area-inset-top));
+  top: calc(136px + env(safe-area-inset-top));
   bottom: auto;
   z-index: 22;
 }
@@ -2035,7 +2198,7 @@
 }
 
 .mapPageListCollapsed .mapFloatingAction {
-  top: calc(82px + env(safe-area-inset-top));
+  top: calc(136px + env(safe-area-inset-top));
   bottom: auto;
 }
 
@@ -3327,12 +3490,12 @@
   position: absolute;
   top: 16px;
   left: 16px;
-  z-index: 25;
+  z-index: 34;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  width: min(540px, calc(100vw - 260px));
+  width: min(560px, calc(100vw - 32px));
   min-height: 46px;
   padding: 0 12px;
   background: rgba(255, 255, 255, 0.96);
@@ -3382,6 +3545,43 @@
   height: 42px;
   object-fit: cover;
   border-radius: 8px;
+  cursor: pointer;
+}
+
+.mapSearchSuggestions button span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mapSearchSuggestions button strong,
+.mapSearchSuggestions button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapSearchSuggestions button small {
+  color: #65736b;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.mapSearchSuggestions p {
+  margin: 0;
+  padding: 8px;
+  color: #65736b;
+  font-weight: 850;
+}
+
+.placeSuggestionIcon {
+  display: grid !important;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: #126b58;
+  background: #e8f3ee;
+  border-radius: 8px;
 }
 
 .locateButton,
@@ -3403,7 +3603,7 @@
 .locateButton {
   right: 18px;
   left: auto;
-  top: calc(140px + env(safe-area-inset-top));
+  top: calc(198px + env(safe-area-inset-top));
   bottom: auto;
   background: rgba(8, 10, 10, 0.88);
 }
@@ -3422,7 +3622,7 @@
 }
 
 .mapPageListCollapsed .locateButton {
-  top: calc(140px + env(safe-area-inset-top));
+  top: calc(198px + env(safe-area-inset-top));
   bottom: auto;
 }
 
@@ -3744,6 +3944,8 @@
 
   .communityToolbar,
   .communityCard,
+  .communitySpotlightHeader,
+  .communityTypeGrid,
   .libraryRow,
   .feedCard {
     grid-template-columns: 1fr;
@@ -3819,7 +4021,7 @@
 
   .mapFloatingAction {
     right: 14px;
-    top: calc(82px + env(safe-area-inset-top));
+    top: calc(136px + env(safe-area-inset-top));
     bottom: auto;
   }
 
@@ -3833,7 +4035,7 @@
   .mapSearchBox {
     top: 12px;
     left: 12px;
-    width: calc(100vw - 188px);
+    width: calc(100vw - 24px);
   }
 
   .mapSortControl {
@@ -3871,7 +4073,7 @@
   }
 
   .mapPageListCollapsed .mapFloatingAction {
-    top: calc(82px + env(safe-area-inset-top));
+    top: calc(136px + env(safe-area-inset-top));
     bottom: auto;
   }
 
@@ -3887,7 +4089,7 @@
   }
 
   .mapPageListCollapsed .locateButton {
-    top: calc(140px + env(safe-area-inset-top));
+    top: calc(198px + env(safe-area-inset-top));
     bottom: auto;
   }
 

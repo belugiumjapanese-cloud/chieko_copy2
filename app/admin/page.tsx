@@ -31,7 +31,7 @@ import { supabase } from '../../lib/supabase'
 import styles from './admin.module.css'
 
 type JsonRecord = Record<string, unknown>
-type SectionKey = 'dashboard' | 'recommend' | 'studio' | 'catalog' | 'moderation' | 'users'
+type SectionKey = 'dashboard' | 'recommend' | 'studio' | 'catalog' | 'communities' | 'moderation' | 'users'
 type CatalogKind = 'folders' | 'communities' | 'posts' | 'users'
 
 type AdminOverview = {
@@ -54,6 +54,7 @@ type AdminOverview = {
   recentFolders: AdminFolderCard[]
   recentCommunities: AdminCommunityCard[]
   recentUsers: AdminUserCard[]
+  communityHierarchy: AdminCommunityMember[]
   events: JsonRecord[]
   eventStats: Array<{ event_type: string; count: number }>
   recommendItems: RecommendItem[]
@@ -99,12 +100,37 @@ type AdminCommunityCard = {
   slug?: string | null
   name: string
   description?: string | null
+  thumbnail_url?: string | null
+  preview_image_url?: string | null
   owner_id?: string | null
   visibility?: string | null
+  community_type?: string | null
+  post_policy?: string | null
+  approval_required?: boolean | null
+  min_contribution_level?: number | null
+  is_paid?: boolean | null
+  price_yen?: number | null
   member_count?: number | null
   posts_count?: number | null
   joined_by_me?: boolean | null
   created_at?: string | null
+}
+
+type AdminCommunityMember = {
+  community_id: string
+  community_name: string
+  community_type?: string | null
+  post_policy?: string | null
+  community_visibility?: string | null
+  user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  role?: string | null
+  contribution_level?: number | null
+  approved_posts_count?: number | null
+  status?: string | null
+  joined_at?: string | null
 }
 
 type AdminPostCard = {
@@ -181,6 +207,7 @@ const sectionItems: Array<{ key: SectionKey; label: string; icon: ReactNode }> =
   { key: 'recommend', label: 'Recommend', icon: <Sparkles size={17} /> },
   { key: 'studio', label: 'Folder Studio', icon: <Folder size={17} /> },
   { key: 'catalog', label: 'Catalog', icon: <Database size={17} /> },
+  { key: 'communities', label: 'Communities', icon: <Compass size={17} /> },
   { key: 'moderation', label: 'Moderation', icon: <ShieldAlert size={17} /> },
   { key: 'users', label: 'Users', icon: <Users size={17} /> },
 ]
@@ -435,7 +462,7 @@ export default function AdminPage() {
       item_type: 'community_pick',
       title: community.name,
       description: community.description || `${community.member_count ?? 0} members / ${community.posts_count ?? 0} pins`,
-      image_url: '',
+      image_url: community.thumbnail_url || community.preview_image_url || '',
       target_url: '',
       folder_id: '',
       post_id: '',
@@ -965,6 +992,27 @@ on conflict (user_id) do update set role = excluded.role;`}</code>
             </section>
           )}
 
+          {section === 'communities' && (
+            <section className={styles.adminGrid}>
+              <Panel eyebrow="Community" title="権限と貢献度" icon={<Compass size={22} />}>
+                <div className={styles.signalList}>
+                  <Signal title="level 0" body="参加直後。閲覧、コメント、保存を中心に使う。" />
+                  <Signal title="level 1" body="承認済みpinが3件ほどある編集者候補。投稿開放の基準に使う。" />
+                  <Signal title="level 2" body="共同制作者やモデレーター候補。投稿承認や整理を任せる候補。" />
+                </div>
+              </Panel>
+
+              <Panel eyebrow="Members" title="Community hierarchy" icon={<Users size={22} />}>
+                <div className={styles.itemList}>
+                  {overview.communityHierarchy.map((member) => (
+                    <CommunityHierarchyRow key={`${member.community_id}-${member.user_id}`} member={member} />
+                  ))}
+                  {!overview.communityHierarchy.length && <p className={styles.empty}>community階層データがありません。追加SQLをrunしてください。</p>}
+                </div>
+              </Panel>
+            </section>
+          )}
+
           {section === 'moderation' && (
             <section className={styles.adminGrid}>
               <Panel eyebrow="Moderation" title="Reports" icon={<Flag size={22} />}>
@@ -1161,14 +1209,35 @@ function FolderRow({ folder, onPick, onOfficial, wide = false, picked = false, o
 function CommunityRow({ community, onPick, wide = false, picked = false }: { community: AdminCommunityCard; onPick: () => void; wide?: boolean; picked?: boolean }) {
   return (
     <article className={wide ? styles.wideRow : ''}>
-      <div className={styles.avatarFallback}><Compass size={20} /></div>
+      {community.thumbnail_url || community.preview_image_url ? (
+        <img src={community.thumbnail_url || community.preview_image_url || '/favicon.ico'} alt="" />
+      ) : (
+        <div className={styles.avatarFallback}><Compass size={20} /></div>
+      )}
       <div>
         <strong>{community.name}</strong>
-        <span>{community.visibility ?? 'public'} / {community.member_count ?? 0} members / {community.posts_count ?? 0} pins</span>
+        <span>{community.community_type ?? community.visibility ?? 'public'} / {community.post_policy ?? 'open'} / {community.member_count ?? 0} members / {community.posts_count ?? 0} pins</span>
       </div>
       <button className={picked ? styles.selectedAction : ''} type="button" onClick={onPick} disabled={picked}>
         {picked ? 'Picked' : 'Pick'}
       </button>
+    </article>
+  )
+}
+
+function CommunityHierarchyRow({ member }: { member: AdminCommunityMember }) {
+  return (
+    <article>
+      <img src={member.avatar_url || '/favicon.ico'} alt="" />
+      <div>
+        <strong>{member.community_name}</strong>
+        <span>
+          @{member.username ?? member.user_id} / {member.role ?? 'member'} / level {member.contribution_level ?? 0}
+          {' '} / {member.approved_posts_count ?? 0} approved / {member.status ?? 'active'}
+        </span>
+        <small>{member.community_type ?? 'open'} / {member.post_policy ?? 'open'} / {member.community_visibility ?? 'public'}</small>
+      </div>
+      <small>{formatDate(member.joined_at ?? '')}</small>
     </article>
   )
 }

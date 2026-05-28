@@ -122,6 +122,12 @@ create table if not exists public.communities (
   thumbnail_url text,
   owner_id uuid not null references public.profiles(id) on delete cascade,
   visibility text not null default 'public' check (visibility in ('public', 'invite_only', 'private')),
+  community_type text not null default 'open' check (community_type in ('open', 'approval', 'private', 'paid')),
+  post_policy text not null default 'open' check (post_policy in ('open', 'approval', 'contribution', 'owner')),
+  approval_required boolean not null default false,
+  min_contribution_level integer not null default 0 check (min_contribution_level between 0 and 2),
+  is_paid boolean not null default false,
+  price_yen integer,
   invite_code text unique,
   member_count integer not null default 1,
   posts_count integer not null default 0,
@@ -134,6 +140,9 @@ create table if not exists public.community_members (
   community_id uuid not null references public.communities(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   role text not null default 'member' check (role in ('owner', 'moderator', 'member')),
+  contribution_level integer not null default 0 check (contribution_level between 0 and 2),
+  approved_posts_count integer not null default 0,
+  status text not null default 'active' check (status in ('active', 'pending', 'editor_candidate', 'suspended')),
   created_at timestamptz not null default now(),
   primary key (community_id, user_id)
 );

@@ -123,5 +123,34 @@ for select
 to authenticated
 using (exists (select 1 from public.admin_users a where a.user_id = auth.uid()));
 
+drop view if exists public.admin_community_hierarchy;
+create view public.admin_community_hierarchy
+with (security_invoker = true)
+as
+select
+  c.id as community_id,
+  c.name as community_name,
+  c.community_type,
+  c.post_policy,
+  c.visibility as community_visibility,
+  cm.user_id,
+  pr.username,
+  pr.display_name,
+  pr.avatar_url,
+  cm.role,
+  cm.contribution_level,
+  cm.approved_posts_count,
+  cm.status,
+  cm.created_at as joined_at
+from public.community_members cm
+join public.communities c on c.id = cm.community_id
+join public.profiles pr on pr.id = cm.user_id
+where exists (select 1 from public.admin_users a where a.user_id = auth.uid())
+order by
+  c.name,
+  case cm.role when 'owner' then 0 when 'moderator' then 1 else 2 end,
+  cm.contribution_level desc,
+  cm.approved_posts_count desc;
+
 -- Writes are intentionally handled by the Next.js admin API using
 -- SUPABASE_SERVICE_ROLE_KEY. Do not expose that key to the browser.

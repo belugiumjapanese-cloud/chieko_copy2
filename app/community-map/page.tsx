@@ -44,6 +44,62 @@ const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const EMPTY_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23dfe8e2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23126b58%22%20opacity%3D%22.35%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23126b58%22%20opacity%3D%22.3%22/%3E%3C/svg%3E'
+const COMMUNITY_PRESETS: Array<{
+  type: CommunityMapKind
+  title: string
+  subtitle: string
+  examples: string
+  privacy: Privacy
+  postPolicy: CommunityPostPolicy
+  approvalRequired: boolean
+  minContributionLevel: number
+  isPaid: boolean
+}> = [
+  {
+    type: 'open',
+    title: 'みんなで作る公開マップ',
+    subtitle: '看板、ドアノブ、階段、珍スポットなどを集める場所。',
+    examples: '閲覧: 全員 / 投稿: 貢献度で解放',
+    privacy: 'public',
+    postPolicy: 'contribution',
+    approvalRequired: false,
+    minContributionLevel: 1,
+    isPaid: false,
+  },
+  {
+    type: 'approval',
+    title: '承認制の専門マップ',
+    subtitle: '建築、名店、研究、都市観察など質を保ちたい場所。',
+    examples: '閲覧: 全員 / 投稿: 承認された人',
+    privacy: 'public',
+    postPolicy: 'approval',
+    approvalRequired: true,
+    minContributionLevel: 0,
+    isPaid: false,
+  },
+  {
+    type: 'private',
+    title: '仲間内のプライベートマップ',
+    subtitle: '旅行、研究室、事務所、友達だけで共有する場所。',
+    examples: '閲覧: 招待者 / 投稿: メンバー',
+    privacy: 'limited',
+    postPolicy: 'open',
+    approvalRequired: false,
+    minContributionLevel: 0,
+    isPaid: false,
+  },
+  {
+    type: 'paid',
+    title: '売るための有料マップ',
+    subtitle: '旅行ガイド、建築ガイド、ツアー連動に使う場所。',
+    examples: '閲覧: 購入者 / 投稿: 作成者または承認者',
+    privacy: 'limited',
+    postPolicy: 'approval',
+    approvalRequired: true,
+    minContributionLevel: 2,
+    isPaid: true,
+  },
+]
 
 const AUTH_PLACEHOLDER_USER: DemoUser = {
   id: 'auth',
@@ -68,6 +124,8 @@ type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
 type LibraryMode = 'folder' | 'pin'
 type DropScope = { id: string; label: string; pins: Pin[] }
 type Privacy = 'public' | 'limited'
+type CommunityMapKind = 'open' | 'approval' | 'private' | 'paid'
+type CommunityPostPolicy = 'open' | 'approval' | 'contribution' | 'owner'
 type ProfileListMode = 'profile' | 'following' | 'followers'
 
 type DemoUser = {
@@ -90,6 +148,12 @@ type Community = {
   description: string
   thumbnailUrl?: string
   privacy: Privacy
+  communityType: CommunityMapKind
+  postPolicy: CommunityPostPolicy
+  approvalRequired: boolean
+  minContributionLevel: number
+  isPaid: boolean
+  priceYen?: number | null
   ownerId: string
   memberIds: string[]
   memberCount?: number
@@ -265,6 +329,12 @@ type AppCommunityCardRow = {
   preview_image_url?: string | null
   owner_id: string
   visibility: 'public' | 'invite_only' | 'private'
+  community_type?: CommunityMapKind | null
+  post_policy?: CommunityPostPolicy | null
+  approval_required?: boolean | null
+  min_contribution_level?: number | null
+  is_paid?: boolean | null
+  price_yen?: number | null
   invite_code: string | null
   member_count: number | null
   posts_count: number | null
@@ -275,6 +345,10 @@ type AppCommunityCardRow = {
 type CommunityMemberRow = {
   community_id: string
   user_id: string
+  role?: string | null
+  contribution_level?: number | null
+  approved_posts_count?: number | null
+  status?: string | null
 }
 
 type CommentRow = {
@@ -363,10 +437,24 @@ type DirectCommunityRow = {
   thumbnail_url?: string | null
   owner_id: string
   visibility: 'public' | 'invite_only' | 'private'
+  community_type?: CommunityMapKind | null
+  post_policy?: CommunityPostPolicy | null
+  approval_required?: boolean | null
+  min_contribution_level?: number | null
+  is_paid?: boolean | null
+  price_yen?: number | null
   invite_code: string | null
   member_count: number | null
   posts_count: number | null
   created_at: string
+}
+
+type MapboxSearchSuggestion = {
+  id: string
+  name: string
+  secondary: string
+  mapboxId: string
+  coordinates?: Coordinates
 }
 
 function toLngLat(value: Coordinates | null | undefined): [number, number] | null {
@@ -383,6 +471,20 @@ function formatShortDate(value?: string) {
 
 function communityLabel(community?: Community) {
   return community ? community.name : 'Unknown community'
+}
+
+function communityTypeLabel(type: CommunityMapKind) {
+  if (type === 'open') return '公開共同map'
+  if (type === 'approval') return '承認制map'
+  if (type === 'private') return 'private map'
+  return '有料map'
+}
+
+function communityPolicyLabel(policy: CommunityPostPolicy, minLevel = 0) {
+  if (policy === 'open') return '投稿: 参加者'
+  if (policy === 'approval') return '投稿: 承認制'
+  if (policy === 'contribution') return `投稿: level ${minLevel}+`
+  return '投稿: owner'
 }
 
 function personalCommunityLabel(community?: Community) {
@@ -477,6 +579,80 @@ function createSlug(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return `${slug || 'community'}-${Math.random().toString(36).slice(2, 7)}`.slice(0, 48)
+}
+
+function createSearchSessionToken() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return createId('search')
+}
+
+function mapboxSuggestionCoordinates(record: Record<string, unknown>): Coordinates | undefined {
+  const coordinates = record.coordinates as Record<string, unknown> | undefined
+  const longitude = Number(coordinates?.longitude)
+  const latitude = Number(coordinates?.latitude)
+  if (Number.isFinite(longitude) && Number.isFinite(latitude)) return { longitude, latitude }
+  return undefined
+}
+
+async function fetchMapboxSearchSuggestions(query: string, sessionToken: string): Promise<MapboxSearchSuggestion[]> {
+  if (!MAPBOX_TOKEN || query.trim().length < 2) return []
+
+  const params = new URLSearchParams({
+    q: query,
+    access_token: MAPBOX_TOKEN,
+    session_token: sessionToken,
+    limit: '6',
+    language: 'ja,en',
+    types: 'poi,address,place,locality,neighborhood,postcode',
+  })
+
+  const response = await fetch(`https://api.mapbox.com/search/searchbox/v1/suggest?${params.toString()}`)
+  if (!response.ok) return []
+  const data = await response.json() as { suggestions?: Array<Record<string, unknown>> }
+  return (data.suggestions ?? [])
+    .map((suggestion, index) => {
+      const mapboxId = String(suggestion.mapbox_id ?? suggestion.id ?? '')
+      const name = String(suggestion.name_preferred ?? suggestion.name ?? '')
+      if (!mapboxId || !name) return null
+      return {
+        id: `${mapboxId}-${index}`,
+        name,
+        secondary: String(suggestion.full_address ?? suggestion.place_formatted ?? ''),
+        mapboxId,
+        coordinates: mapboxSuggestionCoordinates(suggestion),
+      }
+    })
+    .filter(Boolean) as MapboxSearchSuggestion[]
+}
+
+async function retrieveMapboxSearchSuggestion(mapboxId: string, sessionToken: string): Promise<Coordinates | null> {
+  if (!MAPBOX_TOKEN || !mapboxId) return null
+  const params = new URLSearchParams({
+    access_token: MAPBOX_TOKEN,
+    session_token: sessionToken,
+  })
+  const response = await fetch(`https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${params.toString()}`)
+  if (!response.ok) return null
+  const data = await response.json() as {
+    features?: Array<{
+      geometry?: { coordinates?: number[] }
+      properties?: { coordinates?: { longitude?: number; latitude?: number } }
+    }>
+  }
+  const feature = data.features?.[0]
+  const geometry = feature?.geometry?.coordinates
+  if (Array.isArray(geometry) && geometry.length >= 2) {
+    const longitude = Number(geometry[0])
+    const latitude = Number(geometry[1])
+    if (Number.isFinite(longitude) && Number.isFinite(latitude)) return { longitude, latitude }
+  }
+  const coordinates = feature?.properties?.coordinates
+  const longitude = Number(coordinates?.longitude)
+  const latitude = Number(coordinates?.latitude)
+  if (Number.isFinite(longitude) && Number.isFinite(latitude)) return { longitude, latitude }
+  return null
 }
 
 function pinCommunityIds(pin: Pin) {
@@ -685,6 +861,12 @@ function directCommunitiesToCards(rows: DirectCommunityRow[], memberRows: Commun
     preview_image_url: null,
     owner_id: community.owner_id,
     visibility: community.visibility,
+    community_type: community.community_type ?? null,
+    post_policy: community.post_policy ?? null,
+    approval_required: community.approval_required ?? null,
+    min_contribution_level: community.min_contribution_level ?? null,
+    is_paid: community.is_paid ?? null,
+    price_yen: community.price_yen ?? null,
     invite_code: community.invite_code,
     member_count: community.member_count,
     posts_count: community.posts_count,
@@ -827,6 +1009,12 @@ function buildCommunities(communityRows: AppCommunityCardRow[], memberRows: Comm
       description: community.description || '',
       thumbnailUrl: community.thumbnail_url || community.preview_image_url || undefined,
       privacy: mapCommunityPrivacy(community.visibility),
+      communityType: community.community_type ?? (community.visibility === 'private' ? 'private' : 'open'),
+      postPolicy: community.post_policy ?? (community.approval_required ? 'approval' : 'open'),
+      approvalRequired: Boolean(community.approval_required),
+      minContributionLevel: community.min_contribution_level ?? 0,
+      isPaid: Boolean(community.is_paid),
+      priceYen: community.price_yen ?? null,
       ownerId: community.owner_id,
       memberIds,
       memberCount: community.member_count ?? memberIds.length,
@@ -1226,6 +1414,11 @@ export default function CommunityMapPrototype() {
   const [createCommunityOpen, setCreateCommunityOpen] = useState(false)
   const [newCommunityName, setNewCommunityName] = useState('')
   const [newCommunityPrivacy, setNewCommunityPrivacy] = useState<Privacy>('public')
+  const [newCommunityType, setNewCommunityType] = useState<CommunityMapKind>('open')
+  const [newCommunityPostPolicy, setNewCommunityPostPolicy] = useState<CommunityPostPolicy>('contribution')
+  const [newCommunityApprovalRequired, setNewCommunityApprovalRequired] = useState(false)
+  const [newCommunityMinLevel, setNewCommunityMinLevel] = useState(1)
+  const [newCommunityPriceYen, setNewCommunityPriceYen] = useState('')
   const [profileWorldUserId, setProfileWorldUserId] = useState<string | null>(null)
   const [inviteCommunityId, setInviteCommunityId] = useState<string | null>(null)
   const [inviteQuery, setInviteQuery] = useState('')
@@ -1374,6 +1567,7 @@ export default function CommunityMapPrototype() {
     !community.memberIds.includes(activeUserId) &&
     (currentUser.followingIds.some((userId) => community.memberIds.includes(userId)) || community.privacy === 'public'),
   )
+  const communitySpotlightItems = uniqueCommunitiesById([...recommendedCommunities, ...joinedCommunities, ...communities]).slice(0, 6)
   const profileCommunities = communities.filter((community) => community.memberIds.includes(selectedProfile.id))
   const filteredCommunities = communities.filter((community) => {
     const query = communityQuery.trim().toLowerCase()
@@ -1600,7 +1794,7 @@ export default function CommunityMapPrototype() {
       ] = await Promise.all([
         supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('community_members').select('community_id,user_id'),
+        supabase.from('community_members').select('community_id,user_id,role'),
         supabase.from('folder_likes').select('folder_id,user_id,created_at').limit(2000),
         supabase
           .from('recommend_items')
@@ -1657,12 +1851,24 @@ export default function CommunityMapPrototype() {
         console.warn(communitiesResult.error.message)
         const directCommunitiesResult = await supabase
           .from('communities')
-          .select('id,slug,name,description,thumbnail_url,owner_id,visibility,invite_code,member_count,posts_count,created_at')
+          .select('id,slug,name,description,thumbnail_url,owner_id,visibility,community_type,post_policy,approval_required,min_contribution_level,is_paid,price_yen,invite_code,member_count,posts_count,created_at')
           .order('created_at', { ascending: false })
           .limit(200)
         let directCommunityData = Array.isArray(directCommunitiesResult.data)
           ? directCommunitiesResult.data as DirectCommunityRow[]
           : []
+        if (directCommunitiesResult.error) {
+          console.warn(directCommunitiesResult.error.message)
+          const legacyCommunitiesResult = await supabase
+            .from('communities')
+            .select('id,slug,name,description,thumbnail_url,owner_id,visibility,invite_code,member_count,posts_count,created_at')
+            .order('created_at', { ascending: false })
+            .limit(200)
+          directCommunityData = Array.isArray(legacyCommunitiesResult.data)
+            ? legacyCommunitiesResult.data as DirectCommunityRow[]
+            : []
+          if (legacyCommunitiesResult.error) console.warn(legacyCommunitiesResult.error.message)
+        }
         let directCommunityError = directCommunitiesResult.error
         if (directCommunitiesResult.error?.message.toLowerCase().includes('thumbnail_url')) {
           const fallbackCommunitiesResult = await supabase
@@ -2110,6 +2316,16 @@ export default function CommunityMapPrototype() {
     setActiveTab('mypage')
   }, [])
 
+  const applyCommunityPreset = useCallback((type: CommunityMapKind) => {
+    const preset = COMMUNITY_PRESETS.find((item) => item.type === type) ?? COMMUNITY_PRESETS[0]
+    setNewCommunityType(preset.type)
+    setNewCommunityPrivacy(preset.privacy)
+    setNewCommunityPostPolicy(preset.postPolicy)
+    setNewCommunityApprovalRequired(preset.approvalRequired)
+    setNewCommunityMinLevel(preset.minContributionLevel)
+    if (!preset.isPaid) setNewCommunityPriceYen('')
+  }, [])
+
   const createCommunity = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const name = newCommunityName.trim()
@@ -2120,35 +2336,74 @@ export default function CommunityMapPrototype() {
     const slug = createSlug(name)
     const isLimitedCommunity = newCommunityPrivacy === 'limited'
     const inviteCode = isLimitedCommunity ? `${slug}-${Math.random().toString(36).slice(2, 7)}` : null
-    const { data, error } = await client
+    const selectedPreset = COMMUNITY_PRESETS.find((item) => item.type === newCommunityType) ?? COMMUNITY_PRESETS[0]
+    const basePayload = {
+      slug,
+      name,
+      description: selectedPreset.subtitle,
+      owner_id: activeUserId,
+      visibility: isLimitedCommunity ? 'invite_only' : 'public',
+      invite_code: inviteCode,
+    }
+    const extendedPayload = {
+      ...basePayload,
+      community_type: newCommunityType,
+      post_policy: newCommunityPostPolicy,
+      approval_required: newCommunityApprovalRequired || newCommunityPostPolicy === 'approval',
+      min_contribution_level: newCommunityPostPolicy === 'contribution' ? newCommunityMinLevel : 0,
+      is_paid: newCommunityType === 'paid',
+      price_yen: newCommunityType === 'paid' ? Number(newCommunityPriceYen) || null : null,
+    }
+    let insertResult = await client
       .from('communities')
-      .insert({
-        slug,
-        name,
-        description: '新しく作られたコミュニティ。',
-        owner_id: activeUserId,
-        visibility: isLimitedCommunity ? 'invite_only' : 'public',
-        invite_code: inviteCode,
-      })
+      .insert(extendedPayload)
       .select('id')
       .single()
 
-    if (error || !data) {
-      setToast(error?.message ?? 'コミュニティを作成できませんでした。')
+    if (insertResult.error && /community_type|post_policy|approval_required|min_contribution_level|is_paid|price_yen/i.test(insertResult.error.message)) {
+      insertResult = await client
+        .from('communities')
+        .insert(basePayload)
+        .select('id')
+        .single()
+      if (!insertResult.error) {
+        setToast('コミュニティ権限用SQLをrunすると、投稿ルールと貢献度も保存されます。')
+      }
+    }
+
+    if (insertResult.error || !insertResult.data) {
+      setToast(insertResult.error?.message ?? 'コミュニティを作成できませんでした。')
       return
     }
 
-    await client
+    const ownerMemberResult = await client
       .from('community_members')
-      .insert({ community_id: data.id, user_id: activeUserId, role: 'owner' })
+      .insert({ community_id: insertResult.data.id, user_id: activeUserId, role: 'owner', contribution_level: 2, status: 'active' })
+    if (ownerMemberResult.error && /contribution_level|status/i.test(ownerMemberResult.error.message)) {
+      await client
+        .from('community_members')
+        .insert({ community_id: insertResult.data.id, user_id: activeUserId, role: 'owner' })
+    }
     setNewCommunityName('')
-    setNewCommunityPrivacy('public')
+    applyCommunityPreset('open')
     setCreateCommunityOpen(false)
     await loadRemoteData(activeUserId)
-    setSelectedCommunityId(data.id)
-    if (isLimitedCommunity) setInviteCommunityId(data.id)
+    setSelectedCommunityId(insertResult.data.id)
+    if (isLimitedCommunity) setInviteCommunityId(insertResult.data.id)
     setActiveTab('find')
-  }, [activeUserId, loadRemoteData, newCommunityName, newCommunityPrivacy, requireSignedIn])
+  }, [
+    activeUserId,
+    applyCommunityPreset,
+    loadRemoteData,
+    newCommunityApprovalRequired,
+    newCommunityMinLevel,
+    newCommunityName,
+    newCommunityPostPolicy,
+    newCommunityPriceYen,
+    newCommunityPrivacy,
+    newCommunityType,
+    requireSignedIn,
+  ])
 
   const handleCommunityThumbnail = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -3349,11 +3604,62 @@ export default function CommunityMapPrototype() {
                   名前
                   <input value={newCommunityName} onChange={(event) => setNewCommunityName(event.target.value)} placeholder="architecture club" />
                 </label>
-                <div className={styles.segmented}>
-                  <button className={newCommunityPrivacy === 'public' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('public')}>公開</button>
-                  <button className={newCommunityPrivacy === 'limited' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('limited')}>限定公開</button>
+                <div className={styles.communityTypeGrid}>
+                  {COMMUNITY_PRESETS.map((preset) => (
+                    <button
+                      key={preset.type}
+                      className={newCommunityType === preset.type ? styles.active : ''}
+                      type="button"
+                      onClick={() => applyCommunityPreset(preset.type)}
+                    >
+                      <strong>{preset.title}</strong>
+                      <span>{preset.subtitle}</span>
+                      <small>{preset.examples}</small>
+                    </button>
+                  ))}
                 </div>
-                {newCommunityPrivacy === 'limited' && <p className={styles.muted}>作成後、招待リンクで友達だけ参加できる設定になります。</p>}
+                <div className={styles.communityRulePanel}>
+                  <div className={styles.segmented}>
+                    <button className={newCommunityPrivacy === 'public' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('public')}>公開</button>
+                    <button className={newCommunityPrivacy === 'limited' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('limited')}>限定 / 招待</button>
+                  </div>
+                  <label className={styles.checkLine}>
+                    <input
+                      type="checkbox"
+                      checked={newCommunityApprovalRequired}
+                      onChange={(event) => {
+                        setNewCommunityApprovalRequired(event.target.checked)
+                        if (event.target.checked) setNewCommunityPostPolicy('approval')
+                      }}
+                    />
+                    投稿は承認制にする
+                  </label>
+                  <label className={styles.checkLine}>
+                    <input
+                      type="checkbox"
+                      checked={newCommunityPostPolicy === 'contribution'}
+                      onChange={(event) => setNewCommunityPostPolicy(event.target.checked ? 'contribution' : (newCommunityApprovalRequired ? 'approval' : 'open'))}
+                    />
+                    貢献度に応じて投稿権限を開放する
+                  </label>
+                  {newCommunityPostPolicy === 'contribution' && (
+                    <label>
+                      投稿できる最低レベル
+                      <select value={newCommunityMinLevel} onChange={(event) => setNewCommunityMinLevel(Number(event.target.value))}>
+                        <option value={0}>level 0</option>
+                        <option value={1}>level 1</option>
+                        <option value={2}>level 2</option>
+                      </select>
+                    </label>
+                  )}
+                  {newCommunityType === 'paid' && (
+                    <label>
+                      価格
+                      <input value={newCommunityPriceYen} onChange={(event) => setNewCommunityPriceYen(event.target.value)} inputMode="numeric" placeholder="例: 1200" />
+                    </label>
+                  )}
+                </div>
+                {newCommunityPrivacy === 'limited' && <p className={styles.muted}>作成後、招待リンクや通知で友達だけ参加できる設定になります。</p>}
                 <button className={styles.primaryButton} type="submit">作成してmapへ</button>
               </form>
             )}
@@ -3392,14 +3698,32 @@ export default function CommunityMapPrototype() {
               <span>Find</span>
               <h1>公開フォルダーとコミュニティを探す</h1>
             </header>
-            <section className={styles.chaosEntry}>
-              <div>
-                <strong>Join Community</strong>
-                <span>コミュニティを探して、自分のpinを共有する</span>
+            <section className={styles.communitySpotlight}>
+              <div className={styles.communitySpotlightHeader}>
+                <div>
+                  <span>Community</span>
+                  <h2>みんなで地図を作る場所</h2>
+                  <p>公開map、承認制の専門map、仲間内のprivate map、有料mapをここから探して参加できます。</p>
+                </div>
+                <button className={styles.primaryButton} type="button" onClick={() => { setSelectedFindFolderId(null); setFindCommunityOpen(true) }}>
+                  Search community
+                </button>
               </div>
-              <button className={styles.primaryButton} type="button" onClick={() => { setSelectedFindFolderId(null); setFindCommunityOpen(true) }}>
-                Open
-              </button>
+              <label className={styles.communitySearchInline}>
+                <Search size={17} />
+                <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="建築、マンホール、旅行、友達のmap" />
+                <button type="button" onClick={() => setFindCommunityOpen(true)}>Open</button>
+              </label>
+              <div className={styles.communitySpotlightGrid}>
+                {communitySpotlightItems.map((community) => (
+                  <button key={community.id} type="button" onClick={() => openCommunity(community.id)}>
+                    <img src={community.thumbnailUrl || EMPTY_IMAGE} alt="" />
+                    <span>{communityTypeLabel(community.communityType)}</span>
+                    <strong>{community.name}</strong>
+                    <small>{community.memberIds.includes(activeUserId) ? 'Open' : 'Join'} / {community.memberIds.length}人</small>
+                  </button>
+                ))}
+              </div>
             </section>
             <div className={styles.searchBox}>
               <Search size={18} />
@@ -3434,7 +3758,6 @@ export default function CommunityMapPrototype() {
           onDeletePin={deletePin}
           onSavePin={saveExternalPin}
           showPanelsToggle={false}
-          showSearch={false}
           onMapClick={manualPlacement ? confirmManualLocation : undefined}
           overlay={(
             <>
@@ -4261,7 +4584,10 @@ function CommunityListSection({
               <strong>{communityLabel(community)}</strong>
               <h2>{community.name}</h2>
               <p>{community.description}</p>
+              <span><MapIcon size={15} /> {communityTypeLabel(community.communityType)}</span>
+              <span><ShieldCheck size={15} /> {communityPolicyLabel(community.postPolicy, community.minContributionLevel)}</span>
               <span><Users size={15} /> {community.memberIds.length}人</span>
+              {community.isPaid && <span>{community.priceYen ? `¥${community.priceYen}` : '有料'}</span>}
               {community.privacy === 'limited' && <span><Lock size={15} /> 限定公開</span>}
               {community.inviteCode && <small>招待リンク: /invite/{community.inviteCode}</small>}
             </div>
@@ -4892,9 +5218,12 @@ function SplitMapView({
   const [focusedPinId, setFocusedPinId] = useState<string | null>(null)
   const [internalPanelsHidden, setInternalPanelsHidden] = useState(false)
   const [mapSearch, setMapSearch] = useState('')
+  const [placeSearchSuggestions, setPlaceSearchSuggestions] = useState<MapboxSearchSuggestion[]>([])
+  const [placeSearchLoading, setPlaceSearchLoading] = useState(false)
   const [flyToCoordinates, setFlyToCoordinates] = useState<Coordinates | null>(null)
   const [expandedStoryPinId, setExpandedStoryPinId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const searchSessionTokenRef = useRef(createSearchSessionToken())
   const listInteractionRef = useRef(false)
   const listInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listCollapsed = onPanelsHiddenChange ? panelsHidden : internalPanelsHidden
@@ -4987,7 +5316,35 @@ function SplitMapView({
     onPinClick(pinId)
   }, [onPinClick])
 
-  const searchSuggestions = useMemo(() => {
+  useEffect(() => {
+    const query = mapSearch.trim()
+    if (!showSearch || query.length < 2) {
+      setPlaceSearchSuggestions([])
+      setPlaceSearchLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setPlaceSearchLoading(true)
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions = await fetchMapboxSearchSuggestions(query, searchSessionTokenRef.current)
+        if (!cancelled) setPlaceSearchSuggestions(suggestions)
+      } catch (error) {
+        if (!cancelled) setPlaceSearchSuggestions([])
+        console.warn('Mapbox Search Box候補を取得できませんでした。', error)
+      } finally {
+        if (!cancelled) setPlaceSearchLoading(false)
+      }
+    }, 220)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [mapSearch, showSearch])
+
+  const pinSearchSuggestions = useMemo(() => {
     const query = mapSearch.trim().toLowerCase()
     if (!query) return []
     return pins
@@ -4995,15 +5352,28 @@ function SplitMapView({
       .slice(0, 5)
   }, [mapSearch, pins])
 
+  const selectPlaceSuggestion = useCallback(async (suggestion: MapboxSearchSuggestion) => {
+    setMapSearch(suggestion.name)
+    const coordinates = suggestion.coordinates ?? await retrieveMapboxSearchSuggestion(suggestion.mapboxId, searchSessionTokenRef.current)
+    if (coordinates) setFlyToCoordinates(coordinates)
+    setPlaceSearchSuggestions([])
+  }, [])
+
   const submitMapSearch = useCallback(async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
     const query = mapSearch.trim()
     if (!query) return
 
-    const matchedPin = searchSuggestions[0]
+    const matchedPin = pinSearchSuggestions[0]
     if (matchedPin) {
       setFocusedPinId(matchedPin.id)
       onListFocus?.(matchedPin.id)
+      return
+    }
+
+    const matchedPlace = placeSearchSuggestions[0]
+    if (matchedPlace) {
+      await selectPlaceSuggestion(matchedPlace)
       return
     }
 
@@ -5020,7 +5390,7 @@ function SplitMapView({
     } catch (error) {
       console.warn('地名検索に失敗しました。', error)
     }
-  }, [mapSearch, onListFocus, searchSuggestions])
+  }, [mapSearch, onListFocus, pinSearchSuggestions, placeSearchSuggestions, selectPlaceSuggestion])
 
   const moveToCurrentLocation = useCallback(() => {
     if (currentLocation) {
@@ -5063,9 +5433,9 @@ function SplitMapView({
             <form className={styles.mapSearchBox} onSubmit={submitMapSearch}>
               <Search size={17} />
               <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="場所、pinを検索" />
-              {searchSuggestions.length > 0 && (
+              {(pinSearchSuggestions.length > 0 || placeSearchSuggestions.length > 0 || placeSearchLoading) && (
                 <div className={styles.mapSearchSuggestions}>
-                  {searchSuggestions.map((pin) => (
+                  {pinSearchSuggestions.map((pin) => (
                     <button
                       key={pin.id}
                       type="button"
@@ -5079,6 +5449,16 @@ function SplitMapView({
                       <span>{pin.title}</span>
                     </button>
                   ))}
+                  {placeSearchSuggestions.map((suggestion) => (
+                    <button key={suggestion.id} type="button" onClick={() => void selectPlaceSuggestion(suggestion)}>
+                      <span className={styles.placeSuggestionIcon}><MapIcon size={17} /></span>
+                      <span>
+                        <strong>{suggestion.name}</strong>
+                        {suggestion.secondary && <small>{suggestion.secondary}</small>}
+                      </span>
+                    </button>
+                  ))}
+                  {placeSearchLoading && <p>Mapboxで検索中...</p>}
                 </div>
               )}
             </form>

@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     recentUsers,
     events,
     recommendItems,
+    communityHierarchy,
   ] = await Promise.all([
     safeQuery(client.from('profiles').select('id', { count: 'exact', head: true })),
     safeQuery(client.from('posts').select('id', { count: 'exact', head: true })),
@@ -91,6 +92,14 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(100),
     ),
+    safeQuery(
+      client
+        .from('admin_community_hierarchy')
+        .select('*')
+        .order('community_name', { ascending: true })
+        .order('contribution_level', { ascending: false })
+        .limit(500),
+    ),
   ])
 
   const eventRows = Array.isArray(events.data) ? events.data as Array<{ user_id: string; event_type: string }> : []
@@ -123,6 +132,7 @@ export async function GET(request: NextRequest) {
     recentFolders: recentFolders.data ?? [],
     recentCommunities: recentCommunities.data ?? [],
     recentUsers: recentUsers.data ?? [],
+    communityHierarchy: communityHierarchy.data ?? [],
     events: eventRows,
     eventStats,
     recommendItems: recommendItems.data ?? [],
@@ -144,6 +154,7 @@ export async function GET(request: NextRequest) {
       recentUsers,
       events,
       recommendItems,
+      communityHierarchy,
     ]
       .filter((item) => item.error)
       .map((item) => item.error),
