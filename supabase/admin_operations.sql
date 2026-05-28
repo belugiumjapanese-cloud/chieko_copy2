@@ -123,6 +123,51 @@ for select
 to authenticated
 using (exists (select 1 from public.admin_users a where a.user_id = auth.uid()));
 
+-- Keep this admin script safe even if app_support_after_full_schema.sql
+-- has not been rerun yet.
+alter table if exists public.communities
+  add column if not exists community_type text not null default 'open',
+  add column if not exists post_policy text not null default 'open',
+  add column if not exists approval_required boolean not null default false,
+  add column if not exists min_contribution_level integer not null default 0,
+  add column if not exists is_paid boolean not null default false,
+  add column if not exists price_yen integer;
+
+do $$
+begin
+  if to_regclass('public.communities') is not null then
+    alter table public.communities drop constraint if exists communities_community_type_check;
+    alter table public.communities add constraint communities_community_type_check
+      check (community_type in ('open', 'approval', 'private', 'paid'));
+
+    alter table public.communities drop constraint if exists communities_post_policy_check;
+    alter table public.communities add constraint communities_post_policy_check
+      check (post_policy in ('open', 'approval', 'contribution', 'owner'));
+
+    alter table public.communities drop constraint if exists communities_min_contribution_level_check;
+    alter table public.communities add constraint communities_min_contribution_level_check
+      check (min_contribution_level between 0 and 2);
+  end if;
+end $$;
+
+alter table if exists public.community_members
+  add column if not exists contribution_level integer not null default 0,
+  add column if not exists approved_posts_count integer not null default 0,
+  add column if not exists status text not null default 'active';
+
+do $$
+begin
+  if to_regclass('public.community_members') is not null then
+    alter table public.community_members drop constraint if exists community_members_contribution_level_check;
+    alter table public.community_members add constraint community_members_contribution_level_check
+      check (contribution_level between 0 and 2);
+
+    alter table public.community_members drop constraint if exists community_members_status_check;
+    alter table public.community_members add constraint community_members_status_check
+      check (status in ('active', 'pending', 'editor_candidate', 'suspended'));
+  end if;
+end $$;
+
 drop view if exists public.admin_community_hierarchy;
 create view public.admin_community_hierarchy
 with (security_invoker = true)
