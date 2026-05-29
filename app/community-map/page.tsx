@@ -1316,7 +1316,7 @@ function PinMap({
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v11',
+      style: 'mapbox://styles/belgium-jap/cmp8riesh001j01sngrwfbdsz',
       center: initialMapViewRef.current?.center ?? DEFAULT_CENTER,
       zoom: initialMapViewRef.current?.zoom ?? (compact ? 2 : 11),
     })

@@ -15,7 +15,7 @@ export default function BasicMapPage() {
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v11',
+      style: 'mapbox://styles/belgium-jap/cmp8riesh001j01sngrwfbdsz',
       center: [139.7, 35.6],
       zoom: 10,
     })
