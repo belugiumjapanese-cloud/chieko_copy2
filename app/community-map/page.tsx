@@ -41,9 +41,41 @@ mapboxgl.accessToken = MAPBOX_TOKEN
 const PRODUCTION_SITE_URL = 'https://map-omega-nine.vercel.app'
 const CONFIGURED_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
 const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
+const CACHE_VERSION = 1
+const CACHE_PREFIX = 'spot-map:swr-cache'
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const EMPTY_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23dfe8e2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23126b58%22%20opacity%3D%22.35%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23126b58%22%20opacity%3D%22.3%22/%3E%3C/svg%3E'
+const EMBEDDED_RECOMMEND_ITEMS: RecommendItem[] = [
+  {
+    id: 'embedded-event-architecture-walk',
+    item_type: 'event',
+    title: '週末に歩きたい建築と街のイベント',
+    description: '公式ピックアップ',
+    image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=80',
+    target_url: null,
+    folder_id: null,
+    post_id: null,
+    community_id: null,
+    priority: 1,
+    is_published: true,
+    created_at: '2026-05-01T00:00:00.000Z',
+  },
+  {
+    id: 'embedded-community-city-details',
+    item_type: 'announcement',
+    title: '街の細部を集めるCommunity',
+    description: 'マンホール、看板、階段、ドアノブなどの公開mapを育てる場所。',
+    image_url: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1100&q=80',
+    target_url: null,
+    folder_id: null,
+    post_id: null,
+    community_id: null,
+    priority: 2,
+    is_published: true,
+    created_at: '2026-05-01T00:00:00.000Z',
+  },
+]
 const COMMUNITY_PRESETS: Array<{
   type: CommunityMapKind
   title: string
@@ -263,6 +295,20 @@ type RecommendItem = {
   priority: number | null
   is_published: boolean | null
   created_at: string
+}
+
+type CachedRemoteSnapshot = {
+  version: number
+  userId: string
+  savedAt: string
+  users: DemoUser[]
+  pins: Pin[]
+  folders: Folder[]
+  communities: Community[]
+  activities: CommunityActivity[]
+  notifications: NotificationItem[]
+  recommendItems: RecommendItem[]
+  savedPinIds: string[]
 }
 
 type ProfileRow = {
@@ -830,6 +876,61 @@ function uniqueRowsById<T extends { id: string }>(rows: T[]) {
 
 function resultError(result: { error: { message: string } | null }) {
   return result.error?.message ?? ''
+}
+
+function cacheKeyForUser(userId: string) {
+  return `${CACHE_PREFIX}:user:${userId}:v${CACHE_VERSION}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function normalizeCachedSnapshot(value: unknown, userId: string): CachedRemoteSnapshot | null {
+  if (!isRecord(value) || value.version !== CACHE_VERSION || value.userId !== userId) return null
+
+  return {
+    version: CACHE_VERSION,
+    userId,
+    savedAt: typeof value.savedAt === 'string' ? value.savedAt : new Date().toISOString(),
+    users: Array.isArray(value.users) ? value.users as DemoUser[] : [],
+    pins: Array.isArray(value.pins) ? value.pins as Pin[] : [],
+    folders: Array.isArray(value.folders) ? value.folders as Folder[] : [],
+    communities: Array.isArray(value.communities) ? value.communities as Community[] : [],
+    activities: Array.isArray(value.activities) ? value.activities as CommunityActivity[] : [],
+    notifications: Array.isArray(value.notifications) ? value.notifications as NotificationItem[] : [],
+    recommendItems: Array.isArray(value.recommendItems) ? value.recommendItems as RecommendItem[] : [],
+    savedPinIds: Array.isArray(value.savedPinIds) ? value.savedPinIds.filter((item): item is string => typeof item === 'string') : [],
+  }
+}
+
+function loadCachedSnapshot(userId: string) {
+  if (typeof window === 'undefined' || !userId) return null
+  try {
+    const raw = window.localStorage.getItem(cacheKeyForUser(userId))
+    return raw ? normalizeCachedSnapshot(JSON.parse(raw), userId) : null
+  } catch (error) {
+    console.warn('端末キャッシュを読み込めませんでした。', error)
+    return null
+  }
+}
+
+function saveCachedSnapshot(snapshot: CachedRemoteSnapshot) {
+  if (typeof window === 'undefined' || !snapshot.userId) return
+  try {
+    window.localStorage.setItem(cacheKeyForUser(snapshot.userId), JSON.stringify(snapshot))
+  } catch (error) {
+    console.warn('端末キャッシュを保存できませんでした。', error)
+  }
+}
+
+function clearCachedSnapshot(userId: string) {
+  if (typeof window === 'undefined' || !userId) return
+  try {
+    window.localStorage.removeItem(cacheKeyForUser(userId))
+  } catch (error) {
+    console.warn('端末キャッシュを削除できませんでした。', error)
+  }
 }
 
 function directFoldersToCards(rows: DirectFolderRow[]): AppFolderCardRow[] {
@@ -1404,7 +1505,7 @@ export default function CommunityMapPrototype() {
   const [pins, setPins] = useState<Pin[]>([])
   const [activities, setActivities] = useState<CommunityActivity[]>([])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [recommendItems, setRecommendItems] = useState<RecommendItem[]>([])
+  const [recommendItems, setRecommendItems] = useState<RecommendItem[]>(EMBEDDED_RECOMMEND_ITEMS)
   const [folders, setFolders] = useState<Folder[]>([])
   const [savedPinIds, setSavedPinIds] = useState<string[]>([])
   const [seenPinIds, setSeenPinIds] = useState<string[]>([])
@@ -1610,6 +1711,28 @@ export default function CommunityMapPrototype() {
     if (!readNotificationStorageKey || typeof window === 'undefined') return
     window.localStorage.setItem(readNotificationStorageKey, JSON.stringify(readNotificationIds.slice(-200)))
   }, [readNotificationIds, readNotificationStorageKey])
+
+  const hydrateFromCache = useCallback((userId: string) => {
+    const cached = loadCachedSnapshot(userId)
+    if (!cached) return false
+
+    const cachedUsers = cached.users.some((user) => user.id === userId)
+      ? cached.users
+      : [accountFallbackUser(userId), ...cached.users]
+    setUsers((current) => mergeById(current.filter((user) => user.id !== AUTH_PLACEHOLDER_USER.id), cachedUsers))
+    setOwnedAccountIds([userId])
+    setProfileUserId((current) => current || userId)
+    setPins(cached.pins)
+    setFolders(cached.folders)
+    setCommunities(cached.communities)
+    setActivities(cached.activities)
+    setNotifications(cached.notifications)
+    setRecommendItems(cached.recommendItems.length ? cached.recommendItems : EMBEDDED_RECOMMEND_ITEMS)
+    setSavedPinIds(cached.savedPinIds)
+    setRemoteLoading(false)
+    setRemoteError('')
+    return true
+  }, [])
 
   const tagStats = useMemo(() => tagStatsFromPins(pins), [pins])
   const activeTagQuery = activeHashtagQuery(postComposer.tags)
@@ -1897,12 +2020,13 @@ export default function CommunityMapPrototype() {
         ? recommendResult.data
         : []) as RecommendItem[]
       if (recommendResult.error) console.warn(recommendResult.error.message)
+      const nextRecommendItems = remoteRecommendItems.length ? remoteRecommendItems : EMBEDDED_RECOMMEND_ITEMS
 
       const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
       const remoteCommunities = buildCommunities(communityRows, memberRows, userId)
       setFolders(remoteFolders)
       setCommunities(remoteCommunities)
-      setRecommendItems(remoteRecommendItems)
+      setRecommendItems(nextRecommendItems)
 
       const [
         postsResult,
@@ -1968,9 +2092,8 @@ export default function CommunityMapPrototype() {
         }
       }
 
-      setPins(remotePins)
-      setActivities(buildActivities((activitiesResult.error ? [] : activitiesResult.data ?? []) as AppCommunityActivityRow[]))
-      setNotifications(buildNotifications(
+      const remoteActivities = buildActivities((activitiesResult.error ? [] : activitiesResult.data ?? []) as AppCommunityActivityRow[])
+      const remoteNotifications = buildNotifications(
         (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
         folderLikeNotificationRows,
         saveNotificationRows,
@@ -1979,8 +2102,26 @@ export default function CommunityMapPrototype() {
         remoteFolders,
         remoteCommunities,
         userId,
-      ))
-      setSavedPinIds(((savedPostsResult.error ? [] : savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id))
+      )
+      const remoteSavedPinIds = ((savedPostsResult.error ? [] : savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id)
+
+      setPins(remotePins)
+      setActivities(remoteActivities)
+      setNotifications(remoteNotifications)
+      setSavedPinIds(remoteSavedPinIds)
+      saveCachedSnapshot({
+        version: CACHE_VERSION,
+        userId,
+        savedAt: new Date().toISOString(),
+        users: remoteUsers,
+        pins: remotePins,
+        folders: remoteFolders,
+        communities: remoteCommunities,
+        activities: remoteActivities,
+        notifications: remoteNotifications,
+        recommendItems: nextRecommendItems,
+        savedPinIds: remoteSavedPinIds,
+      })
     } catch (error) {
       console.error(error)
       setRemoteError(getErrorMessage(error, 'Supabaseからデータを取得できませんでした。'))
@@ -2021,6 +2162,7 @@ export default function CommunityMapPrototype() {
         setRemoteLoading(false)
         return
       }
+      hydrateFromCache(userId)
       await ensureProfileForAuthUser(client, user)
       await loadPriorityRemoteData(userId)
       void loadRemoteData(userId)
@@ -2042,6 +2184,7 @@ export default function CommunityMapPrototype() {
         setRemoteLoading(false)
         return
       }
+      hydrateFromCache(userId)
       void ensureProfileForAuthUser(client, user)
         .then(async () => {
           await loadPriorityRemoteData(userId)
@@ -2058,7 +2201,7 @@ export default function CommunityMapPrototype() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [loadPriorityRemoteData, loadRemoteData])
+  }, [hydrateFromCache, loadPriorityRemoteData, loadRemoteData])
 
   const ownedAccounts = ownedAccountIds.map((id) => usersById.get(id)).filter((user): user is DemoUser => Boolean(user))
 
@@ -2110,6 +2253,20 @@ export default function CommunityMapPrototype() {
     setAuthUsername('')
     setAuthError('')
   }, [])
+
+  const signOut = useCallback(() => {
+    if (activeUserId) clearCachedSnapshot(activeUserId)
+    setUsers([])
+    setPins([])
+    setFolders([])
+    setCommunities([])
+    setActivities([])
+    setNotifications([])
+    setSavedPinIds([])
+    setRecommendItems(EMBEDDED_RECOMMEND_ITEMS)
+    setRemoteError('')
+    void supabase?.auth.signOut()
+  }, [activeUserId])
 
   const requireSignedIn = useCallback(() => {
     if (!supabase) {
@@ -3324,38 +3481,7 @@ export default function CommunityMapPrototype() {
     return `@${owner?.username ?? 'user'} / ${communityLabel(communitiesById.get(pinCommunityIds(pin)[0] ?? ''))}`
   }, [communitiesById, usersById])
 
-  const recommendHeroItems = recommendItems.length
-    ? recommendItems
-    : [
-        {
-          id: 'fallback-event',
-          item_type: 'event',
-          title: '週末に歩きたい建築と街のイベント',
-          description: '公式ピックアップ',
-          image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=80',
-          target_url: null,
-          folder_id: null,
-          post_id: null,
-          community_id: null,
-          priority: 1,
-          is_published: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 'fallback-folder',
-          item_type: 'folder_pick',
-          title: 'いま保存されている公開フォルダー',
-          description: `${publicFindFolders.length} folders`,
-          image_url: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1100&q=80',
-          target_url: null,
-          folder_id: null,
-          post_id: null,
-          community_id: null,
-          priority: 2,
-          is_published: true,
-          created_at: new Date().toISOString(),
-        },
-      ]
+  const recommendHeroItems = recommendItems.length ? recommendItems : EMBEDDED_RECOMMEND_ITEMS
   const recommendedFolderItems = recommendItems.filter((item) => item.folder_id && ['folder_pick', 'official_folder'].includes(item.item_type))
   const recommendedCommunityItems = recommendItems.filter((item) => item.community_id && item.item_type === 'community_pick')
   const recommendedFoldersFromAdmin = uniqueFoldersById(
@@ -3976,7 +4102,7 @@ export default function CommunityMapPrototype() {
                 {profileMenuOpen && (
                   <div className={styles.profileMenu}>
                     <button type="button" onClick={() => { setAccountCreatorOpen(true); setProfileMenuOpen(false) }}>Account create</button>
-                    <button type="button" onClick={() => supabase?.auth.signOut()}>Sign out</button>
+                    <button type="button" onClick={signOut}>Sign out</button>
                   </div>
                 )}
               </div>
