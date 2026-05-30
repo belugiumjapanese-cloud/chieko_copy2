@@ -11,7 +11,9 @@ import {
   EyeOff,
   Folder,
   FolderPlus,
+  Grid2X2,
   Heart,
+  List,
   LocateFixed,
   Lock,
   Map as MapIcon,
@@ -27,7 +29,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, FormEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getGpsFromImage } from '../../lib/exif'
 import { getDisplayImage } from '../../lib/image'
 import { createId } from '../../lib/storage'
@@ -1474,6 +1476,7 @@ function PinMap({
 export default function CommunityMapPrototype() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('myworld')
   const [findCommunityOpen, setFindCommunityOpen] = useState(false)
+  const [communityBrowseTab, setCommunityBrowseTab] = useState<'discover' | 'limited' | 'joined'>('discover')
   const [selectedFindFolderId, setSelectedFindFolderId] = useState<string | null>(null)
   const [toVisitMode, setToVisitMode] = useState<LibraryMode>('folder')
   const [dropScopeId, setDropScopeId] = useState('follow')
@@ -1674,6 +1677,11 @@ export default function CommunityMapPrototype() {
     const query = communityQuery.trim().toLowerCase()
     if (!query) return true
     return `${community.slug} ${community.name} ${community.description}`.toLowerCase().includes(query)
+  })
+  const browsedCommunities = filteredCommunities.filter((community) => {
+    if (communityBrowseTab === 'joined') return community.memberIds.includes(activeUserId)
+    if (communityBrowseTab === 'limited') return community.privacy !== 'public'
+    return true
   })
 
   const publicFindFolders = useMemo(() => {
@@ -3699,28 +3707,28 @@ export default function CommunityMapPrototype() {
             onPost={() => openPostPicker(selectedCommunity.id)}
           />
         ) : findCommunityOpen ? (
-          <section className={styles.page}>
+          <section className={`${styles.page} ${styles.communityBrowsePage}`}>
             <header className={styles.pageHeaderRow}>
               <div>
                 <span>Find</span>
-                <h1>Join Community</h1>
+                <h1>コミュニティ</h1>
               </div>
               <button className={styles.ghostButton} type="button" onClick={() => setFindCommunityOpen(false)}>
                 <ArrowLeft size={17} />
                 戻る
               </button>
             </header>
-            <div className={styles.sectionHeadingRow}>
-              <div>
-                <h2>Community</h2>
-                <p>貯めた自分のピンを、ここからコミュニティに共有できます。</p>
-              </div>
-              <button className={styles.primaryButton} type="button" onClick={() => setCreateCommunityOpen(true)}>作成</button>
+            <div className={styles.communityBrowseTabs}>
+              <button className={communityBrowseTab === 'discover' ? styles.active : ''} type="button" onClick={() => setCommunityBrowseTab('discover')}>見つける</button>
+              <button className={communityBrowseTab === 'limited' ? styles.active : ''} type="button" onClick={() => setCommunityBrowseTab('limited')}>限定公開</button>
+              <button className={communityBrowseTab === 'joined' ? styles.active : ''} type="button" onClick={() => setCommunityBrowseTab('joined')}>参加中</button>
             </div>
-            <div className={styles.searchBox}>
-              <Search size={18} />
-              <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="建築、映画、友達の旅 などで検索" />
-              <button type="button">検索</button>
+            <div className={styles.communityBrowseTools}>
+              <label className={styles.searchBox}>
+                <Search size={18} />
+                <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="コミュニティを検索" />
+              </label>
+              <button className={styles.primaryButton} type="button" onClick={() => setCreateCommunityOpen(true)}>作成</button>
             </div>
             {createCommunityOpen && (
               <form className={styles.createPanel} onSubmit={createCommunity}>
@@ -3790,18 +3798,8 @@ export default function CommunityMapPrototype() {
               </form>
             )}
             <CommunityListSection
-              title="関係ありそうなコミュニティ"
-              communities={filteredCommunities.filter((community) => recommendedCommunities.some((item) => item.id === community.id))}
-              currentUserId={activeUserId}
-              onOpen={openCommunity}
-              onShare={(communityId) => {
-                setInviteCommunityId(communityId)
-                setInviteQuery('')
-              }}
-            />
-            <CommunityListSection
-              title="所属しているコミュニティ"
-              communities={filteredCommunities.filter((community) => community.memberIds.includes(activeUserId))}
+              title={communityBrowseTab === 'joined' ? '参加中' : communityBrowseTab === 'limited' ? '限定公開' : '見つける'}
+              communities={browsedCommunities}
               currentUserId={activeUserId}
               onOpen={openCommunity}
               onShare={(communityId) => {
@@ -3814,30 +3812,29 @@ export default function CommunityMapPrototype() {
           <FindFolderDetail
             folder={selectedFindFolder}
             pinsById={pinsById}
+            owner={usersById.get(selectedFindFolder.ownerId)}
             onBack={() => setSelectedFindFolderId(null)}
             onOpenPin={setSelectedPinId}
+            onAddPinToFolder={setFolderEditorPinId}
             onToggleLike={toggleFolderLike}
           />
         ) : (
           <section className={styles.page}>
-            <header className={styles.pageHeader}>
-              <span>Find</span>
-              <h1>公開フォルダーとコミュニティを探す</h1>
+            <header className={styles.findSimpleHeader}>
+              <h1>Find</h1>
             </header>
             <section className={styles.communitySpotlight}>
               <div className={styles.communitySpotlightHeader}>
                 <div>
-                  <span>Community</span>
-                  <h2>みんなで地図を作る場所</h2>
-                  <p>公開map、承認制の専門map、仲間内のprivate map、有料mapをここから探して参加できます。</p>
+                  <h2>Community</h2>
                 </div>
                 <button className={styles.primaryButton} type="button" onClick={() => { setSelectedFindFolderId(null); setFindCommunityOpen(true) }}>
-                  Search community
+                  Open
                 </button>
               </div>
               <label className={styles.communitySearchInline}>
                 <Search size={17} />
-                <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="建築、マンホール、旅行、友達のmap" />
+                <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="Community search" />
                 <button type="button" onClick={() => setFindCommunityOpen(true)}>Open</button>
               </label>
               <div className={styles.communitySpotlightGrid}>
@@ -4577,6 +4574,48 @@ export default function CommunityMapPrototype() {
   )
 }
 
+function folderStats(folder: Folder, pinsById: Map<string, Pin>) {
+  const folderPins = folder.pinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin))
+  return {
+    likes: folder.likes,
+    comments: folderPins.reduce((sum, pin) => sum + pin.comments.length, 0),
+    saves: folderPins.reduce((sum, pin) => sum + pin.saves, 0),
+  }
+}
+
+function FolderMetricBar({
+  folder,
+  pinsById,
+  onToggleLike,
+}: {
+  folder: Folder
+  pinsById: Map<string, Pin>
+  onToggleLike: (folderId: string) => void
+}) {
+  const stats = folderStats(folder, pinsById)
+  return (
+    <div className={styles.folderMetricBar}>
+      <button
+        className={folder.likedByMe ? styles.liked : ''}
+        type="button"
+        aria-label="folderにいいね"
+        onClick={() => onToggleLike(folder.id)}
+      >
+        <Heart size={18} />
+        <span>{stats.likes}</span>
+      </button>
+      <span>
+        <MessageCircle size={18} />
+        <b>{stats.comments}</b>
+      </span>
+      <span>
+        <BookmarkPlus size={18} />
+        <b>{stats.saves}</b>
+      </span>
+    </div>
+  )
+}
+
 function FolderShelf({
   title,
   folders,
@@ -4603,14 +4642,7 @@ function FolderShelf({
                 <strong>{folder.name}</strong>
                 <small>{folder.pinIds.length} pins / public folder</small>
               </button>
-              <button
-                className={`${styles.folderLikeButton} ${folder.likedByMe ? styles.liked : ''}`}
-                type="button"
-                onClick={() => onToggleLike(folder.id)}
-              >
-                <Heart size={16} />
-                {folder.likes}
-              </button>
+              <FolderMetricBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} />
             </article>
           )
         })}
@@ -4623,63 +4655,105 @@ function FolderShelf({
 function FindFolderDetail({
   folder,
   pinsById,
+  owner,
   onBack,
   onOpenPin,
+  onAddPinToFolder,
   onToggleLike,
 }: {
   folder: Folder
   pinsById: Map<string, Pin>
+  owner?: DemoUser
   onBack: () => void
   onOpenPin: (pinId: string) => void
+  onAddPinToFolder: (pinId: string) => void
   onToggleLike: (folderId: string) => void
 }) {
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const folderPins = uniquePinsByMemory(folder.pinIds.map((id) => pinsById.get(id)).filter((pin): pin is Pin => Boolean(pin)))
+  const preview = folder.thumbnailUrl || folderPins[0]?.imageUrl || EMPTY_IMAGE
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+    holdTimerRef.current = null
+  }, [])
+  const startAddGesture = useCallback((pinId: string) => {
+    clearHoldTimer()
+    holdTimerRef.current = setTimeout(() => {
+      onAddPinToFolder(pinId)
+      holdTimerRef.current = null
+    }, 520)
+  }, [clearHoldTimer, onAddPinToFolder])
+
+  useEffect(() => clearHoldTimer, [clearHoldTimer])
+
+  const handleContextAdd = useCallback((event: MouseEvent, pinId: string) => {
+    event.preventDefault()
+    clearHoldTimer()
+    onAddPinToFolder(pinId)
+  }, [clearHoldTimer, onAddPinToFolder])
+
+  const renderPinItem = (pin: Pin) => {
+    const addHandlers = {
+      onContextMenu: (event: MouseEvent) => handleContextAdd(event, pin.id),
+      onPointerDown: () => startAddGesture(pin.id),
+      onPointerUp: clearHoldTimer,
+      onPointerLeave: clearHoldTimer,
+      onPointerCancel: clearHoldTimer,
+    }
+
+    if (viewMode === 'list') {
+      return (
+        <button key={pin.id} className={styles.findFolderListItem} type="button" onClick={() => onOpenPin(pin.id)} {...addHandlers}>
+          <img src={pin.imageUrl} alt="" />
+          <div>
+            <strong>{pin.title}</strong>
+            <small>{pin.description || pin.tags.map((tag) => `#${tag}`).join(' ') || '説明文なし'}</small>
+          </div>
+        </button>
+      )
+    }
+
+    return (
+      <button key={pin.id} className={styles.findFolderGridItem} type="button" onClick={() => onOpenPin(pin.id)} {...addHandlers}>
+        <img src={pin.imageUrl} alt="" />
+      </button>
+    )
+  }
 
   return (
-    <section className={styles.page}>
-      <header className={styles.pageHeaderRow}>
-        <div>
-          <span>Find / Folder</span>
-          <h1>{folder.name}</h1>
-          <p>{folder.description || `${folderPins.length} pins`}</p>
-        </div>
-        <button className={styles.ghostButton} type="button" onClick={onBack}>
-          <ArrowLeft size={17} />
-          戻る
+    <section className={`${styles.page} ${styles.findFolderDetailPage}`}>
+      <header className={styles.findFolderDetailTop}>
+        <button className={styles.iconGhostButton} type="button" onClick={onBack} aria-label="戻る">
+          <ArrowLeft size={20} />
         </button>
-      </header>
-      <div className={styles.findFolderHero}>
-        {folder.thumbnailUrl || folderPins[0]?.imageUrl ? (
-          <img src={folder.thumbnailUrl || folderPins[0]?.imageUrl} alt="" />
-        ) : (
-          <span style={{ backgroundColor: folder.color }} />
-        )}
         <div>
-          <strong>{folderPins.length} pins</strong>
-          <small>{folder.isPaid ? 'Paid public folder' : 'Public folder'}</small>
+          <h1>{folder.name}</h1>
+          {owner && <button className={styles.authorLink} type="button">@{owner.username}</button>}
         </div>
-        <button
-          className={`${styles.folderLikeButton} ${folder.likedByMe ? styles.liked : ''}`}
-          type="button"
-          onClick={() => onToggleLike(folder.id)}
-        >
-          <Heart size={16} />
-          {folder.likes}
+      </header>
+      <PinMap pins={folderPins} selectedPinId={null} onPinClick={onOpenPin} compact />
+      <FolderMetricBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} />
+      <div className={styles.findFolderSummary}>
+        <img src={preview} alt="" />
+        <div>
+          <strong>{folder.pinIds.length} pins / {folder.isPaid ? 'paid public folder' : 'public folder'}</strong>
+          <p>{folder.description || 'Description'}</p>
+        </div>
+      </div>
+      <div className={styles.findFolderViewSwitch}>
+        <button className={viewMode === 'grid' ? styles.active : ''} type="button" onClick={() => setViewMode('grid')} aria-label="grid表示">
+          <Grid2X2 size={25} />
+        </button>
+        <button className={viewMode === 'list' ? styles.active : ''} type="button" onClick={() => setViewMode('list')} aria-label="list表示">
+          <List size={27} />
         </button>
       </div>
-      <div className={styles.findFolderPinList}>
-        {folderPins.map((pin, index) => (
-          <button key={pin.id} type="button" onClick={() => onOpenPin(pin.id)}>
-            <span>{index + 1}</span>
-            <img src={pin.imageUrl} alt="" />
-            <div>
-              <strong>{pin.title}</strong>
-              <small>{pin.description || pin.tags.map((tag) => `#${tag}`).join(' ') || '説明文なし'}</small>
-            </div>
-          </button>
-        ))}
+      <div className={viewMode === 'grid' ? styles.findFolderPinGrid : styles.findFolderPinListMode}>
+        {folderPins.map(renderPinItem)}
         {!folderPins.length && <p className={styles.muted}>このfolderには表示できるpinがありません。</p>}
       </div>
+      <p className={styles.gestureHint}>長押し、または右クリックで自分のfolderに追加できます。</p>
     </section>
   )
 }
@@ -5318,6 +5392,7 @@ function SplitMapView({
   onSavePin,
   showPanelsToggle = true,
   showSearch = true,
+  embedded = false,
   overlay,
   floatingAction,
 }: {
@@ -5337,6 +5412,7 @@ function SplitMapView({
   onSavePin?: (pin: Pin) => void
   showPanelsToggle?: boolean
   showSearch?: boolean
+  embedded?: boolean
   overlay?: ReactNode
   floatingAction?: ReactNode
 }) {
@@ -5536,7 +5612,7 @@ function SplitMapView({
   }, [currentLocation])
 
   return (
-    <section className={`${styles.mapPage} ${listCollapsed ? styles.mapPageListCollapsed : ''}`}>
+    <section className={`${styles.mapPage} ${embedded ? styles.mapPageEmbedded : ''} ${listCollapsed ? styles.mapPageListCollapsed : ''}`}>
       <div className={styles.splitMap}>
         <div className={styles.splitMapPane}>
           <PinMap
@@ -5778,36 +5854,52 @@ function CommunityMapView({
   }
 
   return (
-    <SplitMapView
-      pins={pins}
-      selectedPinId={selectedPinId}
-      onPinClick={onPinClick}
-      onListFocus={onListFocus}
-      getPinMeta={getPinMeta}
-      onMapClick={onMapClick}
-      onMapSurfaceClick={onMapSurfaceClick}
-      overlay={(
-        <>
-          <div className={styles.communityMapActions}>
-            <button type="button" onClick={onBack}><ArrowLeft size={18} /></button>
-            <button type="button" onClick={onToggleTimeline}>Timeline</button>
-            {canEditThumbnail && <button type="button" onClick={onEditThumbnail}>Thumb</button>}
-          </div>
-          {manualPlacement && (
-            <div className={styles.placementBanner}>
-              map上で投稿位置をクリックしてください。
-            </div>
-          )}
-          {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
-        </>
-      )}
-      floatingAction={(
-        <button className={styles.communityPostButton} type="button" onClick={onPost}>
-          <Plus size={24} />
+    <section className={styles.communityDetailPage}>
+      <header className={styles.communityDetailHero}>
+        <button className={styles.iconGhostButton} type="button" onClick={onBack} aria-label="戻る"><ArrowLeft size={20} /></button>
+        <div className={styles.communityDetailCover}>
+          {community.thumbnailUrl ? <img src={community.thumbnailUrl} alt="" /> : <span>{community.name.slice(0, 1)}</span>}
+        </div>
+        <div className={styles.communityDetailInfo}>
+          <small>{communityTypeLabel(community.communityType)} / {communityPolicyLabel(community.postPolicy, community.minContributionLevel)}</small>
+          <h1>{community.name}</h1>
+          <p>{community.description || 'Community map'}</p>
+          <span><Users size={16} /> {community.memberIds.length} members / {pins.length} pins</span>
+        </div>
+        <button className={styles.primaryButton} type="button" onClick={onPost}>
+          <Plus size={18} />
           投稿
         </button>
-      )}
-    />
+      </header>
+      <div className={styles.communityDetailTabs}>
+        <button className={styles.active} type="button">Map</button>
+        <button type="button" onClick={onToggleTimeline}>Timeline</button>
+        {canEditThumbnail && <button type="button" onClick={onEditThumbnail}>Thumb</button>}
+      </div>
+      <div className={styles.communityDetailMap}>
+        <SplitMapView
+          pins={pins}
+          selectedPinId={selectedPinId}
+          onPinClick={onPinClick}
+          onListFocus={onListFocus}
+          getPinMeta={getPinMeta}
+          onMapClick={onMapClick}
+          onMapSurfaceClick={onMapSurfaceClick}
+          showSearch={false}
+          embedded
+          overlay={(
+            <>
+              {manualPlacement && (
+                <div className={styles.placementBanner}>
+                  map上で投稿位置をクリックしてください。
+                </div>
+              )}
+              {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
+            </>
+          )}
+        />
+      </div>
+    </section>
   )
 }
 

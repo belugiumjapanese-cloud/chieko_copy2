@@ -802,6 +802,415 @@
   font-size: 0.78rem;
 }
 
+.findSimpleHeader {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+
+.findSimpleHeader h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 8vw, 4.2rem);
+  line-height: 0.95;
+  font-weight: 950;
+}
+
+.folderMetricBar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 0;
+  margin: 0 10px 10px;
+  overflow: hidden;
+  background: #0d1110;
+  border-radius: 8px;
+}
+
+.folderMetricBar button,
+.folderMetricBar > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 10px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 950;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.folderMetricBar > span:last-child {
+  border-right: 0;
+}
+
+.folderMetricBar button {
+  cursor: pointer;
+}
+
+.folderMetricBar button.liked {
+  color: #ff6b74;
+}
+
+.folderMetricBar b,
+.folderMetricBar span {
+  line-height: 1;
+}
+
+.communityBrowsePage {
+  color: #f7faf8;
+  background: #070908;
+}
+
+.communityBrowsePage .ghostButton {
+  color: #f7faf8;
+  background: #181f1d;
+  border-color: #2a3430;
+}
+
+.communityBrowseTabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: 22px;
+  margin: 0 0 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.communityBrowseTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.communityBrowseTabs button {
+  position: relative;
+  min-height: 42px;
+  padding: 0 0 10px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1rem;
+  font-weight: 950;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.communityBrowseTabs button.active {
+  color: #ffffff;
+}
+
+.communityBrowseTabs button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  content: "";
+  background: #ffffff;
+  border-radius: 999px;
+}
+
+.communityBrowseTools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.communityBrowseTools .searchBox {
+  margin-bottom: 0;
+  color: #17221d;
+}
+
+.communityBrowsePage .contentSection h2 {
+  color: #ffffff;
+}
+
+.communityBrowsePage .communityCard {
+  color: #ffffff;
+  background: #151a18;
+  border-color: #242d29;
+  box-shadow: none;
+}
+
+.communityBrowsePage .communityCard h2,
+.communityBrowsePage .communityCard strong {
+  color: #ffffff;
+}
+
+.communityBrowsePage .communityCard p,
+.communityBrowsePage .communityCard span,
+.communityBrowsePage .communityCard small {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.iconGhostButton {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: #17221d;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d8e2db;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.findFolderDetailPage {
+  display: grid;
+  gap: 14px;
+}
+
+.findFolderDetailTop {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.findFolderDetailTop h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 6vw, 2.7rem);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.findFolderDetailPage > .mapCompact {
+  height: min(330px, 38dvh);
+  min-height: 250px;
+}
+
+.findFolderSummary {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.findFolderSummary img {
+  width: 78px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.findFolderSummary strong,
+.findFolderSummary p {
+  margin: 0;
+}
+
+.findFolderSummary p {
+  color: #405049;
+  line-height: 1.55;
+}
+
+.findFolderViewSwitch {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.findFolderViewSwitch button {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  color: #17221d;
+  background: #ffffff;
+  border: 1px solid #d8e2db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.findFolderViewSwitch button.active {
+  color: #ffffff;
+  background: #126b58;
+  border-color: #126b58;
+}
+
+.findFolderPinGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.findFolderGridItem {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: #dfe8e2;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.findFolderGridItem img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.findFolderPinListMode {
+  display: grid;
+  gap: 8px;
+}
+
+.findFolderListItem {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 6px;
+  text-align: left;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #d8e2db;
+  cursor: pointer;
+}
+
+.findFolderListItem img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.findFolderListItem div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.findFolderListItem strong,
+.findFolderListItem small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.findFolderListItem small {
+  color: #405049;
+  font-size: 0.8rem;
+}
+
+.gestureHint {
+  margin: 0;
+  color: #65736b;
+  font-size: 0.78rem;
+}
+
+.communityDetailPage {
+  display: grid;
+  gap: 12px;
+  min-height: calc(100dvh - 74px);
+  padding: 16px;
+  padding-bottom: 86px;
+  color: #f7faf8;
+  background: #080b0a;
+}
+
+.communityDetailHero {
+  display: grid;
+  grid-template-columns: 42px 82px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.communityDetailCover {
+  width: 82px;
+  height: 82px;
+  overflow: hidden;
+  background: #151a18;
+  border: 1px solid #303a35;
+  border-radius: 8px;
+}
+
+.communityDetailCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.communityDetailCover span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 2rem;
+  font-weight: 950;
+}
+
+.communityDetailInfo {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.communityDetailInfo h1,
+.communityDetailInfo p,
+.communityDetailInfo small,
+.communityDetailInfo span {
+  margin: 0;
+}
+
+.communityDetailInfo h1 {
+  overflow: hidden;
+  font-size: clamp(1.4rem, 6vw, 2.6rem);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.communityDetailInfo p,
+.communityDetailInfo small,
+.communityDetailInfo span {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.communityDetailInfo span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.communityDetailTabs {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.communityDetailTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.communityDetailTabs button {
+  min-height: 38px;
+  padding: 8px 14px;
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 950;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.communityDetailTabs button.active {
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.communityDetailMap {
+  min-height: 560px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
 .segmented {
   display: flex;
   flex-wrap: wrap;
@@ -1695,10 +2104,22 @@
   background: #dfe8e2;
 }
 
+.mapPageEmbedded {
+  position: relative;
+  inset: auto;
+  height: 100%;
+  background: transparent;
+}
+
 .splitMap {
   position: relative;
   display: block;
   height: calc(100dvh - 78px);
+}
+
+.mapPageEmbedded .splitMap,
+.mapPageEmbedded.mapPageListCollapsed .splitMap {
+  height: 100%;
 }
 
 .mapPageListCollapsed .splitMap {
@@ -4105,5 +4526,22 @@
   .folderDetailHero,
   .createFolderBar {
     grid-template-columns: 1fr;
+  }
+
+  .communityBrowseTools,
+  .communityDetailHero {
+    grid-template-columns: 1fr;
+  }
+
+  .communityDetailHero .primaryButton {
+    justify-self: stretch;
+  }
+
+  .communityDetailMap {
+    min-height: 520px;
+  }
+
+  .findFolderPinGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
