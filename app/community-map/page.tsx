@@ -4669,12 +4669,12 @@ function FolderActionBar({
         aria-label="folderにいいね"
         onClick={() => onToggleLike(folder.id)}
       >
-        <Heart size={18} />
+        <Heart size={24} />
         <span>{stats.likes}</span>
       </button>
       <button type="button" aria-label="folderをLibraryに追加" onClick={() => onSaveFolder(folder)}>
-        <BookmarkPlus size={18} />
-        <span>Library</span>
+        <BookmarkPlus size={24} />
+        <span>{stats.saves}</span>
       </button>
     </div>
   )
@@ -4706,7 +4706,7 @@ function FolderShelf({
               <button className={styles.folderOpenButton} type="button" onClick={() => onOpenFolder(folder.id)}>
                 {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
                 <strong>{folder.name}</strong>
-                <small>{folder.pinIds.length} pins / public folder</small>
+                <small>{folder.pinIds.length} pins</small>
               </button>
               <FolderActionBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} onSaveFolder={onSaveFolder} />
             </article>
@@ -4805,7 +4805,7 @@ function FindFolderDetail({
       <div className={styles.findFolderSummary}>
         <img src={preview} alt="" />
         <div>
-          <strong>{folder.pinIds.length} pins / {folder.isPaid ? 'paid public folder' : 'public folder'}</strong>
+          <strong>{folder.pinIds.length} pins{folder.isPaid ? ' / paid' : ''}</strong>
           <p>{folder.description || 'Description'}</p>
         </div>
       </div>

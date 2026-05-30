@@ -633,6 +633,10 @@
   cursor: pointer;
 }
 
+.findFolderCard {
+  gap: 0;
+}
+
 .findGrid img,
 .findFolderCard img,
 .folderCard img,
@@ -647,15 +651,12 @@
 
 .findGrid strong,
 .findGrid small,
-.findFolderCard strong,
-.findFolderCard small,
 .folderCard strong,
 .folderCard small {
   padding: 0 10px;
 }
 
 .findGrid small,
-.findFolderCard small,
 .folderCard small {
   padding-bottom: 10px;
   color: #65736b;
@@ -663,13 +664,51 @@
 
 .folderOpenButton {
   display: grid;
-  gap: 7px;
+  gap: 0;
   min-width: 0;
   padding: 0;
   text-align: left;
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+.findFolderCard .folderOpenButton,
+.findFolderCard .folderActionBar button {
+  box-shadow: none;
+}
+
+.findFolderCard .folderOpenButton {
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.findFolderCard .folderActionBar button {
+  min-width: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.findFolderCard .folderActionBar button > span {
+  width: auto;
+  aspect-ratio: auto;
+  background: transparent;
+}
+
+.findFolderCard .folderOpenButton strong {
+  padding: 11px 12px 0;
+  font-size: 1.02rem;
+  line-height: 1.1;
+}
+
+.findFolderCard .folderOpenButton small {
+  padding: 5px 12px 0;
+  color: #65736b;
+  line-height: 1.2;
 }
 
 .folderLikeButton {
@@ -816,32 +855,38 @@
 }
 
 .folderActionBar {
-  display: grid;
-  grid-template-columns: 0.72fr 1fr;
-  gap: 8px;
-  margin: 0 10px 10px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin: 10px 12px 12px;
 }
 
 .folderActionBar button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-height: 40px;
-  padding: 8px 10px;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0;
   color: #101312;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 950;
-  background: #ffffff;
-  border: 1px solid #d9dedb;
-  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
 }
 
 .folderActionBar button.liked {
   color: #111111;
-  background: #f2f2f2;
-  border-color: #111111;
+  background: transparent;
+  border-color: transparent;
+}
+
+.folderActionBar svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.25;
 }
 
 .folderActionBar span {
@@ -3392,6 +3437,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   width: min(430px, calc(100vw - 28px));
   max-height: calc(100dvh - 124px);
+  box-sizing: border-box;
   overflow: hidden;
   background: #ffffff;
   border: 1px solid #d9dedb;
@@ -3417,19 +3463,31 @@
 .pinDetailBody {
   display: grid;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 14px;
   overflow-y: auto;
   min-height: 0;
 }
 
+.pinDetailBody > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .pinDetailBody h2,
 .pinDetailBody p {
   margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pinDetailBody > span,
 .pinDetailBody small {
   color: #65736b;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pinDetailDescription {
@@ -3447,6 +3505,7 @@
 .seeMoreButton {
   justify-self: start;
   min-height: 0;
+  margin-top: -3px;
   padding: 0;
   color: #111111;
   font-size: 0.88rem;
@@ -3462,13 +3521,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tagRow b {
+  max-width: 100%;
   padding: 5px 8px;
   color: #111111;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
   background: #f2f2f2;
-  border-radius: 999px;
+  border-radius: 8px;
 }
 
 .actionRow button {
@@ -3476,6 +3542,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  max-width: 100%;
   min-height: 38px;
   color: #111111;
   background: #ffffff;
