@@ -1,8 +1,8 @@
 .shell {
   min-height: 100dvh;
   padding-bottom: 92px;
-  color: #18231e;
-  background: #eef3ef;
+  color: #111111;
+  background: #f3f3f3;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -30,9 +30,9 @@
   overflow: hidden;
   text-align: center;
   background:
-    linear-gradient(rgba(238, 243, 239, 0.92), rgba(238, 243, 239, 0.94)),
-    linear-gradient(90deg, rgba(18, 107, 88, 0.14) 1px, transparent 1px),
-    linear-gradient(rgba(18, 107, 88, 0.12) 1px, transparent 1px);
+    linear-gradient(rgba(243, 243, 243, 0.92), rgba(243, 243, 243, 0.94)),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(17, 17, 17, 0.07) 1px, transparent 1px);
   background-size: auto, 64px 64px, 64px 64px;
 }
 
@@ -46,7 +46,7 @@
   position: absolute;
   width: 160px;
   height: 160px;
-  background: rgba(18, 107, 88, 0.18);
+  background: rgba(17, 17, 17, 0.12);
   border-radius: 50%;
   filter: blur(34px);
   animation: bootFloat 4.4s ease-in-out infinite;
@@ -80,7 +80,7 @@
   width: 76px;
   height: 76px;
   border: 8px solid rgba(18, 107, 88, 0.12);
-  border-top-color: #126b58;
+  border-top-color: #111111;
   border-radius: 50%;
   animation: bootSpin 0.9s linear infinite;
 }
@@ -166,7 +166,7 @@
   gap: 22px;
   min-height: 100dvh;
   padding: 22px 16px 104px;
-  background: #f7faf8;
+  background: #f6f6f6;
 }
 
 .recommendHeroRail {
@@ -276,7 +276,7 @@
 
 .homeSwitch button.active {
   color: #ffffff;
-  background: #126b58;
+  background: #111111;
 }
 
 .homeMapPanel {
@@ -408,7 +408,7 @@
   padding: 8px 12px;
   color: #ffffff;
   font-weight: 900;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -445,7 +445,7 @@
 }
 
 .chaosEntry .primaryButton {
-  color: #126b58;
+  color: #111111;
   background: #ffffff;
 }
 
@@ -506,7 +506,7 @@
   padding: 7px 10px;
   color: #ffffff;
   font-weight: 950;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
 }
@@ -554,7 +554,7 @@
 }
 
 .ghostButton {
-  color: #126b58;
+  color: #111111;
   background: #ffffff;
   border: 1px solid #d8e2db;
 }
@@ -683,7 +683,7 @@
   color: #65736b;
   font-size: 0.84rem;
   font-weight: 950;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
@@ -698,7 +698,7 @@
 .findGrid em {
   margin: 0 10px 10px;
   padding: 7px 9px;
-  color: #126b58;
+  color: #111111;
   font-size: 0.78rem;
   font-style: normal;
   font-weight: 950;
@@ -815,57 +815,46 @@
   font-weight: 950;
 }
 
-.folderMetricBar {
+.folderActionBar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  gap: 0;
+  grid-template-columns: 0.72fr 1fr;
+  gap: 8px;
   margin: 0 10px 10px;
-  overflow: hidden;
-  background: #0d1110;
-  border-radius: 8px;
 }
 
-.folderMetricBar button,
-.folderMetricBar > span {
+.folderActionBar button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   min-height: 40px;
   padding: 8px 10px;
-  color: #ffffff;
-  font-size: 0.9rem;
+  color: #101312;
+  font-size: 0.88rem;
   font-weight: 950;
-  background: transparent;
-  border: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.folderMetricBar > span:last-child {
-  border-right: 0;
-}
-
-.folderMetricBar button {
+  background: #ffffff;
+  border: 1px solid #d9dedb;
+  border-radius: 8px;
   cursor: pointer;
 }
 
-.folderMetricBar button.liked {
-  color: #ff6b74;
+.folderActionBar button.liked {
+  color: #111111;
+  background: #f2f2f2;
+  border-color: #111111;
 }
 
-.folderMetricBar b,
-.folderMetricBar span {
+.folderActionBar span {
   line-height: 1;
 }
 
 .communityBrowsePage {
-  color: #f7faf8;
+  color: #f6f6f6;
   background: #070908;
 }
 
 .communityBrowsePage .ghostButton {
-  color: #f7faf8;
+  color: #f6f6f6;
   background: #181f1d;
   border-color: #2a3430;
 }
@@ -1026,8 +1015,8 @@
 
 .findFolderViewSwitch button.active {
   color: #ffffff;
-  background: #126b58;
-  border-color: #126b58;
+  background: #111111;
+  border-color: #111111;
 }
 
 .findFolderPinGrid {
@@ -1110,7 +1099,7 @@
   min-height: calc(100dvh - 74px);
   padding: 16px;
   padding-bottom: 86px;
-  color: #f7faf8;
+  color: #f6f6f6;
   background: #080b0a;
 }
 
@@ -1236,8 +1225,8 @@
 .mapScopeBar button.active,
 .profileStats button:hover {
   color: #ffffff;
-  background: #126b58;
-  border-color: #126b58;
+  background: #111111;
+  border-color: #111111;
 }
 
 .libraryModeSwitch {
@@ -1269,7 +1258,7 @@
 
 .libraryModeSwitch button.active {
   color: #ffffff;
-  background: #126b58;
+  background: #111111;
 }
 
 .libraryHeaderActions {
@@ -1363,7 +1352,7 @@
   gap: 7px;
   min-height: 38px;
   padding: 8px 11px;
-  color: #126b58;
+  color: #111111;
   font-weight: 900;
   background: #eff7f3;
   border: 1px solid #d8e2db;
@@ -1435,7 +1424,7 @@
   min-height: 42px;
   min-width: 0;
   padding: 10px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -1455,7 +1444,7 @@
   min-height: 66px;
   padding: 8px;
   text-align: left;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
@@ -1464,7 +1453,7 @@
 .accountGrid button.activeAccount {
   background: #eef8f4;
   border-color: rgba(18, 107, 88, 0.58);
-  box-shadow: inset 4px 0 0 #126b58;
+  box-shadow: inset 4px 0 0 #111111;
 }
 
 .accountGrid img {
@@ -1501,7 +1490,7 @@
   color: #ffffff;
   font-weight: 900;
   white-space: nowrap;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -1537,7 +1526,7 @@
   max-width: 100%;
   padding: 5px 8px;
   overflow: hidden;
-  color: #126b58;
+  color: #111111;
   background: #eef8f4;
   border: 1px solid #d8e2db;
   border-radius: 999px;
@@ -1640,7 +1629,7 @@
 }
 
 .libraryPinRow em {
-  color: #126b58;
+  color: #111111;
   font-size: 0.76rem;
   font-style: normal;
   font-weight: 900;
@@ -1746,7 +1735,7 @@
 }
 
 .pinFolderDropTarget {
-  box-shadow: inset 4px 0 0 #126b58;
+  box-shadow: inset 4px 0 0 #111111;
 }
 
 .folderChipRow {
@@ -1759,7 +1748,7 @@
   max-width: 100%;
   padding: 5px 8px;
   overflow: hidden;
-  color: #126b58;
+  color: #111111;
   background: #eef8f4;
   border: 1px solid #cfe3da;
   border-radius: 999px;
@@ -1773,7 +1762,7 @@
   display: grid;
   gap: 8px;
   padding: 10px 0 14px 98px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 0;
   border-radius: 0;
 }
@@ -1789,7 +1778,7 @@
 .inlineFolderChecks input {
   width: 18px;
   height: 18px;
-  accent-color: #126b58;
+  accent-color: #111111;
 }
 
 .inlineFolderChecks label > span {
@@ -1888,7 +1877,7 @@
 }
 
 .communityCard strong {
-  color: #126b58;
+  color: #111111;
 }
 
 .communityCard h2 {
@@ -1960,7 +1949,7 @@
   min-height: 58px;
   padding: 8px;
   text-align: left;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
@@ -1991,7 +1980,7 @@
 }
 
 .inviteSuggestions b {
-  color: #126b58;
+  color: #111111;
   font-size: 0.86rem;
 }
 
@@ -2025,7 +2014,7 @@
 .inlineCreate input {
   min-height: 42px;
   padding: 10px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -2048,7 +2037,7 @@
   padding: 12px;
   color: #18231e;
   text-align: left;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
@@ -2056,8 +2045,8 @@
 
 .communityTypeGrid button.active {
   color: #ffffff;
-  background: #126b58;
-  border-color: #126b58;
+  background: #111111;
+  border-color: #111111;
 }
 
 .communityTypeGrid span,
@@ -2072,9 +2061,104 @@
   display: grid;
   gap: 10px;
   padding: 12px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
+}
+
+.simpleCommunityCreate {
+  color: #111111;
+  background: #ffffff;
+  border-color: #d9dedb;
+}
+
+.simpleCommunityCreate h2 {
+  margin: 0;
+  color: #111111;
+}
+
+.privacyChoice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.privacyChoice button {
+  display: grid;
+  gap: 6px;
+  min-height: 94px;
+  padding: 13px;
+  color: #111111;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #d9dedb;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.privacyChoice button.active {
+  color: #ffffff;
+  background: #111111;
+  border-color: #111111;
+}
+
+.privacyChoice strong {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.privacyChoice span {
+  color: inherit;
+  opacity: 0.72;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.privateCommunityOptions {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  color: #111111;
+  background: #f4f4f4;
+  border: 1px solid #d9dedb;
+  border-radius: 8px;
+}
+
+.privateCommunityOptions p {
+  margin: 0;
+  color: #666666;
+  font-size: 0.84rem;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.switchLine {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px !important;
+  color: #111111 !important;
+}
+
+.switchLine span {
+  display: grid;
+  gap: 4px;
+}
+
+.switchLine small {
+  color: #666666;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.switchLine input {
+  width: 44px;
+  min-width: 44px;
+  height: 26px;
+  min-height: 26px;
+  accent-color: #111111;
 }
 
 .checkLine {
@@ -2089,7 +2173,7 @@
   width: 18px;
   min-height: 18px;
   padding: 0;
-  accent-color: #126b58;
+  accent-color: #111111;
 }
 
 .composer textarea {
@@ -2172,7 +2256,7 @@
   display: grid;
   place-items: center;
   gap: 8px;
-  color: #126b58;
+  color: #111111;
   background:
     linear-gradient(rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.68)),
     repeating-linear-gradient(0deg, transparent, transparent 63px, rgba(18, 107, 88, 0.14) 64px),
@@ -2503,14 +2587,14 @@
   display: grid;
   gap: 3px;
   padding: 9px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
 
 .timelineList strong,
 .timelineListPage strong {
-  color: #126b58;
+  color: #111111;
 }
 
 .timelineList span,
@@ -2558,7 +2642,7 @@
 }
 
 .timelinePostCard em {
-  color: #126b58;
+  color: #111111;
   font-size: 0.78rem;
   font-style: normal;
   font-weight: 850;
@@ -2576,7 +2660,7 @@
   min-height: 40px;
   min-width: 0;
   padding: 8px 10px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -2586,7 +2670,7 @@
   display: grid;
   place-items: center;
   color: #ffffff;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -2694,7 +2778,7 @@
   align-items: center;
   min-height: 38px;
   padding: 7px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -2702,7 +2786,7 @@
 .folderFilterPanel input {
   width: 18px;
   height: 18px;
-  accent-color: #126b58;
+  accent-color: #111111;
 }
 
 .folderFilterPanel label > span {
@@ -2765,7 +2849,7 @@
   min-height: 34px;
   padding: 6px 8px;
   text-align: left;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
@@ -2778,7 +2862,7 @@
 .visibleListScroll button.currentVisiblePin {
   background: #eef8f4;
   border-color: rgba(18, 107, 88, 0.48);
-  box-shadow: inset 4px 0 0 #126b58;
+  box-shadow: inset 4px 0 0 #111111;
   transform: translateX(2px);
 }
 
@@ -2886,7 +2970,7 @@
 }
 
 .mapStoryCard span {
-  color: #126b58;
+  color: #111111;
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -2900,7 +2984,7 @@
   padding: 9px 18px;
   color: #ffffff;
   font-weight: 950;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 999px;
   box-shadow: 0 10px 24px rgba(18, 107, 88, 0.24);
@@ -2974,7 +3058,7 @@
 }
 
 .mapStoryDetail span {
-  color: #126b58;
+  color: #111111;
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -3067,14 +3151,14 @@
   height: 78px;
   padding: 0;
   overflow: hidden;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 2px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
 }
 
 .composerDraftRail button.active {
-  border-color: #126b58;
+  border-color: #111111;
   box-shadow: 0 0 0 3px rgba(18, 107, 88, 0.12);
 }
 
@@ -3128,7 +3212,7 @@
   align-items: center;
   padding: 10px;
   color: #0f4c3f;
-  background: #edf7f3;
+  background: #f2f2f2;
   border: 1px solid #cfe3da;
   border-radius: 8px;
 }
@@ -3137,7 +3221,7 @@
   padding: 7px;
   box-sizing: content-box;
   color: #ffffff;
-  background: #126b58;
+  background: #111111;
   border-radius: 50%;
 }
 
@@ -3173,9 +3257,9 @@
   gap: 6px;
   min-height: 34px;
   padding: 6px 10px;
-  color: #126b58;
+  color: #111111;
   font-weight: 950;
-  background: #edf7f3;
+  background: #f2f2f2;
   border: 1px solid #cfe3da;
   border-radius: 999px;
   cursor: pointer;
@@ -3223,7 +3307,7 @@
   display: grid;
   gap: 10px;
   padding: 10px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -3254,7 +3338,7 @@
   gap: 9px;
   min-height: 42px;
   padding: 8px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -3262,7 +3346,7 @@
 .checkboxList input {
   width: 18px;
   height: 18px;
-  accent-color: #126b58;
+  accent-color: #111111;
 }
 
 .inlineCreate {
@@ -3278,7 +3362,7 @@
   align-items: center;
   min-height: 42px;
   padding: 5px 6px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -3296,7 +3380,7 @@
 }
 
 .colorSwatches button.active {
-  box-shadow: 0 0 0 3px #126b58;
+  box-shadow: 0 0 0 3px #111111;
 }
 
 .pinDetail {
@@ -3304,25 +3388,29 @@
   right: 14px;
   bottom: 94px;
   z-index: 50;
-  width: min(390px, calc(100vw - 28px));
-  max-height: calc(100dvh - 120px);
-  overflow: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(430px, calc(100vw - 28px));
+  max-height: calc(100dvh - 124px);
+  overflow: hidden;
   background: #ffffff;
-  border: 1px solid #d8e2db;
+  border: 1px solid #d9dedb;
   border-radius: 8px;
   box-shadow: 0 20px 54px rgba(24, 34, 29, 0.22);
 }
 
 .pinDetailOnMap {
-  top: 132px;
-  bottom: auto;
-  width: min(360px, calc(100vw - 28px));
-  max-height: max(220px, calc(100dvh - 78px - 236px - 150px));
+  right: auto;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  width: min(430px, calc(100vw - 28px));
+  max-height: min(560px, calc(100dvh - 118px));
 }
 
 .pinDetail > img {
   width: 100%;
-  height: 220px;
+  height: min(230px, 32dvh);
   object-fit: cover;
 }
 
@@ -3330,6 +3418,8 @@
   display: grid;
   gap: 10px;
   padding: 14px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .pinDetailBody h2,
@@ -3342,6 +3432,31 @@
   color: #65736b;
 }
 
+.pinDetailDescription {
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.pinDetailDescription.clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.seeMoreButton {
+  justify-self: start;
+  min-height: 0;
+  padding: 0;
+  color: #111111;
+  font-size: 0.88rem;
+  font-weight: 950;
+  background: transparent;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .tagRow,
 .actionRow {
   display: flex;
@@ -3351,28 +3466,34 @@
 
 .tagRow b {
   padding: 5px 8px;
-  color: #126b58;
-  background: #edf7f3;
+  color: #111111;
+  background: #f2f2f2;
   border-radius: 999px;
 }
 
 .actionRow button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 38px;
+  color: #111111;
+  background: #ffffff;
+  border: 1px solid #d9dedb;
+  border-radius: 8px;
 }
 
 .actionRow button.liked {
-  color: #d92d59;
-  background: #fff2f5;
-  border-color: #ffc8d4;
+  color: #111111;
+  background: #f2f2f2;
+  border-color: #111111;
 }
 
 .commentBox {
   display: grid;
   gap: 8px;
   padding-top: 10px;
-  border-top: 1px solid #d8e2db;
+  border-top: 1px solid #d9dedb;
 }
 
 .commentBox h3 {
@@ -3385,7 +3506,7 @@
 
 .commentBox p {
   padding: 8px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border-radius: 8px;
 }
 
@@ -3406,7 +3527,7 @@
   display: grid;
   place-items: center;
   color: #ffffff;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -3492,7 +3613,7 @@
   min-width: 0;
   padding: 8px;
   text-align: left;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #e0e8e3;
   border-radius: 8px;
   cursor: pointer;
@@ -3534,14 +3655,14 @@
   padding: 9px 14px;
   color: #ffffff;
   font-weight: 950;
-  background: #126b58;
-  border: 1px solid #126b58;
+  background: #111111;
+  border: 1px solid #111111;
   border-radius: 999px;
   cursor: pointer;
 }
 
 .followButton.following {
-  color: #126b58;
+  color: #111111;
   background: #eef8f4;
   border-color: #b7d5ca;
 }
@@ -3577,7 +3698,7 @@
   min-height: 38px;
   padding: 8px 12px;
   margin-bottom: 12px;
-  color: #126b58;
+  color: #111111;
   font-weight: 900;
   background: #ffffff;
   border: 1px solid #d8e2db;
@@ -3688,7 +3809,7 @@
   padding: 12px 14px;
   color: #ffffff;
   font-weight: 900;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
   box-shadow: 0 14px 34px rgba(24, 34, 29, 0.22);
@@ -3756,14 +3877,14 @@
   align-items: center;
   min-height: 42px;
   overflow: hidden;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
 
 .usernameInput span {
   padding-left: 12px;
-  color: #126b58;
+  color: #111111;
   font-weight: 950;
 }
 
@@ -3820,7 +3941,7 @@
   width: 100%;
   min-height: 42px;
   margin: -4px 0 14px;
-  color: #126b58;
+  color: #111111;
   font-weight: 950;
   background: #ffffff;
   border: 1px solid #d8e2db;
@@ -3852,7 +3973,7 @@
 .folderEditor textarea {
   min-height: 42px;
   padding: 10px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -3888,7 +4009,7 @@
 .authorLink {
   display: inline;
   padding: 0;
-  color: #126b58;
+  color: #111111;
   font: inherit;
   font-weight: 950;
   background: transparent;
@@ -3899,7 +4020,7 @@
 .inlineMention {
   display: inline;
   padding: 0;
-  color: #126b58;
+  color: #111111;
   font: inherit;
   font-weight: 950;
   background: transparent;
@@ -3955,7 +4076,7 @@
   align-items: center;
   min-height: 48px;
   text-align: left;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
   cursor: pointer;
@@ -4000,7 +4121,7 @@
   place-items: center;
   width: 42px;
   height: 42px;
-  color: #126b58;
+  color: #111111;
   background: #e8f3ee;
   border-radius: 8px;
 }
@@ -4148,7 +4269,7 @@
 }
 
 .profilePublishToggle input:checked + b {
-  background: #126b58;
+  background: #111111;
 }
 
 .profilePublishToggle input:checked + b::after {
@@ -4197,7 +4318,7 @@
   gap: 8px;
   align-items: center;
   padding: 8px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -4228,7 +4349,7 @@
 
 .folderPlaylistList article > button:last-child {
   min-height: 36px;
-  color: #126b58;
+  color: #111111;
   font-weight: 900;
   background: #ffffff;
   border: 1px solid #d8e2db;
@@ -4257,7 +4378,7 @@
   padding: 8px 12px;
   color: #ffffff;
   font-weight: 900;
-  background: #126b58;
+  background: #111111;
   border: 0;
   border-radius: 8px;
 }
@@ -4305,7 +4426,7 @@
   display: grid;
   gap: 10px;
   padding: 12px;
-  background: #f7faf8;
+  background: #f6f6f6;
   border: 1px solid #d8e2db;
   border-radius: 8px;
 }
@@ -4341,7 +4462,7 @@
   min-height: 0;
   margin: 0;
   padding: 0;
-  accent-color: #126b58;
+  accent-color: #111111;
 }
 
 @media (max-width: 900px) {
@@ -4367,6 +4488,7 @@
   .communityCard,
   .communitySpotlightHeader,
   .communityTypeGrid,
+  .privacyChoice,
   .libraryRow,
   .feedCard {
     grid-template-columns: 1fr;

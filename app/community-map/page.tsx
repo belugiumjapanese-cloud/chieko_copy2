@@ -47,7 +47,7 @@ const CACHE_VERSION = 1
 const CACHE_PREFIX = 'spot-map:swr-cache'
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const EMPTY_IMAGE =
-  'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23dfe8e2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23126b58%22%20opacity%3D%22.35%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23126b58%22%20opacity%3D%22.3%22/%3E%3C/svg%3E'
+  'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23f2f2f2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23111111%22%20opacity%3D%22.2%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23111111%22%20opacity%3D%22.18%22/%3E%3C/svg%3E'
 const EMBEDDED_RECOMMEND_ITEMS: RecommendItem[] = [
   {
     id: 'embedded-event-architecture-walk',
@@ -1523,6 +1523,7 @@ export default function CommunityMapPrototype() {
   const [newCommunityApprovalRequired, setNewCommunityApprovalRequired] = useState(false)
   const [newCommunityMinLevel, setNewCommunityMinLevel] = useState(1)
   const [newCommunityPriceYen, setNewCommunityPriceYen] = useState('')
+  const [newCommunitySearchable, setNewCommunitySearchable] = useState(true)
   const [profileWorldUserId, setProfileWorldUserId] = useState<string | null>(null)
   const [inviteCommunityId, setInviteCommunityId] = useState<string | null>(null)
   const [inviteQuery, setInviteQuery] = useState('')
@@ -2501,23 +2502,22 @@ export default function CommunityMapPrototype() {
     const slug = createSlug(name)
     const isLimitedCommunity = newCommunityPrivacy === 'limited'
     const inviteCode = isLimitedCommunity ? `${slug}-${Math.random().toString(36).slice(2, 7)}` : null
-    const selectedPreset = COMMUNITY_PRESETS.find((item) => item.type === newCommunityType) ?? COMMUNITY_PRESETS[0]
     const basePayload = {
       slug,
       name,
-      description: selectedPreset.subtitle,
+      description: '',
       owner_id: activeUserId,
-      visibility: isLimitedCommunity ? 'invite_only' : 'public',
+      visibility: isLimitedCommunity ? (newCommunitySearchable ? 'invite_only' : 'private') : 'public',
       invite_code: inviteCode,
     }
     const extendedPayload = {
       ...basePayload,
-      community_type: newCommunityType,
-      post_policy: newCommunityPostPolicy,
-      approval_required: newCommunityApprovalRequired || newCommunityPostPolicy === 'approval',
-      min_contribution_level: newCommunityPostPolicy === 'contribution' ? newCommunityMinLevel : 0,
-      is_paid: newCommunityType === 'paid',
-      price_yen: newCommunityType === 'paid' ? Number(newCommunityPriceYen) || null : null,
+      community_type: isLimitedCommunity ? 'private' : 'open',
+      post_policy: 'open',
+      approval_required: false,
+      min_contribution_level: 0,
+      is_paid: false,
+      price_yen: null,
     }
     let insertResult = await client
       .from('communities')
@@ -2550,7 +2550,13 @@ export default function CommunityMapPrototype() {
         .insert({ community_id: insertResult.data.id, user_id: activeUserId, role: 'owner' })
     }
     setNewCommunityName('')
-    applyCommunityPreset('open')
+    setNewCommunityPrivacy('public')
+    setNewCommunitySearchable(true)
+    setNewCommunityType('open')
+    setNewCommunityPostPolicy('open')
+    setNewCommunityApprovalRequired(false)
+    setNewCommunityMinLevel(0)
+    setNewCommunityPriceYen('')
     setCreateCommunityOpen(false)
     await loadRemoteData(activeUserId)
     setSelectedCommunityId(insertResult.data.id)
@@ -2558,15 +2564,10 @@ export default function CommunityMapPrototype() {
     setActiveTab('find')
   }, [
     activeUserId,
-    applyCommunityPreset,
     loadRemoteData,
-    newCommunityApprovalRequired,
-    newCommunityMinLevel,
     newCommunityName,
-    newCommunityPostPolicy,
-    newCommunityPriceYen,
     newCommunityPrivacy,
-    newCommunityType,
+    newCommunitySearchable,
     requireSignedIn,
   ])
 
@@ -3125,6 +3126,99 @@ export default function CommunityMapPrototype() {
     await loadRemoteData(activeUserId)
   }, [activeUserId, loadRemoteData, requireSignedIn, savedPinIds])
 
+  const saveFolderToLibrary = useCallback(async (folder: Folder) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    if (folder.ownerId === activeUserId) {
+      setToast('このfolderはすでにLibraryにあります。')
+      return
+    }
+
+    const sameFolderAlreadyExists = userFolders.some((item) => {
+      if (item.name !== folder.name || item.pinIds.length !== folder.pinIds.length) return false
+      const itemPinIds = new Set(item.pinIds)
+      return folder.pinIds.every((pinId) => itemPinIds.has(pinId))
+    })
+
+    if (sameFolderAlreadyExists) {
+      setToast('このfolderはLibraryに追加済みです。')
+      return
+    }
+
+    const optimisticId = createId('folder')
+    const copiedFolder: Folder = {
+      ...folder,
+      id: optimisticId,
+      ownerId: activeUserId,
+      kind: 'to_visit',
+      visibility: 'private',
+      likedByMe: false,
+      likes: 0,
+      createdAt: new Date().toISOString(),
+    }
+
+    setFolders((current) => [copiedFolder, ...current])
+
+    const fullPayload = {
+      user_id: activeUserId,
+      folder_kind: 'to_visit',
+      name: folder.name,
+      description: folder.description ?? '',
+      color: folder.color,
+      thumbnail_url: folder.thumbnailUrl ?? null,
+      visibility: 'private',
+    }
+    const fallbackPayload = {
+      user_id: activeUserId,
+      name: folder.name,
+      description: folder.description ?? '',
+      color: folder.color,
+      visibility: 'private',
+    }
+
+    let folderResult = await client
+      .from('folders')
+      .insert(fullPayload)
+      .select('id')
+      .single()
+
+    if (folderResult.error && /folder_kind|thumbnail_url/i.test(folderResult.error.message)) {
+      folderResult = await client
+        .from('folders')
+        .insert(fallbackPayload)
+        .select('id')
+        .single()
+    }
+
+    if (folderResult.error || !folderResult.data) {
+      setFolders((current) => current.filter((item) => item.id !== optimisticId))
+      setToast(folderResult.error?.message ?? 'folderをLibraryに追加できませんでした。')
+      return
+    }
+
+    const savedFolderId = folderResult.data.id
+    setFolders((current) => current.map((item) => (item.id === optimisticId ? { ...item, id: savedFolderId } : item)))
+
+    const folderPosts = folder.pinIds.map((postId, index) => ({
+      folder_id: savedFolderId,
+      post_id: postId,
+      user_id: activeUserId,
+      sort_order: index,
+    }))
+
+    if (folderPosts.length) {
+      const { error } = await client.from('folder_posts').insert(folderPosts)
+      if (error) {
+        setToast(error.message)
+        await loadRemoteData(activeUserId)
+        return
+      }
+    }
+
+    setToast('Libraryにfolderを追加しました。')
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, loadRemoteData, requireSignedIn, userFolders])
+
   const deletePin = useCallback(async (pinId: string) => {
     const client = supabase
     if (!client || !requireSignedIn()) return
@@ -3656,6 +3750,7 @@ export default function CommunityMapPrototype() {
               pinsById={pinsById}
               onOpenFolder={(folderId) => { setActiveTab('find'); setSelectedFindFolderId(folderId) }}
               onToggleLike={toggleFolderLike}
+              onSaveFolder={saveFolderToLibrary}
             />
           </section>
           <section className={styles.recommendSection}>
@@ -3731,69 +3826,39 @@ export default function CommunityMapPrototype() {
               <button className={styles.primaryButton} type="button" onClick={() => setCreateCommunityOpen(true)}>作成</button>
             </div>
             {createCommunityOpen && (
-              <form className={styles.createPanel} onSubmit={createCommunity}>
+              <form className={`${styles.createPanel} ${styles.simpleCommunityCreate}`} onSubmit={createCommunity}>
                 <button className={styles.closeButton} type="button" onClick={() => setCreateCommunityOpen(false)}><X size={17} /></button>
                 <h2>コミュニティを作成</h2>
                 <label>
                   名前
                   <input value={newCommunityName} onChange={(event) => setNewCommunityName(event.target.value)} placeholder="architecture club" />
                 </label>
-                <div className={styles.communityTypeGrid}>
-                  {COMMUNITY_PRESETS.map((preset) => (
-                    <button
-                      key={preset.type}
-                      className={newCommunityType === preset.type ? styles.active : ''}
-                      type="button"
-                      onClick={() => applyCommunityPreset(preset.type)}
-                    >
-                      <strong>{preset.title}</strong>
-                      <span>{preset.subtitle}</span>
-                      <small>{preset.examples}</small>
-                    </button>
-                  ))}
+                <div className={styles.privacyChoice}>
+                  <button className={newCommunityPrivacy === 'public' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('public')}>
+                    <strong>Public</strong>
+                    <span>誰でも見つけて参加できます。</span>
+                  </button>
+                  <button className={newCommunityPrivacy === 'limited' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('limited')}>
+                    <strong>Private</strong>
+                    <span>招待した人だけが参加できます。</span>
+                  </button>
                 </div>
-                <div className={styles.communityRulePanel}>
-                  <div className={styles.segmented}>
-                    <button className={newCommunityPrivacy === 'public' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('public')}>公開</button>
-                    <button className={newCommunityPrivacy === 'limited' ? styles.active : ''} type="button" onClick={() => setNewCommunityPrivacy('limited')}>限定 / 招待</button>
+                {newCommunityPrivacy === 'limited' && (
+                  <div className={styles.privateCommunityOptions}>
+                    <label className={styles.switchLine}>
+                      <span>
+                        <strong>検索可能にする</strong>
+                        <small>オフにすると招待リンクを知っている人だけが見つけられます。</small>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={newCommunitySearchable}
+                        onChange={(event) => setNewCommunitySearchable(event.target.checked)}
+                      />
+                    </label>
+                    <p>作成後に友達を招待できます。投稿承認や貢献度バッジは、コミュニティの設定から調整します。</p>
                   </div>
-                  <label className={styles.checkLine}>
-                    <input
-                      type="checkbox"
-                      checked={newCommunityApprovalRequired}
-                      onChange={(event) => {
-                        setNewCommunityApprovalRequired(event.target.checked)
-                        if (event.target.checked) setNewCommunityPostPolicy('approval')
-                      }}
-                    />
-                    投稿は承認制にする
-                  </label>
-                  <label className={styles.checkLine}>
-                    <input
-                      type="checkbox"
-                      checked={newCommunityPostPolicy === 'contribution'}
-                      onChange={(event) => setNewCommunityPostPolicy(event.target.checked ? 'contribution' : (newCommunityApprovalRequired ? 'approval' : 'open'))}
-                    />
-                    貢献度に応じて投稿権限を開放する
-                  </label>
-                  {newCommunityPostPolicy === 'contribution' && (
-                    <label>
-                      投稿できる最低レベル
-                      <select value={newCommunityMinLevel} onChange={(event) => setNewCommunityMinLevel(Number(event.target.value))}>
-                        <option value={0}>level 0</option>
-                        <option value={1}>level 1</option>
-                        <option value={2}>level 2</option>
-                      </select>
-                    </label>
-                  )}
-                  {newCommunityType === 'paid' && (
-                    <label>
-                      価格
-                      <input value={newCommunityPriceYen} onChange={(event) => setNewCommunityPriceYen(event.target.value)} inputMode="numeric" placeholder="例: 1200" />
-                    </label>
-                  )}
-                </div>
-                {newCommunityPrivacy === 'limited' && <p className={styles.muted}>作成後、招待リンクや通知で友達だけ参加できる設定になります。</p>}
+                )}
                 <button className={styles.primaryButton} type="submit">作成してmapへ</button>
               </form>
             )}
@@ -3817,6 +3882,7 @@ export default function CommunityMapPrototype() {
             onOpenPin={setSelectedPinId}
             onAddPinToFolder={setFolderEditorPinId}
             onToggleLike={toggleFolderLike}
+            onSaveFolder={saveFolderToLibrary}
           />
         ) : (
           <section className={styles.page}>
@@ -3854,9 +3920,9 @@ export default function CommunityMapPrototype() {
               <button type="button">検索</button>
             </div>
             <div className={styles.findMain}>
-              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} />
-              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} />
-              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} />
+              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
+              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
+              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
             </div>
           </section>
         )
@@ -4583,18 +4649,20 @@ function folderStats(folder: Folder, pinsById: Map<string, Pin>) {
   }
 }
 
-function FolderMetricBar({
+function FolderActionBar({
   folder,
   pinsById,
   onToggleLike,
+  onSaveFolder,
 }: {
   folder: Folder
   pinsById: Map<string, Pin>
   onToggleLike: (folderId: string) => void
+  onSaveFolder: (folder: Folder) => void
 }) {
   const stats = folderStats(folder, pinsById)
   return (
-    <div className={styles.folderMetricBar}>
+    <div className={styles.folderActionBar}>
       <button
         className={folder.likedByMe ? styles.liked : ''}
         type="button"
@@ -4604,14 +4672,10 @@ function FolderMetricBar({
         <Heart size={18} />
         <span>{stats.likes}</span>
       </button>
-      <span>
-        <MessageCircle size={18} />
-        <b>{stats.comments}</b>
-      </span>
-      <span>
+      <button type="button" aria-label="folderをLibraryに追加" onClick={() => onSaveFolder(folder)}>
         <BookmarkPlus size={18} />
-        <b>{stats.saves}</b>
-      </span>
+        <span>Library</span>
+      </button>
     </div>
   )
 }
@@ -4622,12 +4686,14 @@ function FolderShelf({
   pinsById,
   onOpenFolder,
   onToggleLike,
+  onSaveFolder,
 }: {
   title: string
   folders: Folder[]
   pinsById: Map<string, Pin>
   onOpenFolder: (folderId: string) => void
   onToggleLike: (folderId: string) => void
+  onSaveFolder: (folder: Folder) => void
 }) {
   return (
     <section className={styles.contentSection}>
@@ -4642,7 +4708,7 @@ function FolderShelf({
                 <strong>{folder.name}</strong>
                 <small>{folder.pinIds.length} pins / public folder</small>
               </button>
-              <FolderMetricBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} />
+              <FolderActionBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} onSaveFolder={onSaveFolder} />
             </article>
           )
         })}
@@ -4660,6 +4726,7 @@ function FindFolderDetail({
   onOpenPin,
   onAddPinToFolder,
   onToggleLike,
+  onSaveFolder,
 }: {
   folder: Folder
   pinsById: Map<string, Pin>
@@ -4668,6 +4735,7 @@ function FindFolderDetail({
   onOpenPin: (pinId: string) => void
   onAddPinToFolder: (pinId: string) => void
   onToggleLike: (folderId: string) => void
+  onSaveFolder: (folder: Folder) => void
 }) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -4733,7 +4801,7 @@ function FindFolderDetail({
         </div>
       </header>
       <PinMap pins={folderPins} selectedPinId={null} onPinClick={onOpenPin} compact />
-      <FolderMetricBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} />
+      <FolderActionBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} onSaveFolder={onSaveFolder} />
       <div className={styles.findFolderSummary}>
         <img src={preview} alt="" />
         <div>
@@ -5970,6 +6038,10 @@ function PinDetail({
   onFolderEdit: () => void
   onOpenProfile: (userId: string) => void
 }) {
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const descriptionText = pin.description || '説明文なし'
+  const shouldClampDescription = descriptionText.length > 96 || descriptionText.split(/\n/).length > 3
+
   return (
     <aside className={`${styles.pinDetail} ${onMapSurface ? styles.pinDetailOnMap : ''}`}>
       <button className={styles.closeButton} type="button" onClick={onClose}><X size={17} /></button>
@@ -5982,7 +6054,14 @@ function PinDetail({
           </button>
         </span>
         <h2>{pin.title}</h2>
-        <p>{pin.description || '説明文なし'}</p>
+        <p className={`${styles.pinDetailDescription} ${shouldClampDescription && !descriptionExpanded ? styles.clamped : ''}`}>
+          {descriptionText}
+        </p>
+        {shouldClampDescription && (
+          <button className={styles.seeMoreButton} type="button" onClick={() => setDescriptionExpanded((current) => !current)}>
+            {descriptionExpanded ? 'show less' : 'see more'}
+          </button>
+        )}
         <small>撮影: {formatShortDate(pin.takenAt)} / 投稿: {formatShortDate(pin.createdAt)}</small>
         <small>{pin.likes} likes / {pin.comments.length} comments / {pin.saves} saves</small>
         <div className={styles.tagRow}>
