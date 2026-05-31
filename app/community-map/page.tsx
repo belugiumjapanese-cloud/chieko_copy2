@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Users,
   UserRound,
   X,
@@ -156,6 +157,7 @@ function getAuthRedirectUrl() {
 }
 
 type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
+type CommunityDetailTab = 'pins' | 'timeline' | 'map'
 type LibraryMode = 'folder' | 'pin'
 type DropScope = { id: string; label: string; pins: Pin[] }
 type Privacy = 'public' | 'limited'
@@ -1588,6 +1590,7 @@ export default function CommunityMapPrototype() {
   const [seenPinIds, setSeenPinIds] = useState<string[]>([])
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null)
+  const [communityDetailTab, setCommunityDetailTab] = useState<CommunityDetailTab>('pins')
   const [communityQuery, setCommunityQuery] = useState('')
   const [createCommunityOpen, setCreateCommunityOpen] = useState(false)
   const [newCommunityName, setNewCommunityName] = useState('')
@@ -1617,7 +1620,6 @@ export default function CommunityMapPrototype() {
   const [communitySubmitOpen, setCommunitySubmitOpen] = useState(false)
   const [communitySubmitPinId, setCommunitySubmitPinId] = useState<string | null>(null)
   const [communitySubmitComposer, setCommunitySubmitComposer] = useState({ title: '', description: '', tags: '' })
-  const [timelineOpen, setTimelineOpen] = useState(false)
   const [communityChatText, setCommunityChatText] = useState('')
   const [manualPlacement, setManualPlacement] = useState(false)
   const [commentText, setCommentText] = useState('')
@@ -2669,7 +2671,7 @@ export default function CommunityMapPrototype() {
     }
     setSelectedCommunityId(communityId)
     setSelectedPinId(null)
-    setTimelineOpen(false)
+    setCommunityDetailTab('pins')
     setActiveTab('find')
   }, [activeUserId, communitiesById, loadRemoteData])
 
@@ -2758,6 +2760,7 @@ export default function CommunityMapPrototype() {
     setCreateCommunityOpen(false)
     await loadRemoteData(activeUserId)
     setSelectedCommunityId(insertResult.data.id)
+    setCommunityDetailTab('pins')
     if (isLimitedCommunity) setInviteCommunityId(insertResult.data.id)
     setActiveTab('find')
   }, [
@@ -2799,6 +2802,39 @@ export default function CommunityMapPrototype() {
       setToast('サムネ画像を更新できませんでした。')
     }
   }, [activeUserId, loadRemoteData, requireSignedIn, selectedCommunityId])
+
+  const deleteCommunity = useCallback(async (community: Community) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    if (community.ownerId !== activeUserId) {
+      setToast('このコミュニティを削除できるのは作成者だけです。')
+      return
+    }
+    if (typeof window !== 'undefined' && !window.confirm(`${community.name} を削除しますか？`)) return
+
+    const previousCommunities = communities
+    const previousSelectedCommunityId = selectedCommunityId
+    setCommunities((current) => current.filter((item) => item.id !== community.id))
+    setSelectedCommunityId(null)
+    setSelectedPinId(null)
+    setCommunityDetailTab('pins')
+
+    const { error } = await client
+      .from('communities')
+      .delete()
+      .eq('id', community.id)
+      .eq('owner_id', activeUserId)
+
+    if (error) {
+      setCommunities(previousCommunities)
+      setSelectedCommunityId(previousSelectedCommunityId)
+      setToast(error.message)
+      await loadRemoteData(activeUserId)
+      return
+    }
+
+    await loadRemoteData(activeUserId)
+  }, [activeUserId, communities, loadRemoteData, requireSignedIn, selectedCommunityId])
 
   const shareCommunityLink = useCallback(async (community: Community) => {
     const inviteUrl = `${getAuthRedirectUrl()}?invite=${community.inviteCode ?? community.id}`
@@ -3270,20 +3306,20 @@ export default function CommunityMapPrototype() {
     setInviteCommunityId(null)
     setProfileWorldUserId(null)
     if (nextTab === 'home') {
-      setTimelineOpen(false)
+      setCommunityDetailTab('pins')
     }
     if (nextTab === 'find') {
       setSelectedCommunityId(null)
       setFindCommunityOpen(false)
       setSelectedFindFolderId(null)
-      setTimelineOpen(false)
+      setCommunityDetailTab('pins')
       setCommunityQuery('')
       setCreateCommunityOpen(false)
     } else {
       setFindCommunityOpen(false)
       setSelectedFindFolderId(null)
       setSelectedCommunityId(null)
-      setTimelineOpen(false)
+      setCommunityDetailTab('pins')
     }
     if (nextTab === 'myworld') {
       setMyWorldPanelsHidden(true)
@@ -3952,19 +3988,23 @@ export default function CommunityMapPrototype() {
             selectedPinId={selectedPinId}
             manualPlacement={manualPlacement}
             postMessage={postMessage}
+            detailTab={communityDetailTab}
             activities={activities.filter((activity) => activity.communityId === selectedCommunity.id)}
             usersById={usersById}
             pinsById={pinsById}
-            timelineOpen={timelineOpen}
             chatText={communityChatText}
-            onBack={() => setSelectedCommunityId(null)}
+            onBack={() => {
+              setSelectedCommunityId(null)
+              setCommunityDetailTab('pins')
+            }}
             onPinClick={openPinFromMap}
             onListFocus={() => setSelectedPinId(null)}
             getPinMeta={getMapPinMeta}
-            onToggleTimeline={() => setTimelineOpen((value) => !value)}
+            onDetailTabChange={setCommunityDetailTab}
             onOpenProfile={openProfile}
-            canEditThumbnail={selectedCommunity.ownerId === activeUserId}
+            canManage={selectedCommunity.ownerId === activeUserId}
             onEditThumbnail={() => communityThumbInputRef.current?.click()}
+            onDeleteCommunity={() => deleteCommunity(selectedCommunity)}
             onChatText={setCommunityChatText}
             onSendChat={addCommunityChat}
             onMapClick={manualPlacement ? confirmManualLocation : undefined}
@@ -4467,7 +4507,7 @@ export default function CommunityMapPrototype() {
         </section>
       )}
 
-      {selectedPin && !(activeTab === 'myworld' || activeTab === 'tovisit') && (
+      {selectedPin && !(activeTab === 'myworld' || activeTab === 'tovisit' || (activeTab === 'find' && Boolean(selectedCommunity))) && (
         <>
           {!(activeTab === 'find' && Boolean(selectedCommunity)) && (
             <button className={styles.detailBackdrop} type="button" aria-label="詳細を閉じる" onClick={() => setSelectedPinId(null)} />
@@ -5668,6 +5708,7 @@ function SplitMapView({
   showPanelsToggle = true,
   showSearch = true,
   embedded = false,
+  disableExpandedStory = false,
   overlay,
   floatingAction,
 }: {
@@ -5688,6 +5729,7 @@ function SplitMapView({
   showPanelsToggle?: boolean
   showSearch?: boolean
   embedded?: boolean
+  disableExpandedStory?: boolean
   overlay?: ReactNode
   floatingAction?: ReactNode
 }) {
@@ -5886,6 +5928,18 @@ function SplitMapView({
     )
   }, [currentLocation])
 
+  const storyCardContent = currentMapPin ? (
+    <>
+      <img src={currentMapPin.imageUrl} alt="" />
+      <div>
+        {getPinMeta && <small>{getPinMeta(currentMapPin)}</small>}
+        <strong>{currentMapPin.title}</strong>
+        <p>{currentMapPin.description || '説明文なし'}</p>
+        <span>{currentMapPin.tags.map((tag) => `#${tag}`).join(' ')}</span>
+      </div>
+    </>
+  ) : null
+
   return (
     <section className={`${styles.mapPage} ${embedded ? styles.mapPageEmbedded : ''} ${listCollapsed ? styles.mapPageListCollapsed : ''}`}>
       <div className={styles.splitMap}>
@@ -5950,22 +6004,20 @@ function SplitMapView({
           )}
           {overlay}
           {currentMapPin && (!listCollapsed || selectedPinId) && (
-            <button className={styles.mapStoryCard} type="button" onClick={() => setExpandedStoryPinId(currentMapPin.id)}>
-              <img src={currentMapPin.imageUrl} alt="" />
-              <div>
-                {getPinMeta && <small>{getPinMeta(currentMapPin)}</small>}
-                <strong>{currentMapPin.title}</strong>
-                <p>{currentMapPin.description || '説明文なし'}</p>
-                <span>{currentMapPin.tags.map((tag) => `#${tag}`).join(' ')}</span>
-              </div>
-            </button>
+            disableExpandedStory ? (
+              <div className={`${styles.mapStoryCard} ${styles.mapStoryCardStatic}`}>{storyCardContent}</div>
+            ) : (
+              <button className={styles.mapStoryCard} type="button" onClick={() => setExpandedStoryPinId(currentMapPin.id)}>
+                {storyCardContent}
+              </button>
+            )
           )}
           {currentMapPin && selectedPinId && onSavePin && (
             <button className={styles.mapStoryAddButton} type="button" onClick={() => onSavePin(currentMapPin)}>
               追加
             </button>
           )}
-          {expandedStoryPin && (
+          {!disableExpandedStory && expandedStoryPin && (
             <aside className={styles.mapStoryDetail}>
               <button className={styles.closeButton} type="button" aria-label="詳細を閉じる" onClick={() => setExpandedStoryPinId(null)}>
                 <X size={16} />
@@ -6033,19 +6085,20 @@ function CommunityMapView({
   selectedPinId,
   manualPlacement,
   postMessage,
+  detailTab,
   activities,
   usersById,
   pinsById,
-  timelineOpen,
   chatText,
   onBack,
   onPinClick,
   onListFocus,
   getPinMeta,
-  onToggleTimeline,
+  onDetailTabChange,
   onOpenProfile,
-  canEditThumbnail = false,
+  canManage = false,
   onEditThumbnail,
+  onDeleteCommunity,
   onChatText,
   onSendChat,
   onMapClick,
@@ -6057,76 +6110,68 @@ function CommunityMapView({
   selectedPinId: string | null
   manualPlacement: boolean
   postMessage: string
+  detailTab: CommunityDetailTab
   activities: CommunityActivity[]
   usersById: Map<string, DemoUser>
   pinsById: Map<string, Pin>
-  timelineOpen: boolean
   chatText: string
   onBack: () => void
   onPinClick: (pinId: string) => void
   onListFocus?: (pinId: string) => void
   getPinMeta?: (pin: Pin) => string
-  onToggleTimeline: () => void
+  onDetailTabChange: (tab: CommunityDetailTab) => void
   onOpenProfile: (userId: string) => void
-  canEditThumbnail?: boolean
+  canManage?: boolean
   onEditThumbnail?: () => void
+  onDeleteCommunity?: () => void
   onChatText: (value: string) => void
   onSendChat: () => void
   onMapClick?: (coordinates: Coordinates) => void
   onMapSurfaceClick?: () => void
   onPost: () => void
 }) {
-  if (timelineOpen) {
-    return (
-      <section className={styles.page}>
-        <header className={styles.pageHeaderRow}>
-          <div>
-            <span>{communityLabel(community)}</span>
-            <h1>Timeline</h1>
-          </div>
-          <button className={styles.ghostButton} type="button" onClick={onToggleTimeline}>
-            <ArrowLeft size={17} />
-            Map
-          </button>
-        </header>
-        <section className={styles.contentSection}>
-          <div className={styles.timelineListPage}>
-            {activities.map((activity) => {
-              const user = usersById.get(activity.userId)
-              const pin = activity.pinId ? pinsById.get(activity.pinId) : null
-              return (
-                <article key={activity.id} className={pin ? styles.timelinePostCard : undefined}>
-                  {pin && <img src={pin.imageUrl} alt="" />}
-                  <div>
-                    <button className={styles.authorLink} type="button" onClick={() => user && onOpenProfile(user.id)}>
-                      @{user?.username ?? 'user'}
-                    </button>
-                    {pin ? (
-                      <>
-                        <b>{activity.title || pin.title}</b>
-                        <span>
-                          <MentionText text={activity.text || pin.description || '説明文なし'} usersById={usersById} onOpenProfile={onOpenProfile} />
-                        </span>
-                        {pin.tags.length > 0 && <em>{pin.tags.map((tag) => `#${tag}`).join(' ')}</em>}
-                      </>
-                    ) : (
-                      <span><MentionText text={activity.text} usersById={usersById} onOpenProfile={onOpenProfile} /></span>
-                    )}
-                  </div>
-                  <small>{formatShortDate(activity.createdAt)}</small>
-                </article>
-              )
-            })}
-            {!activities.length && <p className={styles.muted}>まだtimelineはありません。</p>}
-          </div>
-          <div className={styles.timelineChatPage}>
-            <input value={chatText} onChange={(event) => onChatText(event.target.value)} placeholder="コメントを書く" />
-            <button type="button" onClick={onSendChat}><Send size={16} /></button>
-          </div>
-        </section>
-      </section>
-    )
-  }
+  const communityPins = uniquePinsByMemory(pins)
+  const selectedCommunityPin = selectedPinId
+    ? communityPins.find((pin) => pin.id === selectedPinId) ?? null
+    : null
+
+  const timelineContent = (
+    <section className={styles.communityTimelinePanel}>
+      <div className={styles.timelineListPage}>
+        {activities.map((activity) => {
+          const user = usersById.get(activity.userId)
+          const pin = activity.pinId ? pinsById.get(activity.pinId) : null
+          return (
+            <article key={activity.id} className={pin ? styles.timelinePostCard : undefined}>
+              {pin && <img src={pin.imageUrl} alt="" />}
+              <div>
+                <button className={styles.authorLink} type="button" onClick={() => user && onOpenProfile(user.id)}>
+                  @{user?.username ?? 'user'}
+                </button>
+                {pin ? (
+                  <>
+                    <b>{activity.title || pin.title}</b>
+                    <span>
+                      <MentionText text={activity.text || pin.description || '説明文なし'} usersById={usersById} onOpenProfile={onOpenProfile} />
+                    </span>
+                    {pin.tags.length > 0 && <em>{pin.tags.map((tag) => `#${tag}`).join(' ')}</em>}
+                  </>
+                ) : (
+                  <span><MentionText text={activity.text} usersById={usersById} onOpenProfile={onOpenProfile} /></span>
+                )}
+              </div>
+              <small>{formatShortDate(activity.createdAt)}</small>
+            </article>
+          )
+        })}
+        {!activities.length && <p className={styles.communityEmpty}>まだtimelineはありません。</p>}
+      </div>
+      <div className={styles.timelineChatPage}>
+        <input value={chatText} onChange={(event) => onChatText(event.target.value)} placeholder="コメントを書く" />
+        <button type="button" onClick={onSendChat}><Send size={16} /></button>
+      </div>
+    </section>
+  )
 
   return (
     <section className={styles.communityDetailPage}>
@@ -6146,34 +6191,71 @@ function CommunityMapView({
           投稿
         </button>
       </header>
+      {canManage && (
+        <div className={styles.communityManageBar}>
+          <button className={styles.ghostButton} type="button" onClick={onEditThumbnail}>
+            Thumb
+          </button>
+          <button className={styles.dangerButton} type="button" onClick={onDeleteCommunity}>
+            <Trash2 size={16} />
+            Delete community
+          </button>
+        </div>
+      )}
       <div className={styles.communityDetailTabs}>
-        <button className={styles.active} type="button">Map</button>
-        <button type="button" onClick={onToggleTimeline}>Timeline</button>
-        {canEditThumbnail && <button type="button" onClick={onEditThumbnail}>Thumb</button>}
+        <button className={detailTab === 'pins' ? styles.active : ''} type="button" onClick={() => onDetailTabChange('pins')}>PINS</button>
+        <button className={detailTab === 'timeline' ? styles.active : ''} type="button" onClick={() => onDetailTabChange('timeline')}>TIMELINE</button>
+        <button className={detailTab === 'map' ? styles.active : ''} type="button" onClick={() => onDetailTabChange('map')}>MAP</button>
       </div>
-      <div className={styles.communityDetailMap}>
-        <SplitMapView
-          pins={pins}
-          selectedPinId={selectedPinId}
-          onPinClick={onPinClick}
-          onListFocus={onListFocus}
-          getPinMeta={getPinMeta}
-          onMapClick={onMapClick}
-          onMapSurfaceClick={onMapSurfaceClick}
-          showSearch={false}
-          embedded
-          overlay={(
-            <>
-              {manualPlacement && (
-                <div className={styles.placementBanner}>
-                  map上で投稿位置をクリックしてください。
-                </div>
-              )}
-              {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
-            </>
+      {detailTab === 'pins' && (
+        <section className={styles.communityPinsPanel}>
+          <div className={styles.communityPinsGrid}>
+            {communityPins.map((pin) => (
+              <button key={pin.id} className={styles.communityPinTile} type="button" onClick={() => onPinClick(pin.id)}>
+                <img src={pin.imageUrl} alt="" />
+              </button>
+            ))}
+          </div>
+          {!communityPins.length && <p className={styles.communityEmpty}>まだpinはありません。</p>}
+          {selectedCommunityPin && (
+            <article className={styles.communityPinPreview}>
+              <img src={selectedCommunityPin.imageUrl} alt="" />
+              <div>
+                {getPinMeta && <small>{getPinMeta(selectedCommunityPin)}</small>}
+                <strong>{selectedCommunityPin.title}</strong>
+                <p>{selectedCommunityPin.description || '説明文なし'}</p>
+              </div>
+            </article>
           )}
-        />
-      </div>
+        </section>
+      )}
+      {detailTab === 'timeline' && timelineContent}
+      {detailTab === 'map' && (
+        <div className={styles.communityDetailMap}>
+          <SplitMapView
+            pins={communityPins}
+            selectedPinId={selectedPinId}
+            onPinClick={onPinClick}
+            onListFocus={onListFocus}
+            getPinMeta={getPinMeta}
+            onMapClick={onMapClick}
+            onMapSurfaceClick={onMapSurfaceClick}
+            showSearch={false}
+            embedded
+            disableExpandedStory
+            overlay={(
+              <>
+                {manualPlacement && (
+                  <div className={styles.placementBanner}>
+                    map上で投稿位置をクリックしてください。
+                  </div>
+                )}
+                {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
+              </>
+            )}
+          />
+        </div>
+      )}
     </section>
   )
 }

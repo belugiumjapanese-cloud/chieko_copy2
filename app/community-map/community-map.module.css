@@ -1266,6 +1266,107 @@
   border-radius: 8px;
 }
 
+.communityManageBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px;
+  background: #101413;
+  border: 1px solid #222a27;
+  border-radius: 8px;
+}
+
+.communityManageBar .dangerButton,
+.communityManageBar .ghostButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.communityPinsPanel,
+.communityTimelinePanel {
+  display: grid;
+  gap: 14px;
+}
+
+.communityPinsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.communityPinTile {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: #171b1a;
+  border: 0;
+  cursor: pointer;
+}
+
+.communityPinTile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  transition: transform 160ms ease;
+}
+
+.communityPinTile:hover img {
+  transform: scale(1.03);
+}
+
+.communityPinPreview {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  color: #ffffff;
+  background: #111514;
+  border: 1px solid #26302c;
+  border-radius: 8px;
+}
+
+.communityPinPreview img {
+  width: 92px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.communityPinPreview div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.communityPinPreview small,
+.communityPinPreview p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.communityPinPreview strong,
+.communityPinPreview p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.communityEmpty {
+  margin: 0;
+  padding: 18px;
+  color: rgba(255, 255, 255, 0.62);
+  background: #111514;
+  border: 1px solid #26302c;
+  border-radius: 8px;
+}
+
 .segmented {
   display: flex;
   flex-wrap: wrap;
@@ -2989,6 +3090,10 @@
   box-shadow: 0 16px 42px rgba(24, 34, 29, 0.2);
   backdrop-filter: blur(12px);
   cursor: pointer;
+}
+
+.mapStoryCardStatic {
+  cursor: default;
 }
 
 .mapPageListCollapsed .mapStoryCard {
