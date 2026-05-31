@@ -80,7 +80,8 @@ grant execute on function public.app_folder_like_notifications() to authenticate
 
 -- Optional paid folder price.
 alter table public.folders
-  add column if not exists folder_price_yen integer;
+  add column if not exists folder_price_yen integer,
+  add column if not exists saves_count integer not null default 0;
 
 create or replace view public.app_folder_cards
 with (security_invoker = true)
@@ -109,7 +110,8 @@ select
     array_agg(fp.post_id order by fp.sort_order, fp.created_at) filter (where fp.post_id is not null),
     '{}'::uuid[]
   ) as post_ids,
-  f.folder_price_yen
+  f.folder_price_yen,
+  f.saves_count
 from public.folders f
 join public.profiles pr on pr.id = f.user_id
 left join public.folder_posts fp on fp.folder_id = f.id
@@ -122,6 +124,91 @@ left join lateral (
   limit 1
 ) preview on true
 group by f.id, pr.id, preview.image_url;
+
+-- Optional support for saved public folders and "saved your folder" notifications.
+create table if not exists public.saved_folders (
+  folder_id uuid not null references public.folders(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (folder_id, user_id)
+);
+
+create index if not exists saved_folders_user_idx
+on public.saved_folders (user_id, created_at desc);
+
+create index if not exists saved_folders_folder_idx
+on public.saved_folders (folder_id, created_at desc);
+
+alter table public.saved_folders enable row level security;
+
+drop policy if exists "saved_folders own readable" on public.saved_folders;
+create policy "saved_folders own readable"
+on public.saved_folders
+for select
+using (user_id = auth.uid());
+
+drop policy if exists "saved_folders own writes" on public.saved_folders;
+create policy "saved_folders own writes"
+on public.saved_folders
+for all
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+create or replace function public.refresh_folder_save_counts()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_folder_id uuid;
+begin
+  target_folder_id := coalesce(new.folder_id, old.folder_id);
+  update public.folders
+  set saves_count = (select count(*) from public.saved_folders where folder_id = target_folder_id)
+  where id = target_folder_id;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists saved_folders_refresh_counts on public.saved_folders;
+create trigger saved_folders_refresh_counts
+after insert or delete on public.saved_folders
+for each row execute function public.refresh_folder_save_counts();
+
+update public.folders f
+set saves_count = coalesce((
+  select count(*)
+  from public.saved_folders sf
+  where sf.folder_id = f.id
+), 0);
+
+create or replace function public.app_folder_save_notifications()
+returns table (
+  folder_id uuid,
+  user_id uuid,
+  created_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    sf.folder_id,
+    sf.user_id,
+    sf.created_at
+  from public.saved_folders sf
+  join public.folders f on f.id = sf.folder_id
+  where f.user_id = auth.uid()
+    and sf.user_id <> auth.uid()
+  order by sf.created_at desc
+  limit 200;
+$$;
+
+grant execute on function public.app_folder_save_notifications() to authenticated;
 
 -- Optional community invite notifications.
 create table if not exists public.community_invites (

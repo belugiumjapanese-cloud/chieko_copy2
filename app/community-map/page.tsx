@@ -43,6 +43,7 @@ mapboxgl.accessToken = MAPBOX_TOKEN
 const PRODUCTION_SITE_URL = 'https://map-omega-nine.vercel.app'
 const CONFIGURED_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
 const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
+const AUTH_SESSION_TIMEOUT_MS = 6000
 const CACHE_VERSION = 1
 const CACHE_PREFIX = 'spot-map:swr-cache'
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
@@ -238,7 +239,9 @@ type Folder = {
   pinIds: string[]
   visibility: 'private' | 'public'
   likes: number
+  saves: number
   likedByMe: boolean
+  savedByMe?: boolean
   createdAt: string
 }
 
@@ -276,7 +279,7 @@ type CommunityActivity = {
 
 type NotificationItem = {
   id: string
-  type: 'like' | 'save' | 'invite' | 'folder_like'
+  type: 'like' | 'save' | 'invite' | 'folder_like' | 'folder_save'
   actorId: string
   pinId?: string
   folderId?: string
@@ -311,6 +314,7 @@ type CachedRemoteSnapshot = {
   notifications: NotificationItem[]
   recommendItems: RecommendItem[]
   savedPinIds: string[]
+  savedFolderIds: string[]
 }
 
 type ProfileRow = {
@@ -362,6 +366,7 @@ type AppFolderCardRow = {
   is_paid?: boolean | null
   paid_from_index?: number | null
   folder_price_yen?: number | null
+  saves_count?: number | null
   preview_image_url?: string | null
   thumbnail_url?: string | null
   created_at: string
@@ -425,6 +430,12 @@ type SavedPostRow = {
   created_at?: string | null
 }
 
+type SavedFolderRow = {
+  folder_id: string
+  user_id?: string | null
+  created_at?: string | null
+}
+
 type CommunityInviteRow = {
   id: string
   community_id: string
@@ -473,6 +484,7 @@ type DirectFolderRow = {
   is_paid?: boolean | null
   paid_from_index?: number | null
   folder_price_yen?: number | null
+  saves_count?: number | null
   thumbnail_url?: string | null
   created_at: string
 }
@@ -835,6 +847,20 @@ type AuthUserLike = {
   user_metadata?: Record<string, unknown> | null
 }
 
+async function getSessionWithTimeout(client: NonNullable<typeof supabase>) {
+  return Promise.race([
+    client.auth.getSession(),
+    new Promise<Awaited<ReturnType<typeof client.auth.getSession>>>((resolve) => {
+      setTimeout(() => {
+        resolve({
+          data: { session: null },
+          error: new Error('Auth session timeout'),
+        } as Awaited<ReturnType<typeof client.auth.getSession>>)
+      }, AUTH_SESSION_TIMEOUT_MS)
+    }),
+  ])
+}
+
 async function ensureProfileForAuthUser(client: NonNullable<typeof supabase>, user: AuthUserLike) {
   const displayNameFromMeta = typeof user.user_metadata?.display_name === 'string' ? user.user_metadata.display_name.trim() : ''
   const displayName = displayNameFromMeta || user.email?.split('@')[0] || 'Account'
@@ -903,6 +929,7 @@ function normalizeCachedSnapshot(value: unknown, userId: string): CachedRemoteSn
     notifications: Array.isArray(value.notifications) ? value.notifications as NotificationItem[] : [],
     recommendItems: Array.isArray(value.recommendItems) ? value.recommendItems as RecommendItem[] : [],
     savedPinIds: Array.isArray(value.savedPinIds) ? value.savedPinIds.filter((item): item is string => typeof item === 'string') : [],
+    savedFolderIds: Array.isArray(value.savedFolderIds) ? value.savedFolderIds.filter((item): item is string => typeof item === 'string') : [],
   }
 }
 
@@ -947,6 +974,7 @@ function directFoldersToCards(rows: DirectFolderRow[]): AppFolderCardRow[] {
     is_paid: folder.is_paid ?? false,
     paid_from_index: folder.paid_from_index ?? null,
     folder_price_yen: folder.folder_price_yen ?? null,
+    saves_count: folder.saves_count ?? null,
     preview_image_url: null,
     thumbnail_url: folder.thumbnail_url ?? null,
     created_at: folder.created_at,
@@ -1003,13 +1031,25 @@ function directPostsToCards(rows: DirectPostRow[]): AppPostCardRow[] {
   }))
 }
 
-function buildFolders(folderRows: AppFolderCardRow[], folderLikeRows: FolderLikeRow[] = [], activeUserId = ''): Folder[] {
+function buildFolders(
+  folderRows: AppFolderCardRow[],
+  folderLikeRows: FolderLikeRow[] = [],
+  activeUserId = '',
+  savedFolderRows: SavedFolderRow[] = [],
+): Folder[] {
   const likedFolderIds = new Set(
     activeUserId ? folderLikeRows.filter((like) => like.user_id === activeUserId).map((like) => like.folder_id) : [],
+  )
+  const savedFolderIds = new Set(
+    activeUserId ? savedFolderRows.filter((save) => save.user_id === activeUserId).map((save) => save.folder_id) : [],
   )
   const likesByFolder = new Map<string, number>()
   folderLikeRows.forEach((like) => {
     likesByFolder.set(like.folder_id, (likesByFolder.get(like.folder_id) ?? 0) + 1)
+  })
+  const savesByFolder = new Map<string, number>()
+  savedFolderRows.forEach((save) => {
+    savesByFolder.set(save.folder_id, (savesByFolder.get(save.folder_id) ?? 0) + 1)
   })
 
   return folderRows.map((folder) => ({
@@ -1026,7 +1066,9 @@ function buildFolders(folderRows: AppFolderCardRow[], folderLikeRows: FolderLike
     pinIds: Array.from(new Set(folder.post_ids ?? [])),
     visibility: folder.visibility === 'public' ? 'public' : 'private',
     likes: likesByFolder.get(folder.id) ?? 0,
+    saves: folder.saves_count ?? savesByFolder.get(folder.id) ?? 0,
     likedByMe: likedFolderIds.has(folder.id),
+    savedByMe: savedFolderIds.has(folder.id),
     createdAt: folder.created_at,
   }))
 }
@@ -1035,6 +1077,7 @@ function buildNotifications(
   likeRows: LikeRow[],
   folderLikeRows: FolderLikeRow[],
   saveRows: SavedPostRow[],
+  folderSaveRows: SavedFolderRow[],
   inviteRows: CommunityInviteRow[],
   pins: Pin[],
   folders: Folder[],
@@ -1045,6 +1088,11 @@ function buildNotifications(
 
   const myPinIds = new Set(pins.filter((pin) => pin.ownerId === activeUserId).map((pin) => pin.id))
   const myFolderIds = new Set(folders.filter((folder) => folder.ownerId === activeUserId).map((folder) => folder.id))
+  const myFolderPinIds = new Set(
+    folders
+      .filter((folder) => folder.ownerId === activeUserId)
+      .flatMap((folder) => folder.pinIds),
+  )
   const communityIds = new Set(communities.map((community) => community.id))
   const items: NotificationItem[] = []
 
@@ -1077,6 +1125,31 @@ function buildNotifications(
       type: 'save',
       actorId: row.user_id,
       pinId: row.post_id,
+      createdAt: row.created_at ?? new Date().toISOString(),
+    })
+  })
+
+  folderSaveRows.forEach((row) => {
+    if (!row.user_id || !myFolderIds.has(row.folder_id) || row.user_id === activeUserId) return
+    items.push({
+      id: `folder-save-${row.folder_id}-${row.user_id}`,
+      type: 'folder_save',
+      actorId: row.user_id,
+      folderId: row.folder_id,
+      createdAt: row.created_at ?? new Date().toISOString(),
+    })
+  })
+
+  saveRows.forEach((row) => {
+    if (!row.user_id || !myFolderPinIds.has(row.post_id) || row.user_id === activeUserId) return
+    const folder = folders.find((item) => item.ownerId === activeUserId && item.pinIds.includes(row.post_id))
+    if (!folder || myPinIds.has(row.post_id)) return
+    items.push({
+      id: `folder-pin-save-${folder.id}-${row.post_id}-${row.user_id}`,
+      type: 'save',
+      actorId: row.user_id,
+      pinId: row.post_id,
+      folderId: folder.id,
       createdAt: row.created_at ?? new Date().toISOString(),
     })
   })
@@ -1511,6 +1584,7 @@ export default function CommunityMapPrototype() {
   const [recommendItems, setRecommendItems] = useState<RecommendItem[]>(EMBEDDED_RECOMMEND_ITEMS)
   const [folders, setFolders] = useState<Folder[]>([])
   const [savedPinIds, setSavedPinIds] = useState<string[]>([])
+  const [savedFolderIds, setSavedFolderIds] = useState<string[]>([])
   const [seenPinIds, setSeenPinIds] = useState<string[]>([])
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null)
@@ -1609,9 +1683,22 @@ export default function CommunityMapPrototype() {
     () => folders.filter((folder) => folder.ownerId === activeUserId),
     [activeUserId, folders],
   )
+  const libraryFolders = useMemo(
+    () => folders.filter((folder) => folder.ownerId === activeUserId || savedFolderIds.includes(folder.id)),
+    [activeUserId, folders, savedFolderIds],
+  )
+  const libraryFolderPins = useMemo(
+    () => uniquePinsByMemory(
+      libraryFolders
+        .flatMap((folder) => folder.pinIds)
+        .map((id) => pinsById.get(id))
+        .filter((pin): pin is Pin => Boolean(pin)),
+    ),
+    [libraryFolders, pinsById],
+  )
   const folderLibraryPins = useMemo(
-    () => uniquePinsByMemory(uniquePinsById([...myPostedPins, ...savedPins])),
-    [myPostedPins, savedPins],
+    () => uniquePinsByMemory(uniqueRowsById([...myPostedPins, ...savedPins, ...libraryFolderPins])),
+    [libraryFolderPins, myPostedPins, savedPins],
   )
   const folderEditorFolders = userFolders
   const publicFolderPinIds = useMemo(() => {
@@ -1660,7 +1747,7 @@ export default function CommunityMapPrototype() {
       pins: pins.filter((pin) => pinCommunityIds(pin).includes(community.id)),
     })),
     { id: 'myworld', label: 'My World', pins: myPostedPins },
-    ...userFolders.map((folder) => ({
+    ...libraryFolders.map((folder) => ({
       id: `folder:${folder.id}`,
       label: folder.name,
       pins: folder.pinIds.map((pinId) => pinsById.get(pinId)).filter((pin): pin is Pin => Boolean(pin)),
@@ -1738,6 +1825,7 @@ export default function CommunityMapPrototype() {
     setNotifications(cached.notifications)
     setRecommendItems(cached.recommendItems.length ? cached.recommendItems : EMBEDDED_RECOMMEND_ITEMS)
     setSavedPinIds(cached.savedPinIds)
+    setSavedFolderIds(cached.savedFolderIds)
     setRemoteLoading(false)
     setRemoteError('')
     return true
@@ -1802,6 +1890,7 @@ export default function CommunityMapPrototype() {
           myPostsResult,
           myFoldersResult,
           savedPostsResult,
+          savedFoldersResult,
           myLikesResult,
         ] = await Promise.all([
         supabase
@@ -1823,6 +1912,12 @@ export default function CommunityMapPrototype() {
           .order('created_at', { ascending: false })
           .limit(120),
         supabase
+          .from('saved_folders')
+          .select('folder_id,user_id,created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(120),
+        supabase
           .from('post_likes')
           .select('post_id,user_id,created_at')
           .eq('user_id', userId)
@@ -1835,9 +1930,12 @@ export default function CommunityMapPrototype() {
           console.warn(personalFailed.error.message)
           return
         }
+        if (savedFoldersResult.error) console.warn(savedFoldersResult.error.message)
 
         const savedRows = (savedPostsResult.data ?? []) as SavedPostRow[]
         const savedIds = savedRows.map((row) => row.post_id).filter(Boolean).slice(0, 80)
+        const savedFolderRows = (savedFoldersResult.error ? [] : savedFoldersResult.data ?? []) as SavedFolderRow[]
+        const nextSavedFolderIds = savedFolderRows.map((row) => row.folder_id).filter(Boolean).slice(0, 120)
         let savedPostRows: AppPostCardRow[] = []
         if (savedIds.length) {
           const savedPostResult = await supabase
@@ -1848,12 +1946,48 @@ export default function CommunityMapPrototype() {
             savedPostRows = savedPostResult.data as AppPostCardRow[]
           }
         }
+        let savedFolderCardRows: AppFolderCardRow[] = []
+        if (nextSavedFolderIds.length) {
+          const savedFolderCardsResult = await supabase
+            .from('app_folder_cards')
+            .select('*')
+            .in('id', nextSavedFolderIds)
+          if (!savedFolderCardsResult.error && Array.isArray(savedFolderCardsResult.data)) {
+            savedFolderCardRows = savedFolderCardsResult.data as AppFolderCardRow[]
+          } else if (savedFolderCardsResult.error) {
+            console.warn(savedFolderCardsResult.error.message)
+          }
+        }
 
-        const priorityFolders = buildFolders((myFoldersResult.data ?? []) as AppFolderCardRow[], [], userId)
+        const priorityFolderRows = uniqueRowsById([
+          ...((myFoldersResult.data ?? []) as AppFolderCardRow[]),
+          ...savedFolderCardRows,
+        ])
+        const priorityFolders = buildFolders(priorityFolderRows, [], userId, savedFolderRows)
+        const knownPriorityPostIds = new Set([
+          ...((myPostsResult.data ?? []) as AppPostCardRow[]).map((row) => row.id),
+          ...savedPostRows.map((row) => row.id),
+        ])
+        const folderMissingPostIds = Array.from(new Set(priorityFolders.flatMap((folder) => folder.pinIds)))
+          .filter((id) => !knownPriorityPostIds.has(id))
+          .slice(0, 160)
+        let folderPostRows: AppPostCardRow[] = []
+        if (folderMissingPostIds.length) {
+          const folderPostsResult = await supabase
+            .from('app_post_cards')
+            .select('*')
+            .in('id', folderMissingPostIds)
+          if (!folderPostsResult.error && Array.isArray(folderPostsResult.data)) {
+            folderPostRows = folderPostsResult.data as AppPostCardRow[]
+          } else if (folderPostsResult.error) {
+            console.warn(folderPostsResult.error.message)
+          }
+        }
         const priorityPins = buildPins(
           uniqueRowsById([
             ...((myPostsResult.data ?? []) as AppPostCardRow[]),
             ...savedPostRows,
+            ...folderPostRows,
           ]),
           [],
           (myLikesResult.data ?? []) as LikeRow[],
@@ -1864,6 +1998,7 @@ export default function CommunityMapPrototype() {
         setFolders((current) => mergeById(current, priorityFolders))
         setPins((current) => mergeById(current, priorityPins))
         setSavedPinIds(savedIds)
+        setSavedFolderIds(nextSavedFolderIds)
       })()
     } catch (error) {
       console.error(error)
@@ -1886,6 +2021,7 @@ export default function CommunityMapPrototype() {
       setActivities([])
       setNotifications([])
       setSavedPinIds([])
+      setSavedFolderIds([])
       return
     }
 
@@ -1922,12 +2058,14 @@ export default function CommunityMapPrototype() {
         communitiesResult,
         membersResult,
         folderLikesResult,
+        savedFoldersResult,
         recommendResult,
       ] = await Promise.all([
         supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
         supabase.from('community_members').select('community_id,user_id,role'),
         supabase.from('folder_likes').select('folder_id,user_id,created_at').limit(2000),
+        supabase.from('saved_folders').select('folder_id,user_id,created_at').limit(2000),
         supabase
           .from('recommend_items')
           .select('id,item_type,title,description,image_url,target_url,folder_id,post_id,community_id,priority,is_published,created_at')
@@ -1943,11 +2081,18 @@ export default function CommunityMapPrototype() {
       let folderRows = (foldersResult.error ? [] : foldersResult.data ?? []) as AppFolderCardRow[]
       if (foldersResult.error) {
         console.warn(foldersResult.error.message)
-        const directFoldersResult = await supabase
+        let directFoldersResult: any = await supabase
           .from('folders')
-          .select('id,user_id,folder_kind,name,description,color,visibility,is_paid,paid_from_index,folder_price_yen,thumbnail_url,created_at')
+          .select('id,user_id,folder_kind,name,description,color,visibility,is_paid,paid_from_index,folder_price_yen,saves_count,thumbnail_url,created_at')
           .order('created_at', { ascending: false })
           .limit(300)
+        if (directFoldersResult.error && /saves_count/i.test(directFoldersResult.error.message)) {
+          directFoldersResult = await supabase
+            .from('folders')
+            .select('id,user_id,folder_kind,name,description,color,visibility,is_paid,paid_from_index,folder_price_yen,thumbnail_url,created_at')
+            .order('created_at', { ascending: false })
+            .limit(300)
+        }
         if (!directFoldersResult.error && Array.isArray(directFoldersResult.data)) {
           folderRows = directFoldersToCards(directFoldersResult.data as DirectFolderRow[])
           const directFolderIds = folderRows.map((folder) => folder.id)
@@ -2024,6 +2169,13 @@ export default function CommunityMapPrototype() {
         ? folderLikesResult.data
         : []) as FolderLikeRow[]
       if (folderLikesResult.error) console.warn(folderLikesResult.error.message)
+      const savedFolderRows = (!savedFoldersResult.error && Array.isArray(savedFoldersResult.data)
+        ? savedFoldersResult.data
+        : []) as SavedFolderRow[]
+      if (savedFoldersResult.error) console.warn(savedFoldersResult.error.message)
+      const remoteSavedFolderIds = userId
+        ? savedFolderRows.filter((row) => row.user_id === userId).map((row) => row.folder_id)
+        : []
 
       const remoteRecommendItems = (!recommendResult.error && Array.isArray(recommendResult.data)
         ? recommendResult.data
@@ -2031,11 +2183,12 @@ export default function CommunityMapPrototype() {
       if (recommendResult.error) console.warn(recommendResult.error.message)
       const nextRecommendItems = remoteRecommendItems.length ? remoteRecommendItems : EMBEDDED_RECOMMEND_ITEMS
 
-      const remoteFolders = buildFolders(folderRows, folderLikeRows, userId)
+      const remoteFolders = buildFolders(folderRows, folderLikeRows, userId, savedFolderRows)
       const remoteCommunities = buildCommunities(communityRows, memberRows, userId)
       setFolders(remoteFolders)
       setCommunities(remoteCommunities)
       setRecommendItems(nextRecommendItems)
+      setSavedFolderIds(remoteSavedFolderIds)
 
       const [
         postsResult,
@@ -2065,16 +2218,51 @@ export default function CommunityMapPrototype() {
           .limit(300)
         if (directPostsResult.error || !Array.isArray(directPostsResult.data)) {
           if (directPostsResult.error) console.warn(directPostsResult.error.message)
-          return
+          postRowsForCards = []
+        } else {
+          postRowsForCards = directPostsToCards(directPostsResult.data as DirectPostRow[])
         }
-
-        postRowsForCards = directPostsToCards(directPostsResult.data as DirectPostRow[])
       }
 
       ;[commentsResult, likesResult, savedPostsResult, saveActivityResult, activitiesResult].forEach((result) => {
         const message = resultError(result)
         if (message) console.warn(message)
       })
+
+      const currentPostIds = new Set(postRowsForCards.map((post) => post.id))
+      const remoteSavedPinIds = ((savedPostsResult.error ? [] : savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id)
+      const requiredPostIds = Array.from(new Set([
+        ...remoteFolders.flatMap((folder) => folder.pinIds),
+        ...remoteSavedPinIds,
+      ]))
+        .filter((id) => id && !currentPostIds.has(id))
+        .slice(0, 400)
+      if (requiredPostIds.length) {
+        const missingPostsResult = await supabase
+          .from('app_post_cards')
+          .select('*')
+          .in('id', requiredPostIds)
+        if (!missingPostsResult.error && Array.isArray(missingPostsResult.data)) {
+          postRowsForCards = uniqueRowsById([
+            ...postRowsForCards,
+            ...(missingPostsResult.data as AppPostCardRow[]),
+          ])
+        } else {
+          if (missingPostsResult.error) console.warn(missingPostsResult.error.message)
+          const directMissingPostsResult = await supabase
+            .from('posts')
+            .select('id,user_id,title,description,latitude,longitude,image_url,visibility,tags,taken_at,likes_count,comments_count,saves_count,reports_count,created_at')
+            .in('id', requiredPostIds)
+          if (!directMissingPostsResult.error && Array.isArray(directMissingPostsResult.data)) {
+            postRowsForCards = uniqueRowsById([
+              ...postRowsForCards,
+              ...directPostsToCards(directMissingPostsResult.data as DirectPostRow[]),
+            ])
+          } else if (directMissingPostsResult.error) {
+            console.warn(directMissingPostsResult.error.message)
+          }
+        }
+      }
 
       const remotePins = buildPins(
         postRowsForCards,
@@ -2086,6 +2274,7 @@ export default function CommunityMapPrototype() {
       let saveNotificationRows = (saveActivityResult.error ? [] : saveActivityResult.data ?? []) as SavedPostRow[]
       let inviteNotificationRows: CommunityInviteRow[] = []
       let folderLikeNotificationRows = folderLikeRows
+      let folderSaveNotificationRows = savedFolderRows
       if (userId) {
         const saveNotificationResult = await supabase.rpc('app_save_notifications')
         if (!saveNotificationResult.error && Array.isArray(saveNotificationResult.data)) {
@@ -2094,6 +2283,10 @@ export default function CommunityMapPrototype() {
         const folderLikeNotificationResult = await supabase.rpc('app_folder_like_notifications')
         if (!folderLikeNotificationResult.error && Array.isArray(folderLikeNotificationResult.data)) {
           folderLikeNotificationRows = folderLikeNotificationResult.data as FolderLikeRow[]
+        }
+        const folderSaveNotificationResult = await supabase.rpc('app_folder_save_notifications')
+        if (!folderSaveNotificationResult.error && Array.isArray(folderSaveNotificationResult.data)) {
+          folderSaveNotificationRows = folderSaveNotificationResult.data as SavedFolderRow[]
         }
         const inviteNotificationResult = await supabase.rpc('app_invite_notifications')
         if (!inviteNotificationResult.error && Array.isArray(inviteNotificationResult.data)) {
@@ -2106,14 +2299,13 @@ export default function CommunityMapPrototype() {
         (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
         folderLikeNotificationRows,
         saveNotificationRows,
+        folderSaveNotificationRows,
         inviteNotificationRows,
         remotePins,
         remoteFolders,
         remoteCommunities,
         userId,
       )
-      const remoteSavedPinIds = ((savedPostsResult.error ? [] : savedPostsResult.data ?? []) as SavedPostRow[]).map((row) => row.post_id)
-
       setPins(remotePins)
       setActivities(remoteActivities)
       setNotifications(remoteNotifications)
@@ -2130,6 +2322,7 @@ export default function CommunityMapPrototype() {
         notifications: remoteNotifications,
         recommendItems: nextRecommendItems,
         savedPinIds: remoteSavedPinIds,
+        savedFolderIds: remoteSavedFolderIds,
       })
     } catch (error) {
       console.error(error)
@@ -2142,6 +2335,7 @@ export default function CommunityMapPrototype() {
         setActivities([])
         setNotifications([])
         setSavedPinIds([])
+        setSavedFolderIds([])
       }
     } finally {
       setRemoteLoading(false)
@@ -2159,8 +2353,9 @@ export default function CommunityMapPrototype() {
     let mounted = true
 
     const boot = async () => {
-      const { data } = await client.auth.getSession()
+      const { data, error } = await getSessionWithTimeout(client)
       if (!mounted) return
+      if (error) console.warn(error.message)
       const user = data.session?.user
       const userId = user?.id ?? ''
       setIsAuthenticated(Boolean(userId))
@@ -2182,17 +2377,20 @@ export default function CommunityMapPrototype() {
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
-      if (!session?.user && event !== 'SIGNED_OUT') return
       const user = session?.user
+      if (!user) {
+        setIsAuthenticated(false)
+        setActiveUserId('')
+        setOwnedAccountIds([])
+        setProfileUserId('')
+        setRemoteLoading(false)
+        return
+      }
       const userId = user?.id ?? ''
       setIsAuthenticated(Boolean(userId))
       setActiveUserId(userId)
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId(userId)
-      if (!user) {
-        setRemoteLoading(false)
-        return
-      }
       hydrateFromCache(userId)
       void ensureProfileForAuthUser(client, user)
         .then(async () => {
@@ -3134,90 +3332,40 @@ export default function CommunityMapPrototype() {
       return
     }
 
-    const sameFolderAlreadyExists = userFolders.some((item) => {
-      if (item.name !== folder.name || item.pinIds.length !== folder.pinIds.length) return false
-      const itemPinIds = new Set(item.pinIds)
-      return folder.pinIds.every((pinId) => itemPinIds.has(pinId))
-    })
-
-    if (sameFolderAlreadyExists) {
+    if (savedFolderIds.includes(folder.id) || folder.savedByMe) {
       setToast('このfolderはLibraryに追加済みです。')
       return
     }
 
-    const optimisticId = createId('folder')
-    const copiedFolder: Folder = {
-      ...folder,
-      id: optimisticId,
-      ownerId: activeUserId,
-      kind: 'to_visit',
-      visibility: 'private',
-      likedByMe: false,
-      likes: 0,
-      createdAt: new Date().toISOString(),
-    }
+    setSavedFolderIds((current) => (current.includes(folder.id) ? current : [folder.id, ...current]))
+    setFolders((current) =>
+      current.map((item) =>
+        item.id === folder.id
+          ? { ...item, savedByMe: true, saves: item.saves + 1 }
+          : item,
+      ),
+    )
 
-    setFolders((current) => [copiedFolder, ...current])
+    const { error } = await client
+      .from('saved_folders')
+      .upsert({ folder_id: folder.id, user_id: activeUserId }, { onConflict: 'folder_id,user_id' })
 
-    const fullPayload = {
-      user_id: activeUserId,
-      folder_kind: 'to_visit',
-      name: folder.name,
-      description: folder.description ?? '',
-      color: folder.color,
-      thumbnail_url: folder.thumbnailUrl ?? null,
-      visibility: 'private',
-    }
-    const fallbackPayload = {
-      user_id: activeUserId,
-      name: folder.name,
-      description: folder.description ?? '',
-      color: folder.color,
-      visibility: 'private',
-    }
-
-    let folderResult = await client
-      .from('folders')
-      .insert(fullPayload)
-      .select('id')
-      .single()
-
-    if (folderResult.error && /folder_kind|thumbnail_url/i.test(folderResult.error.message)) {
-      folderResult = await client
-        .from('folders')
-        .insert(fallbackPayload)
-        .select('id')
-        .single()
-    }
-
-    if (folderResult.error || !folderResult.data) {
-      setFolders((current) => current.filter((item) => item.id !== optimisticId))
-      setToast(folderResult.error?.message ?? 'folderをLibraryに追加できませんでした。')
+    if (error) {
+      setSavedFolderIds((current) => current.filter((id) => id !== folder.id))
+      setFolders((current) =>
+        current.map((item) =>
+          item.id === folder.id
+            ? { ...item, savedByMe: false, saves: Math.max(0, item.saves - 1) }
+            : item,
+        ),
+      )
+      setToast(error.message.includes('saved_folders') ? 'Supabaseにsaved_folders SQLを追加してください。' : error.message)
       return
-    }
-
-    const savedFolderId = folderResult.data.id
-    setFolders((current) => current.map((item) => (item.id === optimisticId ? { ...item, id: savedFolderId } : item)))
-
-    const folderPosts = folder.pinIds.map((postId, index) => ({
-      folder_id: savedFolderId,
-      post_id: postId,
-      user_id: activeUserId,
-      sort_order: index,
-    }))
-
-    if (folderPosts.length) {
-      const { error } = await client.from('folder_posts').insert(folderPosts)
-      if (error) {
-        setToast(error.message)
-        await loadRemoteData(activeUserId)
-        return
-      }
     }
 
     setToast('Libraryにfolderを追加しました。')
     await loadRemoteData(activeUserId)
-  }, [activeUserId, loadRemoteData, requireSignedIn, userFolders])
+  }, [activeUserId, loadRemoteData, requireSignedIn, savedFolderIds])
 
   const deletePin = useCallback(async (pinId: string) => {
     const client = supabase
@@ -3246,16 +3394,34 @@ export default function CommunityMapPrototype() {
   const deleteFolder = useCallback(async (folderId: string) => {
     const client = supabase
     if (!client || !requireSignedIn()) return
-    if (!window.confirm('このfolderを削除しますか？')) return
+    const targetFolder = folders.find((folder) => folder.id === folderId)
+    if (!targetFolder) return
+    const isExternalSavedFolder = targetFolder.ownerId !== activeUserId
+    if (!window.confirm(isExternalSavedFolder ? 'このfolderをLibraryから外しますか？' : 'このfolderを削除しますか？')) return
 
     setFolderEditId(null)
     setToVisitFolderId((current) => (current === folderId ? null : current))
-    setFolders((current) => current.filter((folder) => folder.id !== folderId))
 
+    if (isExternalSavedFolder) {
+      setSavedFolderIds((current) => current.filter((id) => id !== folderId))
+      setFolders((current) =>
+        current.map((folder) =>
+          folder.id === folderId
+            ? { ...folder, savedByMe: false, saves: Math.max(0, folder.saves - 1) }
+            : folder,
+        ),
+      )
+      const { error } = await client.from('saved_folders').delete().eq('folder_id', folderId).eq('user_id', activeUserId)
+      if (error) setToast(error.message)
+      await loadRemoteData(activeUserId)
+      return
+    }
+
+    setFolders((current) => current.filter((folder) => folder.id !== folderId))
     const { error } = await client.from('folders').delete().eq('id', folderId).eq('user_id', activeUserId)
     if (error) setToast(error.message)
     await loadRemoteData(activeUserId)
-  }, [activeUserId, loadRemoteData, requireSignedIn])
+  }, [activeUserId, folders, loadRemoteData, requireSignedIn])
 
   const togglePinFolder = useCallback(async (pinId: string, folderId: string, checked: boolean) => {
     const client = supabase
@@ -3357,6 +3523,7 @@ export default function CommunityMapPrototype() {
         pinIds: [pinId],
         visibility: 'private',
         likes: 0,
+        saves: 0,
         likedByMe: false,
         createdAt: new Date().toISOString(),
       },
@@ -3434,6 +3601,7 @@ export default function CommunityMapPrototype() {
         pinIds: [],
         visibility: mapVisibility(data.visibility),
         likes: 0,
+        saves: 0,
         likedByMe: false,
         createdAt: data.created_at,
       },
@@ -3748,7 +3916,9 @@ export default function CommunityMapPrototype() {
               title={recommendedFoldersFromAdmin.length ? 'Official / picked folders' : 'Public folders'}
               folders={(recommendedFoldersFromAdmin.length ? recommendedFoldersFromAdmin : publicFindFolders).slice(0, 8)}
               pinsById={pinsById}
+              usersById={usersById}
               onOpenFolder={(folderId) => { setActiveTab('find'); setSelectedFindFolderId(folderId) }}
+              onOpenProfile={openProfile}
               onToggleLike={toggleFolderLike}
               onSaveFolder={saveFolderToLibrary}
             />
@@ -3879,6 +4049,7 @@ export default function CommunityMapPrototype() {
             pinsById={pinsById}
             owner={usersById.get(selectedFindFolder.ownerId)}
             onBack={() => setSelectedFindFolderId(null)}
+            onOpenProfile={openProfile}
             onOpenPin={setSelectedPinId}
             onAddPinToFolder={setFolderEditorPinId}
             onToggleLike={toggleFolderLike}
@@ -3920,9 +4091,9 @@ export default function CommunityMapPrototype() {
               <button type="button">検索</button>
             </div>
             <div className={styles.findMain}>
-              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
-              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
-              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} onOpenFolder={setSelectedFindFolderId} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
+              <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} usersById={usersById} onOpenFolder={setSelectedFindFolderId} onOpenProfile={openProfile} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
+              <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} usersById={usersById} onOpenFolder={setSelectedFindFolderId} onOpenProfile={openProfile} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
+              <FolderShelf title="好きそうなフォルダー" folders={publicFindFolders.filter((folder) => folder.ownerId !== activeUserId)} pinsById={pinsById} usersById={usersById} onOpenFolder={setSelectedFindFolderId} onOpenProfile={openProfile} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
             </div>
           </section>
         )
@@ -3991,7 +4162,8 @@ export default function CommunityMapPrototype() {
           mode={toVisitMode}
           onModeChange={setToVisitMode}
           pins={folderLibraryPins}
-          folders={userFolders}
+          folders={libraryFolders}
+          usersById={usersById}
           selectedFolderId={toVisitFolderId}
           onSelectFolder={setToVisitFolderId}
           folderSearch={folderSearch}
@@ -4139,6 +4311,7 @@ export default function CommunityMapPrototype() {
                               {notification.type === 'like' && 'あなたのpinにいいねしました。'}
                               {notification.type === 'folder_like' && 'あなたのfolderにいいねしました。'}
                               {notification.type === 'save' && 'あなたのpinを保存しました。'}
+                              {notification.type === 'folder_save' && 'あなたのfolderをLibraryに追加しました。'}
                               {notification.type === 'invite' && 'コミュニティに招待されました。'}
                             </small>
                             <em>{notification.type === 'invite' ? communityLabel(community ?? undefined) : folder?.name ?? pin?.title ?? 'memory'}</em>
@@ -4645,7 +4818,7 @@ function folderStats(folder: Folder, pinsById: Map<string, Pin>) {
   return {
     likes: folder.likes,
     comments: folderPins.reduce((sum, pin) => sum + pin.comments.length, 0),
-    saves: folderPins.reduce((sum, pin) => sum + pin.saves, 0),
+    saves: folder.saves,
   }
 }
 
@@ -4684,14 +4857,18 @@ function FolderShelf({
   title,
   folders,
   pinsById,
+  usersById,
   onOpenFolder,
+  onOpenProfile,
   onToggleLike,
   onSaveFolder,
 }: {
   title: string
   folders: Folder[]
   pinsById: Map<string, Pin>
+  usersById: Map<string, DemoUser>
   onOpenFolder: (folderId: string) => void
+  onOpenProfile: (userId: string) => void
   onToggleLike: (folderId: string) => void
   onSaveFolder: (folder: Folder) => void
 }) {
@@ -4701,6 +4878,7 @@ function FolderShelf({
       <div className={styles.findGrid}>
         {folders.map((folder) => {
           const preview = folder.thumbnailUrl || folder.pinIds.map((id) => pinsById.get(id)?.imageUrl).find(Boolean)
+          const owner = usersById.get(folder.ownerId)
           return (
             <article key={`${title}-${folder.id}`} className={styles.findFolderCard}>
               <button className={styles.folderOpenButton} type="button" onClick={() => onOpenFolder(folder.id)}>
@@ -4708,6 +4886,15 @@ function FolderShelf({
                 <strong>{folder.name}</strong>
                 <small>{folder.pinIds.length} pins</small>
               </button>
+              {owner && (
+                <button
+                  className={styles.folderOwnerLink}
+                  type="button"
+                  onClick={() => onOpenProfile(owner.id)}
+                >
+                  @{owner.username}
+                </button>
+              )}
               <FolderActionBar folder={folder} pinsById={pinsById} onToggleLike={onToggleLike} onSaveFolder={onSaveFolder} />
             </article>
           )
@@ -4723,6 +4910,7 @@ function FindFolderDetail({
   pinsById,
   owner,
   onBack,
+  onOpenProfile,
   onOpenPin,
   onAddPinToFolder,
   onToggleLike,
@@ -4732,6 +4920,7 @@ function FindFolderDetail({
   pinsById: Map<string, Pin>
   owner?: DemoUser
   onBack: () => void
+  onOpenProfile: (userId: string) => void
   onOpenPin: (pinId: string) => void
   onAddPinToFolder: (pinId: string) => void
   onToggleLike: (folderId: string) => void
@@ -4797,7 +4986,7 @@ function FindFolderDetail({
         </button>
         <div>
           <h1>{folder.name}</h1>
-          {owner && <button className={styles.authorLink} type="button">@{owner.username}</button>}
+          {owner && <button className={styles.authorLink} type="button" onClick={() => onOpenProfile(owner.id)}>@{owner.username}</button>}
         </div>
       </header>
       <PinMap pins={folderPins} selectedPinId={null} onPinClick={onOpenPin} compact />
@@ -4920,6 +5109,7 @@ function FolderLibraryView({
   onModeChange,
   pins,
   folders,
+  usersById,
   selectedFolderId,
   onSelectFolder,
   folderSearch,
@@ -4942,6 +5132,7 @@ function FolderLibraryView({
   onModeChange: (value: LibraryMode) => void
   pins: Pin[]
   folders: Folder[]
+  usersById: Map<string, DemoUser>
   selectedFolderId: string | null
   onSelectFolder: (folderId: string | null) => void
   folderSearch: string
@@ -4975,21 +5166,25 @@ function FolderLibraryView({
   const ownedPins = pins.filter((pin) => pin.ownerId === currentUserId)
   const savedExternalPins = pins.filter((pin) => pin.ownerId !== currentUserId)
   const pinFolders = (pinId: string) => folders.filter((folder) => folder.pinIds.includes(pinId))
-  const renderLibraryPin = (pin: Pin) => (
-    <article key={pin.id} className={styles.libraryPinRow}>
-      <button type="button" onClick={() => onOpenPin(pin.id)}>
-        <img src={pin.imageUrl} alt="" />
-        <span>
-          <strong>{pin.title}</strong>
-          <small>{getMeta(pin)}</small>
-          <em>{pinFolders(pin.id).map((folder) => folder.name).join(', ') || 'Folder未分類'}</em>
-        </span>
-      </button>
-      <button className={styles.ghostButton} type="button" onClick={() => onOpenPin(pin.id)}>
-        詳細
-      </button>
-    </article>
-  )
+  const renderLibraryPin = (pin: Pin) => {
+    const owner = usersById.get(pin.ownerId)
+    const ownerLabel = pin.ownerId === currentUserId ? 'My drop' : owner ? `@${owner.username}` : getMeta(pin)
+    return (
+      <article key={pin.id} className={styles.libraryPinRow}>
+        <button type="button" onClick={() => onOpenPin(pin.id)}>
+          <img src={pin.imageUrl} alt="" />
+          <span>
+            <strong>{pin.title}</strong>
+            <small>{ownerLabel}</small>
+            <em>{pinFolders(pin.id).map((folder) => folder.name).join(', ') || 'Folder未分類'}</em>
+          </span>
+        </button>
+        <button className={styles.ghostButton} type="button" onClick={() => onOpenPin(pin.id)}>
+          詳細
+        </button>
+      </article>
+    )
+  }
 
   return (
     <section className={styles.page}>
@@ -5029,14 +5224,21 @@ function FolderLibraryView({
         <section className={`${styles.contentSection} ${styles.folderPlaylist}`}>
           <div className={styles.folderPlaylistHeader}>
             <h2>{selectedFolder.name}</h2>
+            {selectedFolder.ownerId !== currentUserId && (
+              <small>@{usersById.get(selectedFolder.ownerId)?.username ?? 'user'}</small>
+            )}
             <p>{selectedFolder.description || 'Description'}</p>
             <small>
               {selectedFolder.visibility === 'public' ? 'Public folder' : 'Private folder'}
               {selectedFolder.isPaid ? ` / Paid${selectedFolder.priceYen ? ` ¥${selectedFolder.priceYen}` : ''}` : ''}
             </small>
             <div className={styles.folderPlaylistActions}>
-              <button className={styles.ghostButton} type="button" onClick={() => onEditFolder(selectedFolder.id)}>Edit Folder</button>
-              <button className={styles.dangerButton} type="button" onClick={() => onDeleteFolder(selectedFolder.id)}>Delete Folder</button>
+              {selectedFolder.ownerId === currentUserId && (
+                <button className={styles.ghostButton} type="button" onClick={() => onEditFolder(selectedFolder.id)}>Edit Folder</button>
+              )}
+              <button className={styles.dangerButton} type="button" onClick={() => onDeleteFolder(selectedFolder.id)}>
+                {selectedFolder.ownerId === currentUserId ? 'Delete Folder' : 'Remove from Library'}
+              </button>
             </div>
           </div>
           <PinFolderList
@@ -5060,23 +5262,28 @@ function FolderLibraryView({
                 <button key={folder.id} type="button" onClick={() => onSelectFolder(folder.id)}>
                   {preview ? <img src={preview} alt="" /> : <span style={{ backgroundColor: folder.color }} />}
                   <strong>{folder.name}</strong>
-                  <small>{folder.pinIds.length} pins / {folder.visibility}</small>
-                  <em
-                    role="button"
-                    tabIndex={0}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onEditFolder(folder.id)
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      onEditFolder(folder.id)
-                    }}
-                  >
-                    Edit Folder
-                  </em>
+                  <small>
+                    {folder.pinIds.length} pins
+                    {folder.ownerId !== currentUserId ? ` / @${usersById.get(folder.ownerId)?.username ?? 'user'}` : ` / ${folder.visibility}`}
+                  </small>
+                  {folder.ownerId === currentUserId && (
+                    <em
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onEditFolder(folder.id)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onEditFolder(folder.id)
+                      }}
+                    >
+                      Edit Folder
+                    </em>
+                  )}
                 </button>
               )
             })}
