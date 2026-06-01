@@ -850,9 +850,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function getSignInErrorMessage(error: unknown) {
   const message = getErrorMessage(error, '')
-  if (/upstream connect|remote connection failure|transport failure|service unavailable|schema cache|PGRST002|503/i.test(message)) {
-    return 'Supabase側が一時的に利用できない状態です。Usage/Billingの制限、またはDatabase/APIの状態を確認してください。'
-  }
   if (/invalid login credentials|user not found|invalid email or password|invalid credentials/i.test(message)) {
     return 'メールアドレスまたはパスワードが間違っています。'
   }
