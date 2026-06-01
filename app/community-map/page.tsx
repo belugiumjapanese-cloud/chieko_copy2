@@ -823,22 +823,44 @@ function mapCommunityPrivacy(value: string | null | undefined): Privacy {
   return value === 'public' ? 'public' : 'limited'
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = (error as { message?: unknown }).message
-    if (typeof message === 'string' && message) return message
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (!error) return fallback
+  if (typeof error === 'string') return error.trim() || fallback
+  if (error instanceof Error && error.message?.trim()) return error.message.trim()
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>
+    const candidates = ['message', 'error_description', 'details', 'hint', 'code', 'name']
+    for (const key of candidates) {
+      const value = record[key]
+      if (typeof value === 'string' && value.trim() && value.trim() !== '{}') return value.trim()
+    }
+    if (record.cause) {
+      const causeMessage = getErrorMessage(record.cause, '')
+      if (causeMessage) return causeMessage
+    }
+    try {
+      const serialized = JSON.stringify(error)
+      if (serialized && serialized !== '{}' && serialized !== '[]') return serialized
+    } catch {
+      // Ignore serialization errors and use the fallback below.
+    }
   }
   return fallback
 }
 
 function getSignInErrorMessage(error: unknown) {
   const message = getErrorMessage(error, '')
-  if (/invalid login credentials|user not found|invalid email or password/i.test(message)) {
+  if (/invalid login credentials|user not found|invalid email or password|invalid credentials/i.test(message)) {
     return 'メールアドレスまたはパスワードが間違っています。'
   }
   if (/email not confirmed/i.test(message)) {
     return 'メール確認が完了していません。メール内のURLを開いてからログインしてください。'
+  }
+  if (/failed to fetch|network|fetch failed|load failed/i.test(message)) {
+    return 'Supabaseに接続できませんでした。通信環境かSupabase URLを確認してください。'
+  }
+  if (/not found|404/i.test(message) || message === '{}') {
+    return 'Supabase URLが正しくない可能性があります。NEXT_PUBLIC_SUPABASE_URLは /rest/v1 なしのURLにしてください。'
   }
   return message || 'ログインできませんでした。'
 }
@@ -2369,9 +2391,19 @@ export default function CommunityMapPrototype() {
         return
       }
       hydrateFromCache(userId)
-      await ensureProfileForAuthUser(client, user)
-      await loadPriorityRemoteData(userId)
-      void loadRemoteData(userId)
+      try {
+        await ensureProfileForAuthUser(client, user)
+        await loadPriorityRemoteData(userId)
+        void loadRemoteData(userId)
+      } catch (error) {
+        console.error(error)
+        setRemoteError(getErrorMessage(error, 'プロフィールの準備に失敗しました。'))
+        setUsers((current) => mergeById(current.filter((profile) => profile.id !== AUTH_PLACEHOLDER_USER.id), [accountFallbackUser(userId)]))
+        setOwnedAccountIds([userId])
+        setProfileUserId((current) => current || userId)
+        setRemoteLoading(false)
+        void loadRemoteData(userId)
+      }
     }
 
     boot()
@@ -2399,11 +2431,13 @@ export default function CommunityMapPrototype() {
           await loadPriorityRemoteData(userId)
           void loadRemoteData(userId)
         })
-        .catch((error) => {
-          console.error(error)
-          setRemoteError(getErrorMessage(error, 'プロフィールの準備に失敗しました。'))
-          loadRemoteData(userId)
-        })
+      .catch((error) => {
+        console.error(error)
+        setRemoteError(getErrorMessage(error, 'プロフィールの準備に失敗しました。'))
+        setUsers((current) => mergeById(current.filter((profile) => profile.id !== AUTH_PLACEHOLDER_USER.id), [accountFallbackUser(userId)]))
+        setRemoteLoading(false)
+        void loadRemoteData(userId)
+      })
     })
 
     return () => {
@@ -2589,17 +2623,32 @@ export default function CommunityMapPrototype() {
         setToast(message)
         return
       }
+      const user = data.user ?? data.session?.user
+      if (!user) {
+        const message = 'ログイン情報を取得できませんでした。もう一度ログインしてください。'
+        setAuthError(message)
+        setToast(message)
+        return
+      }
       setIsAuthenticated(true)
-      setActiveUserId(data.user.id)
-      setOwnedAccountIds([data.user.id])
-      setProfileUserId(data.user.id)
+      setActiveUserId(user.id)
+      setOwnedAccountIds([user.id])
+      setProfileUserId(user.id)
       setProfileListMode('profile')
       setSelectedPinId(null)
-      await ensureProfileForAuthUser(client, data.user)
-      await loadPriorityRemoteData(data.user.id)
       resetAuthForm()
-      void loadRemoteData(data.user.id)
       setToast('ログインしました。')
+      try {
+        await ensureProfileForAuthUser(client, user)
+        await loadPriorityRemoteData(user.id)
+        void loadRemoteData(user.id)
+      } catch (error) {
+        console.error(error)
+        setRemoteError(getErrorMessage(error, 'プロフィールの準備に失敗しました。'))
+        setUsers((current) => mergeById(current.filter((profile) => profile.id !== AUTH_PLACEHOLDER_USER.id), [accountFallbackUser(user.id)]))
+        setRemoteLoading(false)
+        void loadRemoteData(user.id)
+      }
     })
       .catch((error) => {
         const message = getSignInErrorMessage(error)
