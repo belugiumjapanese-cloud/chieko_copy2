@@ -10,31 +10,42 @@ Supabase or sign-in can be broken while the team still needs to review product d
 ## GitHub Folders
 
 ```text
-app/ui-lab/            UI review page for the user app
-app/admin-lab/         UI review page for the admin/operations app
-lib/mock-data/         Mock users, pins, folders, communities, and recommendations
-docs/ui-lab.md         This memo
+app/ui-lab/                         UI review page for the user app
+app/admin-lab/                      UI review page for the admin/operations app
+lib/mock-data/ui-lab.ts             Aggregates the mock data used by /ui-lab
+lib/mock-data/ui-lab/chieko.ts      Chieko's editable mock profile, pins, folders, and communities
+lib/mock-data/ui-lab-types.ts       Shared mock data types
+docs/ui-lab.md                      This memo
 ```
 
 ## Mock Data
 
-All mock content lives in:
+The `/ui-lab` route reads its assembled mock content from:
 
 ```text
 lib/mock-data/ui-lab.ts
 ```
 
-Edit this file to change users, pins, folders, communities, recommendations, or admin dashboard numbers. The UI lab routes should not import `lib/supabase.ts`, `lib/remote-store.ts`, or any API route.
+Chieko's own editable content lives in:
 
-`/ui-lab` is intentionally close to the Supabase-connected UI. If the production Drop, pin shape, folder cards, community details, Library, or Profile UI changes, mirror that CSS/class structure here and only replace the data source with `lib/mock-data/ui-lab.ts`.
+```text
+lib/mock-data/ui-lab/chieko.ts
+```
+
+Edit `chieko.ts` to change Chieko's profile, pins, folders, or communities without touching other teammates' mock data. The aggregate `ui-lab.ts` imports those exports and combines them with the rest of the lab data.
+
+The UI lab routes should not import `lib/supabase.ts`, `lib/remote-store.ts`, or any API route.
+
+`/ui-lab` is intentionally close to the Supabase-connected UI. If the production Drop, pin shape, folder cards, community details, Library, or Profile UI changes, mirror that CSS/class structure here and only replace the data source with mock data.
 
 ## Collaboration Flow
 
 1. Use Vercel preview deployments from GitHub pushes to review UI with the three-person team.
 2. Keep product/UI experiments inside `/ui-lab`, `/admin-lab`, and `lib/mock-data`.
-3. Treat `/ui-lab` as the faithful mock-data version of the app, not a separate design proposal.
-4. When a UI direction is approved, port only that piece back into the production app.
-5. Supabase schema, auth, and RLS debugging can continue separately without blocking UI review.
+3. Put teammate-specific mock edits in separate files under `lib/mock-data/ui-lab/` when possible.
+4. Treat `/ui-lab` as the faithful mock-data version of the app, not a separate design proposal.
+5. When a UI direction is approved, port only that piece back into the production app.
+6. Supabase schema, auth, and RLS debugging can continue separately without blocking UI review.
 
 ## Why This Exists
 
