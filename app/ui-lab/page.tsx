@@ -1,5 +1,7 @@
 'use client'
 
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import {
   ArrowLeft,
   BookmarkPlus,
@@ -19,7 +21,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   folderThumbnail,
   labCommunities,
@@ -41,6 +43,11 @@ type AppTab = 'find' | 'home' | 'myworld' | 'tovisit' | 'mypage'
 type CommunityBrowseTab = 'discover' | 'limited' | 'joined'
 type CommunityDetailTab = 'pins' | 'timeline' | 'map'
 type FolderViewMode = 'grid' | 'list'
+
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
+const MAPBOX_STYLE = 'mapbox://styles/belgium-jap/cmp8riesh001j01sngrwfbdsz'
+const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
+if (MAPBOX_TOKEN) mapboxgl.accessToken = MAPBOX_TOKEN
 
 const navItems: Array<{ id: AppTab; label: string; Icon: LucideIcon }> = [
   { id: 'find', label: 'Find', Icon: Search },
@@ -73,41 +80,52 @@ function pinMeta(pin: LabPin) {
   return `${community?.name ?? 'Drop'} / @${owner.username}`
 }
 
-function mapBackgroundStyle(): CSSProperties {
-  return {
-    position: 'relative',
-    overflow: 'hidden',
-    background:
-      'linear-gradient(28deg, transparent 0 44%, rgba(255,255,255,.92) 44.2% 47%, transparent 47.2%), linear-gradient(142deg, transparent 0 39%, rgba(255,255,255,.86) 39.2% 42.2%, transparent 42.4%), linear-gradient(90deg, rgba(17,17,17,.1) 1px, transparent 1px), linear-gradient(rgba(17,17,17,.08) 1px, transparent 1px), #dfe8e2',
-    backgroundSize: 'auto, auto, 58px 58px, 58px 58px, auto',
-  }
+function pinLngLat(pin: LabPin): [number, number] {
+  return [pin.longitude, pin.latitude]
 }
 
-function PinMarker({
-  pin,
-  selected,
-  onClick,
-}: {
-  pin: LabPin
-  selected: boolean
-  onClick: () => void
-}) {
-  const style = {
-    position: 'absolute',
-    left: `${pin.x}%`,
-    top: `${pin.y}%`,
-    transform: 'translate(-50%, -100%)',
-    '--pin-color': selected ? '#111111' : pin.color,
-  } as CSSProperties
+function fitMapToPins(map: mapboxgl.Map, pins: LabPin[], compact: boolean) {
+  if (!pins.length) {
+    map.easeTo({ center: DEFAULT_CENTER, zoom: compact ? 9 : 11, duration: 0 })
+    return
+  }
 
-  return (
-    <button className={cx(styles.marker, selected && styles.markerActive)} style={style} type="button" onClick={onClick}>
-      <span>
-        <img src={pin.imageUrl} alt="" />
-      </span>
-      <b>{pin.title}</b>
-    </button>
-  )
+  if (pins.length === 1) {
+    map.easeTo({ center: pinLngLat(pins[0]), zoom: compact ? 10 : 13, duration: 0 })
+    return
+  }
+
+  const bounds = new mapboxgl.LngLatBounds()
+  pins.forEach((pin) => bounds.extend(pinLngLat(pin)))
+  map.fitBounds(bounds, {
+    padding: compact ? 36 : 78,
+    maxZoom: compact ? 11 : 13,
+    duration: 0,
+  })
+}
+
+function createPinMarker(pin: LabPin, selected: boolean, onClick: () => void) {
+  const element = document.createElement('button')
+  element.className = cx(styles.marker, selected && styles.markerActive)
+  element.type = 'button'
+  element.style.setProperty('--pin-color', selected ? '#111111' : pin.color)
+  element.setAttribute('aria-label', pin.title)
+
+  const imageFrame = document.createElement('span')
+  const image = document.createElement('img')
+  image.src = pin.imageUrl
+  image.alt = ''
+  imageFrame.append(image)
+
+  const label = document.createElement('b')
+  label.textContent = pin.title
+
+  element.append(imageFrame, label)
+  element.addEventListener('click', (event) => {
+    event.stopPropagation()
+    onClick()
+  })
+  return element
 }
 
 function StaticMap({
@@ -125,23 +143,89 @@ function StaticMap({
   overlay?: ReactNode
   children?: ReactNode
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const mapRef = useRef<mapboxgl.Map | null>(null)
+  const markerRefs = useRef<mapboxgl.Marker[]>([])
+  const lastPinsKeyRef = useRef('')
+  const onPinClickRef = useRef(onPinClick)
+  const pinsKey = pins.map((pin) => pin.id).join('|')
+  const selectedPin = pins.find((pin) => pin.id === selectedPinId) ?? null
+
+  useEffect(() => {
+    onPinClickRef.current = onPinClick
+  }, [onPinClick])
+
+  useEffect(() => {
+    if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return
+
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      style: MAPBOX_STYLE,
+      center: DEFAULT_CENTER,
+      zoom: compact ? 9 : 11,
+      attributionControl: false,
+    })
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-left')
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
+    mapRef.current = map
+
+    return () => {
+      markerRefs.current.forEach((marker) => marker.remove())
+      markerRefs.current = []
+      map.remove()
+      mapRef.current = null
+      lastPinsKeyRef.current = ''
+    }
+  }, [compact])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const refreshMarkers = () => {
+      markerRefs.current.forEach((marker) => marker.remove())
+      markerRefs.current = pins.map((pin) =>
+        new mapboxgl.Marker({
+          element: createPinMarker(pin, pin.id === selectedPinId, () => onPinClickRef.current(pin.id)),
+          anchor: 'bottom',
+        }).setLngLat(pinLngLat(pin)).addTo(map),
+      )
+
+      if (pinsKey !== lastPinsKeyRef.current) {
+        fitMapToPins(map, pins, compact)
+        lastPinsKeyRef.current = pinsKey
+      }
+
+      if (selectedPin) {
+        map.easeTo({
+          center: pinLngLat(selectedPin),
+          zoom: Math.max(map.getZoom(), compact ? 10 : 13),
+          duration: 420,
+        })
+      }
+    }
+
+    if (!map.loaded()) {
+      map.once('load', refreshMarkers)
+      return () => {
+        map.off('load', refreshMarkers)
+      }
+    }
+
+    refreshMarkers()
+  }, [compact, pins, pinsKey, selectedPin, selectedPinId])
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className={cx(styles.mapFallback, compact && styles.mapCompact)}>
+        <strong>Mapbox token が必要です</strong>
+      </div>
+    )
+  }
+
   return (
-    <div className={cx(styles.mapCanvas, compact && styles.mapCompact)} style={mapBackgroundStyle()}>
-      <span style={{ position: 'absolute', top: '24%', left: '22%', color: 'rgba(24,35,30,.36)', fontSize: '2rem', fontWeight: 950 }}>Brussels</span>
-      <span style={{ position: 'absolute', right: '12%', top: '54%', color: 'rgba(24,35,30,.32)', fontSize: '1.25rem', fontWeight: 900 }}>Canal</span>
-      {pins.length > 4 && (
-        <button
-          className={styles.clusterMarker}
-          style={{ position: 'absolute', right: '24%', top: '34%', transform: 'translate(-50%, -50%)' }}
-          type="button"
-          onClick={() => onPinClick(pins[0].id)}
-        >
-          <span>{pins.length - 2}</span>
-        </button>
-      )}
-      {pins.map((pin) => (
-        <PinMarker key={pin.id} pin={pin} selected={pin.id === selectedPinId} onClick={() => onPinClick(pin.id)} />
-      ))}
+    <div className={cx(styles.mapCanvas, compact && styles.mapCompact)} style={{ position: 'relative', overflow: 'hidden' }}>
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
       {overlay}
       {children}
     </div>
