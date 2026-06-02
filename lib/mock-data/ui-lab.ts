@@ -1,72 +1,7 @@
-export type LabUser = {
-  id: string
-  username: string
-  displayName: string
-  avatarUrl: string
-  bio: string
-  followers: number
-  following: number
-}
+import { chiekoCommunities, chiekoFolders, chiekoPins, chiekoUser } from './ui-lab/chieko'
+import type { LabCommunity, LabFolder, LabPin, LabRecommendItem, LabUser } from './ui-lab-types'
 
-export type LabPin = {
-  id: string
-  ownerId: string
-  communityId?: string
-  title: string
-  note: string
-  imageUrl: string
-  tags: string[]
-  latitude: number
-  longitude: number
-  x: number
-  y: number
-  color: string
-  likes: number
-  comments: number
-  saves: number
-  createdAt: string
-}
-
-export type LabFolder = {
-  id: string
-  ownerId: string
-  name: string
-  description: string
-  pinIds: string[]
-  visibility: 'public' | 'private'
-  isOfficial?: boolean
-  likes: number
-  saves: number
-  thumbnailUrl?: string
-}
-
-export type LabCommunity = {
-  id: string
-  ownerId: string
-  name: string
-  description: string
-  privacy: 'public' | 'private'
-  joinPolicy: 'open' | 'approval' | 'invite'
-  thumbnailUrl: string
-  memberCount: number
-  pinIds: string[]
-  messages: Array<{
-    id: string
-    userId: string
-    body: string
-    createdAt: string
-  }>
-}
-
-export type LabRecommendItem = {
-  id: string
-  type: 'event' | 'folder' | 'community' | 'editorial'
-  title: string
-  description: string
-  imageUrl: string
-  targetId?: string
-  publishedAt: string
-}
+export type { LabCommunity, LabFolder, LabPin, LabRecommendItem, LabUser } from './ui-lab-types'
 
 export const labCurrentUserId = 'u_mame'
 
@@ -80,15 +15,7 @@ export const labUsers: LabUser[] = [
     followers: 128,
     following: 42,
   },
-  {
-    id: 'u_chieko',
-    username: 'chieko_nh',
-    displayName: 'Chieko',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=420&q=80',
-    bio: 'Facade hunter. Windows, corners, street textures.',
-    followers: 820,
-    following: 331,
-  },
+  chiekoUser,
   {
     id: 'u_arc',
     username: 'arc_walks',
@@ -110,24 +37,7 @@ export const labUsers: LabUser[] = [
 ]
 
 export const labPins: LabPin[] = [
-  {
-    id: 'p_brutalist_window',
-    ownerId: 'u_chieko',
-    communityId: 'c_architecture',
-    title: 'Quiet concrete windows',
-    note: 'Small windows on a heavy facade. The rhythm feels accidental, but it holds the whole street.',
-    imageUrl: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80',
-    tags: ['facade', 'concrete', 'window'],
-    latitude: 50.845,
-    longitude: 4.351,
-    x: 44,
-    y: 42,
-    color: '#f5f5f5',
-    likes: 38,
-    comments: 6,
-    saves: 14,
-    createdAt: '2026-05-28T12:20:00.000Z',
-  },
+  ...chiekoPins,
   {
     id: 'p_stair_blue',
     ownerId: 'u_mame',
@@ -199,24 +109,6 @@ export const labPins: LabPin[] = [
     saves: 0,
     createdAt: '2026-05-22T08:30:00.000Z',
   },
-  {
-    id: 'p_corner_shop',
-    ownerId: 'u_chieko',
-    communityId: 'c_city_details',
-    title: 'Corner shop sign',
-    note: 'The sign is doing more for the street than the storefront.',
-    imageUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=900&q=80',
-    tags: ['sign', 'corner', 'street'],
-    latitude: 50.849,
-    longitude: 4.376,
-    x: 70,
-    y: 48,
-    color: '#fb7185',
-    likes: 22,
-    comments: 3,
-    saves: 12,
-    createdAt: '2026-05-27T18:00:00.000Z',
-  },
 ]
 
 export const labFolders: LabFolder[] = [
@@ -240,16 +132,7 @@ export const labFolders: LabFolder[] = [
     likes: 0,
     saves: 0,
   },
-  {
-    id: 'f_little_wonders',
-    ownerId: 'u_chieko',
-    name: 'little wonders',
-    description: 'Small urban moments that should not disappear in the feed.',
-    pinIds: ['p_brutalist_window', 'p_corner_shop', 'p_stair_blue'],
-    visibility: 'public',
-    likes: 41,
-    saves: 12,
-  },
+  ...chiekoFolders,
   {
     id: 'f_architecture',
     ownerId: 'u_arc',
@@ -279,20 +162,7 @@ export const labCommunities: LabCommunity[] = [
       { id: 'm2', userId: 'u_chieko', body: 'Added a concrete-window example. Needs material tags.', createdAt: '2026-05-31T12:00:00.000Z' },
     ],
   },
-  {
-    id: 'c_city_details',
-    ownerId: 'u_chieko',
-    name: 'City Details',
-    description: 'Open public map for signs, stairs, handles, manholes, and small discoveries.',
-    privacy: 'public',
-    joinPolicy: 'open',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=900&q=80',
-    memberCount: 803,
-    pinIds: ['p_corner_shop', 'p_stair_blue'],
-    messages: [
-      { id: 'm3', userId: 'u_chieko', body: 'Let us keep titles short and tags specific.', createdAt: '2026-05-30T11:00:00.000Z' },
-    ],
-  },
+  ...chiekoCommunities,
   {
     id: 'c_private_trip',
     ownerId: 'u_mame',
