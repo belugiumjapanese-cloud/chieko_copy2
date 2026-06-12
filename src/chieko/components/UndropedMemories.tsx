@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { auth } from '../lib/firebase'
 import { createDropWithImage, createFolder, listDrops, listFolders } from '../lib/dropService'
 import { hasNearbyDrop, reverseGeocode } from '../lib/geo'
@@ -30,6 +30,7 @@ export function UndropedMemories({
   const [drops, setDrops] = useState<DropDoc[]>([])
   const [folders, setFolders] = useState<DropFolder[]>([])
   const [memories, setMemories] = useState<MemoryCandidate[]>([])
+  const memoriesRef = useRef<MemoryCandidate[]>([])
   const [folderSelections, setFolderSelections] = useState<Record<string, string>>({})
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -46,10 +47,14 @@ export function UndropedMemories({
   }, [loadBaseData])
 
   useEffect(() => {
-    return () => {
-      memories.forEach((memory) => URL.revokeObjectURL(memory.previewUrl))
-    }
+    memoriesRef.current = memories
   }, [memories])
+
+  useEffect(() => {
+    return () => {
+      memoriesRef.current.forEach((memory) => URL.revokeObjectURL(memory.previewUrl))
+    }
+  }, [])
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return
