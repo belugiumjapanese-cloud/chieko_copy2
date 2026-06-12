@@ -1,7 +1,7 @@
-import { getApp, getApps, initializeApp, type FirebaseOptions } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
+import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app'
+import { getAuth, type Auth } from 'firebase/auth'
+import { getFirestore, type Firestore } from 'firebase/firestore'
+import { getStorage, type FirebaseStorage } from 'firebase/storage'
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,8 +23,8 @@ export function hasFirebaseConfig() {
   )
 }
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+const app: FirebaseApp | null = hasFirebaseConfig() ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null
 
-export const db = getFirestore(app)
-export const storage = getStorage(app)
-export const auth = getAuth(app)
+export const db = app ? getFirestore(app) : (null as unknown as Firestore)
+export const storage = app ? getStorage(app) : (null as unknown as FirebaseStorage)
+export const auth = app ? getAuth(app) : ({ currentUser: null } as unknown as Auth)
