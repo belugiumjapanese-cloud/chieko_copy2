@@ -81,7 +81,7 @@ function ManualLocationPicker({
 export function DropUploader({ userId, mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '', onCreated }: DropUploaderProps) {
   const activeUserId = userId ?? auth.currentUser?.uid ?? ''
   const [folders, setFolders] = useState<DropFolder[]>([])
-  const [selectedFolderId, setSelectedFolderId] = useState('')
+  const [selectedFolderId, setSelectedFolderId] = useState('__new__')
   const [newFolderName, setNewFolderName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -102,7 +102,7 @@ export function DropUploader({ userId, mapboxToken = process.env.NEXT_PUBLIC_MAP
       .then((items) => {
         if (ignore) return
         setFolders(items)
-        setSelectedFolderId((current) => current || items[0]?.id || '__new__')
+        setSelectedFolderId((current) => (current && current !== '__new__' ? current : items[0]?.id || '__new__'))
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'フォルダの読み込みに失敗しました'))
 

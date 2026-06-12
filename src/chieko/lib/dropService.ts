@@ -1,10 +1,15 @@
 import { addDoc, collection, doc, getDocs, increment, orderBy, query, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { db, storage } from './firebase'
+import { db, hasFirebaseConfig, storage } from './firebase'
 import { compressImageForUpload } from './photo'
 import type { DropDoc, DropFolder, DropTimestamp, NewDropInput } from './types'
 
+function assertFirebaseConfig() {
+  if (!hasFirebaseConfig()) throw new Error('Firebaseの環境変数が未設定です')
+}
+
 function userCollection(userId: string, child: 'drops' | 'folders') {
+  assertFirebaseConfig()
   return collection(db, 'users', userId, child)
 }
 
@@ -13,6 +18,8 @@ function timestampToDate(value: DropTimestamp): DropTimestamp {
 }
 
 export async function listFolders(userId: string): Promise<DropFolder[]> {
+  if (!hasFirebaseConfig()) return []
+
   const snapshot = await getDocs(query(userCollection(userId, 'folders'), orderBy('createdAt', 'desc')))
 
   return snapshot.docs.map((folderDoc) => {
@@ -28,6 +35,8 @@ export async function listFolders(userId: string): Promise<DropFolder[]> {
 }
 
 export async function createFolder(userId: string, name: string) {
+  assertFirebaseConfig()
+
   const folderRef = await addDoc(userCollection(userId, 'folders'), {
     name: name.trim(),
     createdAt: serverTimestamp(),
@@ -38,6 +47,8 @@ export async function createFolder(userId: string, name: string) {
 }
 
 export async function listDrops(userId: string): Promise<DropDoc[]> {
+  if (!hasFirebaseConfig()) return []
+
   const snapshot = await getDocs(query(userCollection(userId, 'drops'), orderBy('createdAt', 'desc')))
 
   return snapshot.docs.map((dropDoc) => {
@@ -59,6 +70,8 @@ export async function listDrops(userId: string): Promise<DropDoc[]> {
 }
 
 export async function createDropWithImage(userId: string, input: NewDropInput) {
+  assertFirebaseConfig()
+
   const dropRef = doc(userCollection(userId, 'drops'))
   const compressedImage = await compressImageForUpload(input.imageFile)
   const imagePath = `users/${userId}/drops/${dropRef.id}/${Date.now()}-${input.imageFile.name}`
