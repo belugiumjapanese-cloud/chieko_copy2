@@ -1,14 +1,14 @@
-import { addDoc, collection, doc, getDocs, increment, orderBy, query, serverTimestamp, setDoc, writeBatch, Timestamp } from 'firebase/firestore'
+import { addDoc, collection, doc, getDocs, increment, orderBy, query, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from './firebase'
 import { compressImageForUpload } from './photo'
-import type { DropDoc, DropFolder, NewDropInput } from './types'
+import type { DropDoc, DropFolder, DropTimestamp, NewDropInput } from './types'
 
 function userCollection(userId: string, child: 'drops' | 'folders') {
   return collection(db, 'users', userId, child)
 }
 
-function timestampToDate(value: unknown) {
+function timestampToDate(value: DropTimestamp): DropTimestamp {
   return value instanceof Timestamp ? value.toDate() : value
 }
 
