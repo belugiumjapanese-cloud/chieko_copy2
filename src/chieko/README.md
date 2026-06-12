@@ -15,6 +15,19 @@ This folder contains an isolated Drop implementation for Chieko. It does not con
 - `lib/photo.ts`: EXIF reading with `exifr` and image compression with `browser-image-compression`.
 - `lib/geo.ts`: Mapbox reverse geocoding, distance checks, and profile stats helpers.
 
+## Snap Globe (`globe/`)
+
+A Snap Map-inspired 3D globe experience built with Three.js and Mapbox. Demo route: `/experiments/snap-globe`.
+
+- `globe/SnapGlobe.tsx`: main component. Renders the Three.js globe, crossfades into a Mapbox map (`projection: globe`, satellite-streets style) when you zoom in, and returns to the globe when you zoom back out. Includes the Snap Map-style UI: search pill, settings with Ghost Mode toggle, friend avatar markers, activity heatmap, and a bottom friend carousel.
+- `globe/lib/globeEngine.ts`: Three.js scene — textured earth sphere, atmosphere glow shaders, star field, inertial drag rotation, pinch/wheel zoom, friend avatar sprites with raycast taps, fly-to-and-dive animation.
+- `globe/lib/earthTexture.ts`: stitches Mapbox satellite tiles and reprojects web mercator to an equirectangular texture for the sphere (with an offline fallback).
+- `globe/lib/friends.ts`: demo friend data, avatar badge canvas builder, relative-time formatting.
+- `globe/lib/heat.ts`: demo activity points and heatmap layer paint definition.
+- `globe/standalone/index.html`: self-contained, build-free version of the same experience (Three.js and Mapbox GL loaded from CDN). Open the file directly in a browser — no Node.js or dev server required. Enter a Mapbox token in the on-screen prompt (stored in localStorage) or pass it as `?token=pk....`; without a token it falls back to a stylized globe.
+
+Only `NEXT_PUBLIC_MAPBOX_TOKEN` is required (no Firebase). Pass `friends` / `me` props to replace the demo data.
+
 ## Required environment variables
 
 ```env
