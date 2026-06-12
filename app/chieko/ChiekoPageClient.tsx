@@ -3,20 +3,20 @@
 import {
   BookOpen,
   Camera,
-  Folder,
-  Heart,
   MapPinned,
   Plus,
-  Sparkles,
   UserRound,
   Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
-import { DropGlobe, DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
+import { DropGlobe, DropLibrary, DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
 import { hasFirebaseConfig } from '../../src/chieko/lib/firebase'
+import type { LibraryPin } from '../../src/chieko/library/libraryData'
 import styles from './chieko-page.module.css'
+
+type PinFocus = { id?: string; lng: number; lat: number } | null
 
 type AppTab = 'community' | 'library' | 'drop' | 'profile'
 type SheetMode = 'drop' | 'memories' | 'folders' | null
@@ -34,16 +34,24 @@ const communityCards = [
   { title: 'Cafe windows', meta: '88 new drops', tone: '#ff8db3' },
 ]
 
-const libraryCards = [
-  { title: 'My pins', body: '写真から作った自分だけの世界地図', Icon: Heart },
-  { title: 'Folders', body: 'To Visit / Wish / Cafe / Shops', Icon: Folder },
-  { title: 'Memories', body: 'まだDropしていない写真を探す', Icon: Sparkles },
-]
-
-function DropGlobeSurface({ onOpenSheet }: { onOpenSheet: (mode: SheetMode) => void }) {
+function DropGlobeSurface({
+  onOpenSheet,
+  focusTarget,
+  onFocusConsumed,
+}: {
+  onOpenSheet: (mode: SheetMode) => void
+  focusTarget: PinFocus
+  onFocusConsumed: () => void
+}) {
   return (
     <section className={styles.mapScreen} aria-label="Drop globe">
-      <DropGlobe topInset={48} bottomInset={92} onRequestDrop={() => onOpenSheet('drop')} />
+      <DropGlobe
+        topInset={48}
+        bottomInset={92}
+        onRequestDrop={() => onOpenSheet('drop')}
+        focusTarget={focusTarget}
+        onFocusConsumed={onFocusConsumed}
+      />
     </section>
   )
 }
@@ -82,32 +90,16 @@ function CommunityView({ onBackToMap }: { onBackToMap: () => void }) {
   )
 }
 
-function LibraryView({ onOpenSheet }: { onOpenSheet: (mode: SheetMode) => void }) {
+function LibraryView({
+  onOpenSheet,
+  onOpenPin,
+}: {
+  onOpenSheet: (mode: SheetMode) => void
+  onOpenPin: (pin: LibraryPin) => void
+}) {
   return (
-    <section className={styles.panelScreen} aria-label="Library">
-      <div className={styles.panelHeader}>
-        <div>
-          <span className={styles.eyebrow}>Library</span>
-          <h2>保存した世界</h2>
-        </div>
-      </div>
-      <div className={styles.libraryGrid}>
-        {libraryCards.map(({ title, body, Icon }) => (
-          <button
-            className={styles.libraryCard}
-            key={title}
-            type="button"
-            onClick={() => {
-              if (title === 'Folders') onOpenSheet('folders')
-              if (title === 'Memories') onOpenSheet('memories')
-            }}
-          >
-            <Icon aria-hidden="true" size={22} />
-            <strong>{title}</strong>
-            <span>{body}</span>
-          </button>
-        ))}
-      </div>
+    <section className={styles.mapScreen} aria-label="Library">
+      <DropLibrary onOpenPin={onOpenPin} onOpenSheet={onOpenSheet} />
     </section>
   )
 }
@@ -179,7 +171,13 @@ function Sheet({ mode, onClose }: { mode: SheetMode; onClose: () => void }) {
 export function ChiekoPageClient() {
   const [activeTab, setActiveTab] = useState<AppTab>('drop')
   const [sheetMode, setSheetMode] = useState<SheetMode>(null)
+  const [pinFocus, setPinFocus] = useState<PinFocus>(null)
   const firebaseReady = hasFirebaseConfig()
+
+  const handleOpenPin = (pin: LibraryPin) => {
+    setPinFocus({ id: pin.id, lng: pin.lng, lat: pin.lat })
+    setActiveTab('drop')
+  }
 
   return (
     <main className={styles.shell}>
@@ -194,9 +192,11 @@ export function ChiekoPageClient() {
         </div>
 
         <div className={styles.screenSlot}>
-          {activeTab === 'drop' ? <DropGlobeSurface onOpenSheet={setSheetMode} /> : null}
+          {activeTab === 'drop' ? (
+            <DropGlobeSurface onOpenSheet={setSheetMode} focusTarget={pinFocus} onFocusConsumed={() => setPinFocus(null)} />
+          ) : null}
           {activeTab === 'community' ? <CommunityView onBackToMap={() => setActiveTab('drop')} /> : null}
-          {activeTab === 'library' ? <LibraryView onOpenSheet={setSheetMode} /> : null}
+          {activeTab === 'library' ? <LibraryView onOpenSheet={setSheetMode} onOpenPin={handleOpenPin} /> : null}
           {activeTab === 'profile' ? <ProfileView /> : null}
         </div>
 

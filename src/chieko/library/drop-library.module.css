@@ -1,0 +1,429 @@
+.library {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  background: linear-gradient(180deg, #f3f8f5 0%, #e9f2ed 100%);
+}
+
+/* ---------- ホーム(ライブラリ一覧) ---------- */
+
+.home {
+  position: absolute;
+  inset: 0;
+  padding: 66px 16px 116px;
+  overflow-y: auto;
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.38s ease, filter 0.38s ease;
+  scrollbar-width: none;
+}
+
+.home::-webkit-scrollbar {
+  display: none;
+}
+
+.homeBehind {
+  transform: scale(0.94) translateY(-8px);
+  opacity: 0.45;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.largeTitle {
+  margin: 0 0 2px;
+  font-size: 2.05rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #0f1814;
+}
+
+.subTitle {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #6b7a72;
+}
+
+.collectionList {
+  margin-bottom: 22px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(15, 24, 20, 0.06);
+  border-radius: 18px;
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  overflow: hidden;
+}
+
+.collectionRow {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 14px;
+  font-family: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(15, 24, 20, 0.07);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.collectionRow:last-child {
+  border-bottom: none;
+}
+
+.collectionRow:active {
+  background: rgba(15, 24, 20, 0.05);
+}
+
+.rowIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  font-size: 21px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(15, 24, 20, 0.06);
+}
+
+.rowBody {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rowBody strong {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #0f1814;
+}
+
+.rowBody span {
+  font-size: 0.74rem;
+  color: #6b7a72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowAside {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #93a39a;
+}
+
+.chevron {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: #b3c0b8;
+}
+
+.sectionTitle {
+  margin: 0 0 10px;
+  font-size: 1.12rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #0f1814;
+}
+
+.recentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recentCard {
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.recentCard img {
+  width: 100%;
+  aspect-ratio: 1.25;
+  object-fit: cover;
+  background: #dfe9e3;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(15, 24, 20, 0.12);
+}
+
+.recentCard strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f1814;
+}
+
+.recentCard span {
+  display: block;
+  font-size: 0.72rem;
+  color: #6b7a72;
+}
+
+/* ---------- 詳細(コレクション)ビュー ---------- */
+
+.detail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: rgba(242, 248, 244, 0.78);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  animation: detailIn 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.detailClosing {
+  animation: detailOut 0.32s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes detailIn {
+  from {
+    opacity: 0.4;
+    transform: translateX(72%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes detailOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0.3;
+    transform: translateX(78%);
+  }
+}
+
+.detailHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 58px 12px 6px;
+}
+
+.backBtn {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 7px 12px 7px 7px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0f1814;
+  background: rgba(255, 255, 255, 0.72);
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(15, 24, 20, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+.backBtn span {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.detailScroll {
+  flex: 1;
+  padding: 4px 16px 116px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.detailScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.detailTitleRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 6px 0 2px;
+}
+
+.detailIcon {
+  font-size: 1.6rem;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #0f1814;
+}
+
+.detailMeta {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7a72;
+}
+
+/* 丸いカテゴリボタンのレール */
+
+.categoryRail {
+  display: flex;
+  flex: none;
+  gap: 14px;
+  margin: 0 -16px 14px;
+  padding: 6px 16px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.categoryRail::-webkit-scrollbar {
+  display: none;
+}
+
+.categoryBtn {
+  display: grid;
+  flex: none;
+  gap: 5px;
+  justify-items: center;
+  padding: 0;
+  font-family: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.categoryCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  box-shadow: 0 6px 14px rgba(15, 24, 20, 0.1), inset 0 0 0 1px rgba(15, 24, 20, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, background 0.28s ease;
+}
+
+.categoryBtn span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #5d6c64;
+  transition: color 0.2s ease;
+}
+
+.categoryBtn:active .categoryCircle {
+  transform: scale(0.92);
+}
+
+.categoryBtnActive .categoryCircle {
+  background: #0f1814;
+  box-shadow: 0 0 0 3px #ffcf3f, 0 8px 18px rgba(15, 24, 20, 0.28);
+  transform: scale(1.08) translateY(-2px);
+}
+
+.categoryBtnActive span {
+  color: #0f1814;
+}
+
+/* ピングリッド */
+
+.pinGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pinCard {
+  position: relative;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.82);
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(15, 24, 20, 0.12);
+  overflow: hidden;
+  cursor: pointer;
+  animation: pinIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pinIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pinCard img {
+  width: 100%;
+  aspect-ratio: 1.15;
+  object-fit: cover;
+  background: #dfe9e3;
+  display: block;
+}
+
+.pinCategoryChip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 50%;
+  box-shadow: 0 3px 8px rgba(15, 24, 20, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.pinBody {
+  display: grid;
+  gap: 1px;
+  padding: 8px 10px 10px;
+}
+
+.pinBody strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f1814;
+}
+
+.pinBody span {
+  font-size: 0.7rem;
+  color: #6b7a72;
+}
+
+.pinEmpty {
+  grid-column: 1 / -1;
+  padding: 26px 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #93a39a;
+  text-align: center;
+}
