@@ -1,0 +1,443 @@
+.shell {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #0d1326 0%, #05070f 70%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.globeCanvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.globeCanvas:active {
+  cursor: grabbing;
+}
+
+.mapWrap {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.48s ease;
+}
+
+.mapWrapVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.topBar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.roundBtn {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.roundBtn:active {
+  transform: scale(0.94);
+}
+
+.searchPill {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  font-weight: 700;
+  color: #7a7f87;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 22px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.ghostBanner {
+  position: absolute;
+  top: calc(66px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #111319;
+  background: #fffc00;
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.settingsCard {
+  position: absolute;
+  top: calc(66px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 7;
+  display: grid;
+  gap: 10px;
+  width: min(290px, calc(100% - 24px));
+  padding: 14px;
+  color: #15171d;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.settingHint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6c7280;
+}
+
+.toggle {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 28px;
+  background: #d4d8e0;
+  border-radius: 14px;
+  transition: background 0.2s ease;
+}
+
+.toggleOn {
+  background: #fffc00;
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.toggleOn .toggleKnob {
+  transform: translateX(20px);
+}
+
+.tokenWarn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 6;
+  margin: 0;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(20, 22, 28, 0.85);
+  border-radius: 14px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.bottomArea {
+  position: absolute;
+  right: 0;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 6;
+}
+
+.friendsScroller {
+  display: flex;
+  gap: 10px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.friendsScroller::-webkit-scrollbar {
+  display: none;
+}
+
+.friendCard {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 14px 8px 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 26px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  text-align: left;
+}
+
+.friendCardActive {
+  outline: 3px solid #fffc00;
+}
+
+.friendCardAvatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+  background: #f1f3f7;
+  border-radius: 50%;
+}
+
+.friendCardBody {
+  display: grid;
+  gap: 1px;
+}
+
+.friendCardBody strong {
+  font-size: 0.86rem;
+  color: #15171d;
+}
+
+.friendCardBody span {
+  font-size: 0.72rem;
+  color: #6c7280;
+  white-space: nowrap;
+}
+
+.friendDetail {
+  position: absolute;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 7;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: min(380px, calc(100% - 24px));
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 20px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+}
+
+.friendDetailAvatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  font-size: 28px;
+  background: #f1f3f7;
+  border-radius: 50%;
+}
+
+.friendDetailBody {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.friendDetailBody strong {
+  font-size: 0.98rem;
+  color: #15171d;
+}
+
+.friendDetailBody span {
+  font-size: 0.78rem;
+  color: #6c7280;
+}
+
+.friendDetailActions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+}
+
+.primaryAction {
+  padding: 9px 14px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #111319;
+  background: #fffc00;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.closeAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  color: #4d525c;
+  background: #eef0f4;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.globeBtn {
+  position: absolute;
+  right: 14px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  font-size: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  gap: 12px;
+  place-content: center;
+  justify-items: center;
+  color: #cfd6e4;
+  font-weight: 700;
+  background: radial-gradient(circle at 50% 35%, #0d1326 0%, #05070f 70%);
+}
+
+.loadingOverlay p {
+  margin: 0;
+}
+
+.spinner {
+  width: 38px;
+  height: 38px;
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #fffc00;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mapFriend {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.mapFriendAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  font-size: 27px;
+  background: #ffffff;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.mapFriendName {
+  margin-top: 3px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  background: rgba(20, 22, 28, 0.78);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.mapMe .mapFriendAvatar {
+  border-color: #fffc00;
+}
+
+.mePulse {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 252, 0, 0.35);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  animation: pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.9;
+    transform: translateX(-50%) scale(1);
+  }
+
+  70% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.9);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.9);
+  }
+}
