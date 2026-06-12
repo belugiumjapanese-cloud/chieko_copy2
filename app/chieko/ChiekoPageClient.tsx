@@ -1,6 +1,5 @@
 'use client'
 
-import mapboxgl from 'mapbox-gl'
 import {
   BookOpen,
   Camera,
@@ -8,70 +7,25 @@ import {
   Heart,
   MapPinned,
   Plus,
-  Search,
   Sparkles,
   UserRound,
   Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
+import { useState } from 'react'
+import { DropGlobe, DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
 import { hasFirebaseConfig } from '../../src/chieko/lib/firebase'
 import styles from './chieko-page.module.css'
 
 type AppTab = 'community' | 'library' | 'drop' | 'profile'
 type SheetMode = 'drop' | 'memories' | 'folders' | null
 
-const MAPBOX_STYLE = 'mapbox://styles/mapbox/light-v11'
-const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
-
 const navItems: Array<{ id: AppTab; label: string; Icon: LucideIcon }> = [
   { id: 'community', label: 'Community', Icon: Users },
   { id: 'library', label: 'Library', Icon: BookOpen },
   { id: 'drop', label: 'Drop', Icon: MapPinned },
   { id: 'profile', label: 'Profile', Icon: UserRound },
-]
-
-const mapFilters = ['My pins', 'Follow', 'Chaos', 'Wish', 'Architecture', 'Cafe', 'Shops']
-
-const mapSpots = [
-  {
-    id: 'home-corner',
-    label: 'Corner sign',
-    area: 'Ixelles',
-    x: 35,
-    y: 37,
-    color: '#ffcf3f',
-    imageUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'museum-day',
-    label: 'Museum day',
-    area: 'Parc Leopold',
-    x: 63,
-    y: 30,
-    color: '#57c7ff',
-    imageUrl: 'https://images.unsplash.com/photo-1565060169187-2f105f0b8f51?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'window-walk',
-    label: 'Quiet window',
-    area: 'Louise',
-    x: 55,
-    y: 57,
-    color: '#ff8db3',
-    imageUrl: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'coffee-note',
-    label: 'Cafe note',
-    area: 'Saint-Gilles',
-    x: 24,
-    y: 62,
-    color: '#6ee7b7',
-    imageUrl: 'https://images.unsplash.com/photo-1511081692775-05d0f180a065?auto=format&fit=crop&w=240&q=80',
-  },
 ]
 
 const communityCards = [
@@ -86,104 +40,10 @@ const libraryCards = [
   { title: 'Memories', body: 'まだDropしていない写真を探す', Icon: Sparkles },
 ]
 
-function SnapMapSurface({ onOpenSheet }: { onOpenSheet: (mode: SheetMode) => void }) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const [selectedSpotId, setSelectedSpotId] = useState(mapSpots[0].id)
-  const selectedSpot = useMemo(
-    () => mapSpots.find((spot) => spot.id === selectedSpotId) ?? mapSpots[0],
-    [selectedSpotId],
-  )
-
-  useEffect(() => {
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
-    if (!containerRef.current || !token) return
-
-    mapboxgl.accessToken = token
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: MAPBOX_STYLE,
-      center: DEFAULT_CENTER,
-      zoom: 12,
-      attributionControl: false,
-      interactive: true,
-    })
-    mapRef.current = map
-
-    return () => {
-      map.remove()
-      mapRef.current = null
-    }
-  }, [])
-
+function DropGlobeSurface({ onOpenSheet }: { onOpenSheet: (mode: SheetMode) => void }) {
   return (
-    <section className={styles.mapScreen} aria-label="Drop map">
-      <div className={styles.mapBackground}>
-        <div className={styles.fallbackMap} aria-hidden="true">
-          <span className={styles.waterOne} />
-          <span className={styles.waterTwo} />
-          <span className={styles.parkOne} />
-          <span className={styles.parkTwo} />
-          <span className={styles.roadOne} />
-          <span className={styles.roadTwo} />
-          <span className={styles.roadThree} />
-        </div>
-        <div ref={containerRef} className={styles.mapCanvas} />
-      </div>
-
-      <div className={styles.mapTopLayer}>
-        <button className={styles.searchPill} type="button">
-          <Search aria-hidden="true" size={18} />
-          <span>場所、pinを検索</span>
-        </button>
-        <div className={styles.filterRail} aria-label="map filters">
-          {mapFilters.map((filter) => (
-            <button className={styles.filterChip} key={filter} type="button">
-              {filter}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.storyRail} aria-label="friend drops">
-        {mapSpots.map((spot) => (
-          <button
-            className={spot.id === selectedSpotId ? styles.activeStory : styles.storyBubble}
-            key={spot.id}
-            type="button"
-            onClick={() => setSelectedSpotId(spot.id)}
-          >
-            <img src={spot.imageUrl} alt="" />
-            <span>{spot.area}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.pinLayer} aria-label="map pins">
-        {mapSpots.map((spot) => (
-          <button
-            className={styles.snapPin}
-            key={spot.id}
-            style={{ left: `${spot.x}%`, top: `${spot.y}%`, borderColor: spot.color }}
-            type="button"
-            onClick={() => setSelectedSpotId(spot.id)}
-            aria-label={spot.label}
-          >
-            <img src={spot.imageUrl} alt="" />
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.mapPeek}>
-        <img src={selectedSpot.imageUrl} alt="" />
-        <div>
-          <strong>{selectedSpot.label}</strong>
-          <span>{selectedSpot.area} · 今日のDrop候補</span>
-        </div>
-        <button className={styles.peekButton} type="button" onClick={() => onOpenSheet('drop')}>
-          Drop
-        </button>
-      </div>
+    <section className={styles.mapScreen} aria-label="Drop globe">
+      <DropGlobe topInset={48} bottomInset={92} onRequestDrop={() => onOpenSheet('drop')} />
     </section>
   )
 }
@@ -334,7 +194,7 @@ export function ChiekoPageClient() {
         </div>
 
         <div className={styles.screenSlot}>
-          {activeTab === 'drop' ? <SnapMapSurface onOpenSheet={setSheetMode} /> : null}
+          {activeTab === 'drop' ? <DropGlobeSurface onOpenSheet={setSheetMode} /> : null}
           {activeTab === 'community' ? <CommunityView onBackToMap={() => setActiveTab('drop')} /> : null}
           {activeTab === 'library' ? <LibraryView onOpenSheet={setSheetMode} /> : null}
           {activeTab === 'profile' ? <ProfileView /> : null}

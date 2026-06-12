@@ -17,7 +17,10 @@ This folder contains an isolated Drop implementation for Chieko. It does not con
 
 ## Snap Globe (`globe/`)
 
-A Snap Map-inspired 3D globe experience built with Three.js and Mapbox. Demo route: `/experiments/snap-globe`.
+A Snap Map-inspired 3D globe experience built with Three.js and Mapbox. The Drop tab of `/chieko` uses `DropGlobe`; a friends-demo version lives at `/experiments/snap-globe`.
+
+- `globe/DropGlobe.tsx`: the Drop-concept globe used by the app. Your Drops become photo badges on the globe; zooming in dives into the Mapbox map with photo pins and a "footprint" heatmap built from your Drop locations. Includes folder filter chips, country/city/Drop stats, a Drop detail card, a bottom Drop carousel, and an empty state that calls `onRequestDrop`. Loads real data from Firestore when signed in, otherwise demo Drops (`lib/demoDrops.ts`). `topInset` / `bottomInset` make room for the host app's header and nav.
+- `globe/lib/badges.ts`: rounded-square photo badge canvases for globe sprites (with a placeholder fallback).
 
 - `globe/SnapGlobe.tsx`: main component. Renders the Three.js globe, crossfades into a Mapbox map (`projection: globe`, satellite-streets style) when you zoom in, and returns to the globe when you zoom back out. Includes the Snap Map-style UI: search pill, settings with Ghost Mode toggle, friend avatar markers, activity heatmap, and a bottom friend carousel.
 - `globe/lib/globeEngine.ts`: Three.js scene — textured earth sphere, atmosphere glow shaders, star field, inertial drag rotation, pinch/wheel zoom, friend avatar sprites with raycast taps, fly-to-and-dive animation.

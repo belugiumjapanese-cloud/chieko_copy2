@@ -48,6 +48,24 @@ export function buildHeatData(): FeatureCollection<Point> {
   return { type: 'FeatureCollection', features }
 }
 
+// Drop(自分の足あと)からヒートマップ用の点群を作る。
+export function buildDropHeatData(points: Array<{ lng: number; lat: number }>): FeatureCollection<Point> {
+  const features: FeatureCollection<Point>['features'] = []
+  points.forEach((point) => {
+    for (let i = 0; i < 14; i++) {
+      const spread = 0.28
+      const offsetLng = (Math.random() + Math.random() - 1) * spread
+      const offsetLat = (Math.random() + Math.random() - 1) * spread * 0.8
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [point.lng + offsetLng, point.lat + offsetLat] },
+        properties: { weight: 0.5 + Math.random() * 0.5 },
+      })
+    }
+  })
+  return { type: 'FeatureCollection', features }
+}
+
 export const HEAT_LAYER_PAINT = {
   'heatmap-weight': ['get', 'weight'],
   'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 2, 0.9, 9, 1.6],
