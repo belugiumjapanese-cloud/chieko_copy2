@@ -1,7 +1,9 @@
 .shell {
+  --globe-top: 0px;
+  --globe-bottom: 0px;
   position: relative;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
   background: radial-gradient(circle at 50% 35%, #0d1326 0%, #05070f 70%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -38,7 +40,7 @@
 
 .topBar {
   position: absolute;
-  top: calc(12px + env(safe-area-inset-top));
+  top: calc(12px + var(--globe-top) + env(safe-area-inset-top));
   right: 12px;
   left: 12px;
   z-index: 6;
@@ -82,7 +84,7 @@
 
 .ghostBanner {
   position: absolute;
-  top: calc(66px + env(safe-area-inset-top));
+  top: calc(66px + var(--globe-top) + env(safe-area-inset-top));
   left: 50%;
   z-index: 6;
   display: flex;
@@ -101,7 +103,7 @@
 
 .settingsCard {
   position: absolute;
-  top: calc(66px + env(safe-area-inset-top));
+  top: calc(66px + var(--globe-top) + env(safe-area-inset-top));
   right: 12px;
   z-index: 7;
   display: grid;
@@ -166,7 +168,7 @@
 
 .tokenWarn {
   position: absolute;
-  top: calc(112px + env(safe-area-inset-top));
+  top: calc(112px + var(--globe-top) + env(safe-area-inset-top));
   left: 50%;
   z-index: 6;
   width: max-content;
@@ -185,7 +187,7 @@
 .bottomArea {
   position: absolute;
   right: 0;
-  bottom: calc(10px + env(safe-area-inset-bottom));
+  bottom: calc(10px + var(--globe-bottom) + env(safe-area-inset-bottom));
   left: 0;
   z-index: 6;
 }
@@ -250,7 +252,7 @@
 
 .friendDetail {
   position: absolute;
-  bottom: calc(86px + env(safe-area-inset-bottom));
+  bottom: calc(86px + var(--globe-bottom) + env(safe-area-inset-bottom));
   left: 50%;
   z-index: 7;
   display: flex;
@@ -328,7 +330,7 @@
 .globeBtn {
   position: absolute;
   right: 14px;
-  bottom: calc(86px + env(safe-area-inset-bottom));
+  bottom: calc(86px + var(--globe-bottom) + env(safe-area-inset-bottom));
   z-index: 6;
   display: flex;
   align-items: center;
@@ -442,4 +444,158 @@
     opacity: 0;
     transform: translateX(-50%) scale(1.9);
   }
+}
+
+.statsRow {
+  position: absolute;
+  top: calc(66px + var(--globe-top) + env(safe-area-inset-top));
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+
+.statChip {
+  padding: 6px 11px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: rgba(20, 22, 28, 0.72);
+  border-radius: 14px;
+  white-space: nowrap;
+}
+
+.statChip strong {
+  margin-right: 3px;
+  color: #fffc00;
+}
+
+.chipsRow {
+  position: absolute;
+  top: calc(104px + var(--globe-top) + env(safe-area-inset-top));
+  right: 0;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 2px 12px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chipsRow::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #3c424d;
+  background: rgba(255, 255, 255, 0.92);
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.chipActive {
+  color: #111319;
+  background: #fffc00;
+}
+
+.dropThumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #f1f3f7;
+}
+
+.dropDetailImage {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: #f1f3f7;
+}
+
+.mapDropPin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.mapDropPinImage {
+  width: 54px;
+  height: 54px;
+  border: 3px solid #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  object-fit: cover;
+  background: #ffffff;
+}
+
+.mapDropPinActive .mapDropPinImage {
+  border-color: #fffc00;
+}
+
+.mapDropPinName {
+  margin-top: 3px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  background: rgba(20, 22, 28, 0.78);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.emptyCard {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  width: min(300px, calc(100% - 48px));
+  padding: 18px 16px;
+  color: #15171d;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%);
+}
+
+.emptyCard strong {
+  font-size: 0.98rem;
+}
+
+.emptyCard p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6c7280;
+}
+
+.previewTag {
+  position: absolute;
+  top: calc(66px + var(--globe-top) + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 5;
+  padding: 6px 11px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #111319;
+  background: rgba(255, 252, 0, 0.92);
+  border-radius: 14px;
 }

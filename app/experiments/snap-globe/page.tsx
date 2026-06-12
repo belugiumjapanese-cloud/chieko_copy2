@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 }
 
 export default function SnapGlobeExperimentPage() {
-  return <SnapGlobe />
+  return (
+    <div style={{ height: '100dvh' }}>
+      <SnapGlobe />
+    </div>
+  )
 }

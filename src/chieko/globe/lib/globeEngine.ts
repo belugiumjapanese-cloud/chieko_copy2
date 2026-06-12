@@ -374,6 +374,17 @@ export class GlobeEngine {
     this.lastInteraction = performance.now()
   }
 
+  setMarkers(inputs: GlobeMarkerInput[]) {
+    this.markerGroup.children.slice().forEach((child) => {
+      const sprite = child as THREE.Sprite
+      sprite.material.map?.dispose()
+      sprite.material.dispose()
+      this.markerGroup.remove(sprite)
+    })
+    this.markerById.clear()
+    inputs.forEach((input) => this.addMarker(input))
+  }
+
   setMarkerHidden(id: string, hidden: boolean) {
     if (hidden) this.hiddenMarkers.add(id)
     else this.hiddenMarkers.delete(id)
