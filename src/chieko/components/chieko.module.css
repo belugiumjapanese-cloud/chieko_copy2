@@ -1,0 +1,396 @@
+.panel {
+  width: min(100%, 760px);
+  padding: 18px;
+  color: #16211c;
+  background: #ffffff;
+  border: 1px solid rgba(22, 33, 28, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(22, 33, 28, 0.12);
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #33413a;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: #17211c;
+  background: #f8fbf9;
+  border: 1px solid #d9e4de;
+  border-radius: 8px;
+  outline: none;
+}
+
+.textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: #137c68;
+  box-shadow: 0 0 0 3px rgba(19, 124, 104, 0.14);
+}
+
+.fileBox {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: #f4f8f5;
+  border: 1px dashed #9eb6aa;
+  border-radius: 8px;
+}
+
+.preview {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.previewImage,
+.thumb,
+.folderThumb {
+  width: 100%;
+  object-fit: cover;
+  background: #e6eee9;
+  border-radius: 8px;
+}
+
+.previewImage {
+  height: 112px;
+}
+
+.thumb {
+  width: 92px;
+  height: 92px;
+  flex: 0 0 92px;
+}
+
+.button,
+.secondaryButton,
+.ghostButton,
+.dangerButton {
+  min-height: 42px;
+  padding: 10px 14px;
+  font-weight: 800;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.button {
+  color: #ffffff;
+  background: #111f1a;
+}
+
+.secondaryButton {
+  color: #ffffff;
+  background: #137c68;
+}
+
+.ghostButton {
+  color: #223029;
+  background: #eef4f0;
+}
+
+.dangerButton {
+  color: #ffffff;
+  background: #b23b4a;
+}
+
+.button:disabled,
+.secondaryButton:disabled,
+.ghostButton:disabled,
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.status,
+.muted,
+.errorText {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.status {
+  color: #137c68;
+}
+
+.muted {
+  color: #68756f;
+}
+
+.errorText {
+  color: #a72f3f;
+}
+
+.warning {
+  padding: 10px 12px;
+  color: #5a3b0b;
+  background: #fff4d4;
+  border: 1px solid #f0d485;
+  border-radius: 8px;
+}
+
+.mapPicker,
+.mapCanvas {
+  min-height: 320px;
+  overflow: hidden;
+  background: #e7eee8;
+  border: 1px solid #cfddd5;
+  border-radius: 8px;
+}
+
+.emptyMap {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  padding: 18px;
+  text-align: center;
+  color: #54635c;
+  background: #edf4ef;
+  border: 1px dashed #b8cac1;
+  border-radius: 8px;
+}
+
+.folderInline {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr);
+  gap: 10px;
+}
+
+.cardList {
+  display: grid;
+  gap: 12px;
+}
+
+.memoryCard {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dde7e1;
+  border-radius: 8px;
+}
+
+.memoryBody {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  width: min(100%, 760px);
+  padding: 14px 16px;
+  color: #14211b;
+  background: #eaf6f0;
+  border: 1px solid #b6d9c9;
+  border-radius: 8px;
+}
+
+.bannerTitle {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.bannerActions {
+  display: flex;
+  align-items: center;
+}
+
+.mapShell {
+  position: relative;
+  min-height: 100dvh;
+  color: #14211b;
+  background: #e7eee8;
+}
+
+.mapCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+.mapOverlay {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 12px;
+  width: min(100% - 24px, 820px);
+  padding: 16px 0 0;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.mapOverlay > * {
+  pointer-events: auto;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(20, 33, 27, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(20, 33, 27, 0.12);
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.stat strong {
+  font-size: 1.15rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(20, 33, 27, 0.1);
+  border-radius: 8px;
+}
+
+.tab,
+.activeTab {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-weight: 800;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.tab {
+  color: #304038;
+  background: transparent;
+}
+
+.activeTab {
+  color: #ffffff;
+  background: #111f1a;
+}
+
+.popup {
+  display: grid;
+  gap: 6px;
+  max-width: 210px;
+}
+
+.popup img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.folderGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.folderCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #dde7e1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.folderThumb {
+  aspect-ratio: 4 / 3;
+}
+
+.folderEmpty {
+  display: grid;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  color: #66736c;
+  background: #edf4ef;
+  border-radius: 8px;
+}
+
+.folderMeta {
+  display: grid;
+  gap: 3px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #33413a;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 14px;
+  }
+
+  .preview,
+  .folderInline {
+    grid-template-columns: 1fr;
+  }
+
+  .memoryCard {
+    flex-direction: column;
+  }
+
+  .thumb {
+    width: 100%;
+    height: 180px;
+  }
+}
