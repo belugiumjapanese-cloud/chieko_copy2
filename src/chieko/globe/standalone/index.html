@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Chieko Snap Globe</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css" rel="stylesheet" />
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+[hidden] { display: none !important; }
+
+.shell {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #0d1326 0%, #05070f 70%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.globeCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.globeCanvas:active { cursor: grabbing; }
+
+.mapWrap { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.48s ease; }
+.mapWrapVisible { opacity: 1; pointer-events: auto; }
+
+.topBar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.roundBtn {
+  display: flex; flex: none; align-items: center; justify-content: center;
+  width: 44px; height: 44px; font-size: 20px;
+  background: rgba(255, 255, 255, 0.95); border: none; border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); cursor: pointer;
+}
+.roundBtn:active { transform: scale(0.94); }
+
+.searchPill {
+  display: flex; flex: 1; align-items: center; gap: 8px;
+  height: 44px; padding: 0 16px;
+  font-weight: 700; color: #7a7f87;
+  background: rgba(255, 255, 255, 0.95); border-radius: 22px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.ghostBanner {
+  position: absolute;
+  top: calc(66px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 6;
+  display: flex; gap: 8px; align-items: center;
+  padding: 8px 16px;
+  font-size: 0.82rem; font-weight: 700; color: #111319;
+  background: #fffc00; border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.settingsCard {
+  position: absolute;
+  top: calc(66px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 7;
+  display: grid; gap: 10px;
+  width: min(290px, calc(100% - 24px));
+  padding: 14px;
+  color: #15171d;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+
+.settingRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 4px 0;
+  font-size: 0.95rem; font-weight: 700; color: inherit;
+  background: none; border: none; cursor: pointer;
+}
+.settingHint { margin: 0; font-size: 0.78rem; color: #6c7280; }
+
+.toggle { position: relative; flex: none; width: 48px; height: 28px; background: #d4d8e0; border-radius: 14px; transition: background 0.2s ease; }
+.toggleOn { background: #fffc00; }
+.toggleKnob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); transition: transform 0.2s ease; }
+.toggleOn .toggleKnob { transform: translateX(20px); }
+
+.tokenCard {
+  position: absolute;
+  bottom: calc(160px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 5;
+  display: grid; gap: 8px;
+  width: min(340px, calc(100% - 24px));
+  padding: 14px;
+  color: #ffffff;
+  background: rgba(20, 22, 28, 0.92);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.tokenCard input {
+  width: 100%; min-height: 38px; padding: 8px 10px;
+  font-size: 0.8rem; color: #15171d;
+  border: none; border-radius: 10px; outline: none;
+}
+.tokenCardRow { display: flex; gap: 8px; }
+.tokenCardRow button {
+  flex: 1; padding: 9px 0;
+  font-size: 0.8rem; font-weight: 800;
+  border: none; border-radius: 12px; cursor: pointer;
+}
+.tokenSave { color: #111319; background: #fffc00; }
+.tokenSkip { color: #ffffff; background: rgba(255, 255, 255, 0.16); }
+.tokenCard a { color: #9ecbff; }
+
+.bottomArea { position: absolute; right: 0; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; z-index: 6; }
+
+.friendsScroller { display: flex; gap: 10px; padding: 6px 12px; overflow-x: auto; scrollbar-width: none; }
+.friendsScroller::-webkit-scrollbar { display: none; }
+
+.friendCard {
+  display: flex; flex: none; gap: 10px; align-items: center;
+  padding: 8px 14px 8px 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none; border-radius: 26px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer; text-align: left;
+  font-family: inherit;
+}
+.friendCardActive { outline: 3px solid #fffc00; }
+.friendCardAvatar { display: flex; flex: none; align-items: center; justify-content: center; width: 40px; height: 40px; font-size: 22px; background: #f1f3f7; border-radius: 50%; }
+.friendCardBody { display: grid; gap: 1px; }
+.friendCardBody strong { font-size: 0.86rem; color: #15171d; }
+.friendCardBody span { font-size: 0.72rem; color: #6c7280; white-space: nowrap; }
+
+.friendDetail {
+  position: absolute;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 7;
+  display: flex; gap: 12px; align-items: center;
+  width: min(380px, calc(100% - 24px));
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 20px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+}
+.friendDetailAvatar { display: flex; flex: none; align-items: center; justify-content: center; width: 52px; height: 52px; font-size: 28px; background: #f1f3f7; border-radius: 50%; }
+.friendDetailBody { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.friendDetailBody strong { font-size: 0.98rem; color: #15171d; }
+.friendDetailBody span { font-size: 0.78rem; color: #6c7280; }
+.friendDetailActions { display: flex; flex: none; gap: 8px; align-items: center; }
+.primaryAction { padding: 9px 14px; font-size: 0.82rem; font-weight: 800; color: #111319; background: #fffc00; border: none; border-radius: 16px; cursor: pointer; }
+.closeAction { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; font-size: 13px; color: #4d525c; background: #eef0f4; border: none; border-radius: 50%; cursor: pointer; }
+
+.globeBtn {
+  position: absolute;
+  right: 14px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+  width: 50px; height: 50px; font-size: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none; border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.loadingOverlay {
+  position: absolute; inset: 0; z-index: 9;
+  display: grid; gap: 12px; place-content: center; justify-items: center;
+  color: #cfd6e4; font-weight: 700;
+  background: radial-gradient(circle at 50% 35%, #0d1326 0%, #05070f 70%);
+}
+.loadingOverlay p { margin: 0; }
+.spinner { width: 38px; height: 38px; border: 4px solid rgba(255, 255, 255, 0.18); border-top-color: #fffc00; border-radius: 50%; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.mapFriend { position: relative; display: flex; flex-direction: column; align-items: center; padding: 0; background: none; border: none; cursor: pointer; font-family: inherit; }
+.mapFriendAvatar { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; font-size: 27px; background: #ffffff; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4); }
+.mapFriendName { margin-top: 3px; padding: 2px 8px; font-size: 11px; font-weight: 800; color: #ffffff; background: rgba(20, 22, 28, 0.78); border-radius: 10px; white-space: nowrap; }
+.mapMe .mapFriendAvatar { border-color: #fffc00; }
+.mePulse { position: absolute; top: 0; left: 50%; width: 52px; height: 52px; background: rgba(255, 252, 0, 0.35); border-radius: 50%; transform: translateX(-50%); animation: pulse 2.2s ease-out infinite; pointer-events: none; }
+@keyframes pulse {
+  0% { opacity: 0.9; transform: translateX(-50%) scale(1); }
+  70% { opacity: 0; transform: translateX(-50%) scale(1.9); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.9); }
+}
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <canvas class="globeCanvas" id="globeCanvas" aria-label="地球儀"></canvas>
+  <div class="mapWrap" id="mapWrap"></div>
+
+  <header class="topBar">
+    <button class="roundBtn" id="profileBtn" type="button" aria-label="プロフィール">😎</button>
+    <div class="searchPill" role="search"><span aria-hidden="true">🔍</span><span>検索</span></div>
+    <button class="roundBtn" id="settingsBtn" type="button" aria-label="設定">⚙️</button>
+  </header>
+
+  <div class="ghostBanner" id="ghostBanner" hidden><span aria-hidden="true">👻</span>ゴーストモード中 — 友達からは見えません</div>
+
+  <div class="settingsCard" id="settingsCard" hidden>
+    <strong>マップ設定</strong>
+    <button class="settingRow" id="ghostToggle" type="button" aria-pressed="false">
+      <span><span aria-hidden="true">👻</span> ゴーストモード</span>
+      <span class="toggle" id="ghostToggleTrack"><span class="toggleKnob"></span></span>
+    </button>
+    <p class="settingHint">オンにすると自分の現在地がマップに表示されなくなります。</p>
+  </div>
+
+  <div class="tokenCard" id="tokenCard" hidden>
+    <span>Mapboxのアクセストークンを入れると衛星写真の地球と地図が表示されます(無料で取得できます)。</span>
+    <input id="tokenInput" type="text" placeholder="pk.eyJ1Ijoi…" autocomplete="off" spellcheck="false" />
+    <div class="tokenCardRow">
+      <button class="tokenSave" id="tokenSave" type="button">保存して表示</button>
+      <button class="tokenSkip" id="tokenSkip" type="button">トークンなしで見る</button>
+    </div>
+    <span><a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noreferrer">トークンの取得はこちら</a>(このトークンは端末のlocalStorageにのみ保存されます)</span>
+  </div>
+
+  <div class="friendDetail" id="friendDetail" hidden></div>
+
+  <footer class="bottomArea">
+    <div class="friendsScroller" id="friendsScroller" aria-label="フレンド一覧"></div>
+  </footer>
+
+  <button class="globeBtn" id="globeBtn" type="button" aria-label="地球儀に戻る" hidden>🌍</button>
+
+  <div class="loadingOverlay" id="loadingOverlay">
+    <span class="spinner" aria-hidden="true"></span>
+    <p>地球を準備中…</p>
+  </div>
+</div>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three'
+
+// ---------------------------------------------------------------- token ----
+const params = new URLSearchParams(location.search)
+const urlToken = params.get('token')
+function readStoredToken() {
+  try { return localStorage.getItem('chieko-mapbox-token') || '' } catch { return '' }
+}
+if (urlToken) {
+  try { localStorage.setItem('chieko-mapbox-token', urlToken) } catch { /* private mode */ }
+}
+const TOKEN = urlToken || readStoredToken()
+
+// --------------------------------------------------------------- friends ---
+const ME = { id: 'me', name: '自分', emoji: '😎', lat: 35.659, lng: 139.7, place: '渋谷', status: '📍 ここにいるよ', lastActiveMinutes: 0 }
+
+const FRIENDS = [
+  { id: 'yui', name: 'ゆい', emoji: '🦊', lat: 35.6812, lng: 139.7671, place: '東京駅', status: '🍜 ラーメン待ち', lastActiveMinutes: 4 },
+  { id: 'ren', name: 'れん', emoji: '🐼', lat: 34.6937, lng: 135.5023, place: '大阪', status: '🎤 カラオケ中', lastActiveMinutes: 18 },
+  { id: 'mina', name: 'ミナ', emoji: '🐰', lat: 37.5665, lng: 126.978, place: 'ソウル', status: '☕ カフェ巡り', lastActiveMinutes: 41 },
+  { id: 'wei', name: 'ウェイ', emoji: '🐯', lat: 25.033, lng: 121.5654, place: '台北', status: '🌃 夜市なう', lastActiveMinutes: 73 },
+  { id: 'jake', name: 'Jake', emoji: '🐻', lat: 40.7306, lng: -73.9866, place: 'NY', status: '🏀 公園でバスケ', lastActiveMinutes: 130 },
+  { id: 'lea', name: 'Léa', emoji: '🐱', lat: 48.8566, lng: 2.3522, place: 'パリ', status: '🥐 朝ごはん', lastActiveMinutes: 220 },
+  { id: 'oli', name: 'Oli', emoji: '🦉', lat: 51.5072, lng: -0.1276, place: 'ロンドン', status: '🎧 散歩中', lastActiveMinutes: 360 },
+  { id: 'maya', name: 'Maya', emoji: '🐨', lat: -33.8688, lng: 151.2093, place: 'シドニー', status: '🏖️ ビーチ', lastActiveMinutes: 540 },
+]
+
+function formatLastActive(minutes) {
+  if (minutes < 1) return 'たった今'
+  if (minutes < 60) return `${minutes}分前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}時間前`
+  return `${Math.floor(hours / 24)}日前`
+}
+
+function createAvatarBadge(emoji, options = {}) {
+  const size = options.size ?? 128
+  const ring = options.ring ?? '#ffffff'
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return canvas
+
+  const center = size / 2
+  const radius = size * 0.42
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
+  ctx.shadowBlur = size * 0.06
+  ctx.shadowOffsetY = size * 0.03
+  ctx.fillStyle = ring
+  ctx.beginPath()
+  ctx.arc(center, center, radius, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  ctx.fillStyle = '#f3f5f9'
+  ctx.beginPath()
+  ctx.arc(center, center, radius - size * 0.045, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.font = `${Math.round(size * 0.42)}px "Apple Color Emoji", "Noto Color Emoji", sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(emoji, center, center + size * 0.02)
+
+  return canvas
+}
+
+// --------------------------------------------------------- earth texture ---
+const TILE_ZOOM = 2
+const GRID = 1 << TILE_ZOOM
+const TILE_SIZE = 512
+const MAX_MERCATOR_LAT = 85.051129
+const OUTPUT_WIDTH = 2048
+const OUTPUT_HEIGHT = 1024
+
+function loadTile(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('tile load failed'))
+    image.src = url
+  })
+}
+
+function paintFallbackOcean(ctx, width, height) {
+  const gradient = ctx.createLinearGradient(0, 0, 0, height)
+  gradient.addColorStop(0, '#0c2034')
+  gradient.addColorStop(0.5, '#123150')
+  gradient.addColorStop(1, '#0c2034')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.strokeStyle = 'rgba(110, 160, 210, 0.18)'
+  ctx.lineWidth = 1
+  for (let i = 1; i < 12; i++) {
+    const y = (height / 12) * i
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
+  for (let i = 1; i < 24; i++) {
+    const x = (width / 24) * i
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, height)
+    ctx.stroke()
+  }
+}
+
+// Mapboxの衛星タイル(ウェブメルカトル)を行単位で正距円筒図法に再投影して
+// 球体用テクスチャを作る。タイルが取れないときは様式化した海のグリッドで代用。
+async function buildEarthTexture(token) {
+  const output = document.createElement('canvas')
+  output.width = OUTPUT_WIDTH
+  output.height = OUTPUT_HEIGHT
+  const outputCtx = output.getContext('2d')
+  if (!outputCtx) return output
+
+  paintFallbackOcean(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT)
+  if (!token) return output
+
+  const mercator = document.createElement('canvas')
+  mercator.width = TILE_SIZE * GRID
+  mercator.height = TILE_SIZE * GRID
+  const mercatorCtx = mercator.getContext('2d')
+  if (!mercatorCtx) return output
+
+  mercatorCtx.fillStyle = '#0c2034'
+  mercatorCtx.fillRect(0, 0, mercator.width, mercator.height)
+
+  const loads = []
+  for (let x = 0; x < GRID; x++) {
+    for (let y = 0; y < GRID; y++) {
+      const url = `https://api.mapbox.com/v4/mapbox.satellite/${TILE_ZOOM}/${x}/${y}@2x.jpg90?access_token=${token}`
+      loads.push(loadTile(url).then((image) => {
+        mercatorCtx.drawImage(image, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+      }))
+    }
+  }
+
+  const results = await Promise.allSettled(loads)
+  if (!results.some((result) => result.status === 'fulfilled')) return output
+
+  for (let row = 0; row < OUTPUT_HEIGHT; row++) {
+    const lat = 90 - ((row + 0.5) * 180) / OUTPUT_HEIGHT
+    const clamped = Math.max(-MAX_MERCATOR_LAT, Math.min(MAX_MERCATOR_LAT, lat))
+    const latRad = (clamped * Math.PI) / 180
+    const mercatorY = (1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2
+    const sourceY = Math.min(mercator.height - 1, Math.max(0, mercatorY * mercator.height))
+    outputCtx.drawImage(mercator, 0, sourceY, mercator.width, 1, 0, row, OUTPUT_WIDTH, 1)
+  }
+
+  return output
+}
+
+// -------------------------------------------------------------- heatmap ----
+const HOTSPOTS = [
+  { lng: 139.77, lat: 35.68, strength: 1 },
+  { lng: 135.5, lat: 34.69, strength: 0.85 },
+  { lng: 130.4, lat: 33.59, strength: 0.6 },
+  { lng: 126.98, lat: 37.57, strength: 0.85 },
+  { lng: 121.56, lat: 25.03, strength: 0.7 },
+  { lng: 103.85, lat: 1.29, strength: 0.65 },
+  { lng: 100.5, lat: 13.75, strength: 0.7 },
+  { lng: 151.21, lat: -33.87, strength: 0.6 },
+  { lng: -73.99, lat: 40.73, strength: 0.95 },
+  { lng: -118.24, lat: 34.05, strength: 0.8 },
+  { lng: -87.63, lat: 41.88, strength: 0.6 },
+  { lng: -99.13, lat: 19.43, strength: 0.6 },
+  { lng: -0.13, lat: 51.51, strength: 0.85 },
+  { lng: 2.35, lat: 48.86, strength: 0.8 },
+  { lng: 13.4, lat: 52.52, strength: 0.6 },
+  { lng: 28.98, lat: 41.01, strength: 0.65 },
+  { lng: 55.27, lat: 25.2, strength: 0.6 },
+  { lng: 72.88, lat: 19.08, strength: 0.75 },
+  { lng: -46.63, lat: -23.55, strength: 0.7 },
+  { lng: 31.24, lat: 30.04, strength: 0.55 },
+]
+
+function buildHeatData() {
+  const features = []
+  HOTSPOTS.forEach((hotspot) => {
+    const count = Math.round(30 + hotspot.strength * 40)
+    for (let i = 0; i < count; i++) {
+      const spread = 0.55
+      const offsetLng = (Math.random() + Math.random() - 1) * spread
+      const offsetLat = (Math.random() + Math.random() - 1) * spread * 0.8
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [hotspot.lng + offsetLng, hotspot.lat + offsetLat] },
+        properties: { weight: hotspot.strength * (0.4 + Math.random() * 0.6) },
+      })
+    }
+  })
+  return { type: 'FeatureCollection', features }
+}
+
+const HEAT_LAYER_PAINT = {
+  'heatmap-weight': ['get', 'weight'],
+  'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 2, 0.9, 9, 1.6],
+  'heatmap-color': [
+    'interpolate', ['linear'], ['heatmap-density'],
+    0, 'rgba(0, 0, 0, 0)',
+    0.18, 'rgba(64, 196, 255, 0.5)',
+    0.42, 'rgba(96, 255, 140, 0.65)',
+    0.62, 'rgba(255, 252, 0, 0.75)',
+    0.82, 'rgba(255, 150, 40, 0.85)',
+    1, 'rgba(255, 70, 60, 0.92)',
+  ],
+  'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 2, 14, 6, 34, 10, 56],
+  'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.85, 11, 0.5, 13, 0],
+}
+
+// --------------------------------------------------------- globe engine ----
+const MIN_DISTANCE = 1.3
+const MAX_DISTANCE = 4.4
+const DIVE_DISTANCE = 1.52
+const MARKER_RADIUS = 1.028
+const DEG = Math.PI / 180
+
+const ATMOSPHERE_VERTEX = `
+varying vec3 vNormal;
+void main() {
+  vNormal = normalize(normalMatrix * normal);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`
+
+const ATMOSPHERE_FRAGMENT = `
+varying vec3 vNormal;
+void main() {
+  float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 4.0);
+  gl_FragColor = vec4(0.36, 0.58, 1.0, 1.0) * intensity;
+}
+`
+
+const RIM_FRAGMENT = `
+varying vec3 vNormal;
+void main() {
+  float intensity = pow(1.04 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 5.0);
+  gl_FragColor = vec4(0.5, 0.7, 1.0, 1.0) * intensity * 0.55;
+}
+`
+
+function normalizeLng(lng) {
+  return ((lng + 540) % 360) - 180
+}
+
+function shortestLngDelta(from, to) {
+  return ((to - from + 540) % 360) - 180
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
+
+function latLngToVector3(lat, lng, radius) {
+  const phi = (lng + 180) * DEG
+  const theta = (90 - lat) * DEG
+  return new THREE.Vector3(
+    -radius * Math.cos(phi) * Math.sin(theta),
+    radius * Math.cos(theta),
+    radius * Math.sin(phi) * Math.sin(theta),
+  )
+}
+
+class GlobeEngine {
+  constructor(options) {
+    this.canvas = options.canvas
+    this.onDive = options.onDive
+    this.onMarkerSelect = options.onMarkerSelect
+
+    this.scene = new THREE.Scene()
+    this.markerGroup = new THREE.Group()
+    this.markerById = new Map()
+    this.hiddenMarkers = new Set()
+    this.raycaster = new THREE.Raycaster()
+
+    this.view = { lng: 137, lat: 34 }
+    this.distance = 3.9
+    this.distanceTarget = 2.9
+    this.fitDistance = 3.2
+    this.maxDistance = MAX_DISTANCE
+    this.initialFitDone = false
+    this.velocity = { lng: 0, lat: 0 }
+    this.pointers = new Map()
+    this.lastPinchGap = 0
+    this.tapCandidate = null
+    this.lastMoveTime = 0
+    this.lastInteraction = 0
+    this.flight = null
+    this.diveFired = false
+    this.locked = false
+    this.paused = false
+    this.disposed = false
+    this.raf = 0
+    this.lastFrameTime = 0
+
+    this.renderer = new THREE.WebGLRenderer({ canvas: options.canvas, antialias: true })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.scene.background = new THREE.Color('#05070f')
+
+    this.camera = new THREE.PerspectiveCamera(38, 1, 0.05, 120)
+
+    const texture = new THREE.CanvasTexture(options.earthTexture)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy()
+
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 96), new THREE.MeshBasicMaterial({ map: texture }))
+    this.scene.add(earth)
+
+    const atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 64, 64),
+      new THREE.ShaderMaterial({
+        vertexShader: ATMOSPHERE_VERTEX,
+        fragmentShader: ATMOSPHERE_FRAGMENT,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      }),
+    )
+    atmosphere.scale.setScalar(1.18)
+    this.scene.add(atmosphere)
+
+    const rim = new THREE.Mesh(
+      new THREE.SphereGeometry(1.001, 64, 64),
+      new THREE.ShaderMaterial({
+        vertexShader: ATMOSPHERE_VERTEX,
+        fragmentShader: RIM_FRAGMENT,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      }),
+    )
+    this.scene.add(rim)
+
+    this.scene.add(this.buildStars())
+    this.scene.add(this.markerGroup)
+    if (options.markers) options.markers.forEach((marker) => this.addMarker(marker))
+
+    this.handlePointerDown = this.handlePointerDown.bind(this)
+    this.handlePointerMove = this.handlePointerMove.bind(this)
+    this.handlePointerUp = this.handlePointerUp.bind(this)
+    this.handleWheel = this.handleWheel.bind(this)
+    this.tick = this.tick.bind(this)
+
+    this.canvas.addEventListener('pointerdown', this.handlePointerDown)
+    this.canvas.addEventListener('pointermove', this.handlePointerMove)
+    this.canvas.addEventListener('pointerup', this.handlePointerUp)
+    this.canvas.addEventListener('pointercancel', this.handlePointerUp)
+    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false })
+
+    this.lastFrameTime = performance.now()
+    this.raf = requestAnimationFrame(this.tick)
+  }
+
+  buildStars() {
+    const count = 1600
+    const positions = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      const direction = new THREE.Vector3().randomDirection().multiplyScalar(30 + Math.random() * 30)
+      positions.set([direction.x, direction.y, direction.z], i * 3)
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    return new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({ color: 0xffffff, size: 0.14, sizeAttenuation: true, transparent: true, opacity: 0.85 }),
+    )
+  }
+
+  addMarker(input) {
+    const texture = new THREE.CanvasTexture(input.image)
+    texture.colorSpace = THREE.SRGBColorSpace
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture }))
+    sprite.position.copy(latLngToVector3(input.lat, input.lng, MARKER_RADIUS))
+    sprite.userData.id = input.id
+    sprite.userData.baseSize = input.size ?? 0.11
+    this.markerGroup.add(sprite)
+    this.markerById.set(input.id, sprite)
+  }
+
+  handlePointerDown(event) {
+    if (this.locked) return
+    this.canvas.setPointerCapture(event.pointerId)
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    this.lastInteraction = performance.now()
+    this.velocity = { lng: 0, lat: 0 }
+    this.flight = null
+    if (this.pointers.size === 1) {
+      this.tapCandidate = { x: event.clientX, y: event.clientY }
+    } else {
+      this.tapCandidate = null
+      this.lastPinchGap = this.pinchGap()
+    }
+  }
+
+  handlePointerMove(event) {
+    if (this.locked || !this.pointers.has(event.pointerId)) return
+    const previous = this.pointers.get(event.pointerId)
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    this.lastInteraction = performance.now()
+
+    if (this.pointers.size === 2) {
+      const gap = this.pinchGap()
+      if (this.lastPinchGap > 0 && gap > 0) {
+        this.setDistanceTarget(this.distanceTarget * (this.lastPinchGap / gap))
+      }
+      this.lastPinchGap = gap
+      return
+    }
+
+    const dx = event.clientX - previous.x
+    const dy = event.clientY - previous.y
+    if (this.tapCandidate) {
+      const total = Math.hypot(event.clientX - this.tapCandidate.x, event.clientY - this.tapCandidate.y)
+      if (total > 6) this.tapCandidate = null
+    }
+
+    const sensitivity = (0.082 * (this.distance - 1.02)) / Math.max(this.canvas.clientHeight / 640, 0.5)
+    const deltaLng = -dx * sensitivity
+    const deltaLat = dy * sensitivity
+    this.view.lng += deltaLng
+    this.view.lat = THREE.MathUtils.clamp(this.view.lat + deltaLat, -84, 84)
+
+    const now = performance.now()
+    const elapsed = Math.max(now - this.lastMoveTime, 8) / 1000
+    this.velocity.lng = THREE.MathUtils.lerp(this.velocity.lng, deltaLng / elapsed, 0.45)
+    this.velocity.lat = THREE.MathUtils.lerp(this.velocity.lat, deltaLat / elapsed, 0.45)
+    this.lastMoveTime = now
+  }
+
+  handlePointerUp(event) {
+    this.pointers.delete(event.pointerId)
+    this.lastPinchGap = this.pointers.size === 2 ? this.pinchGap() : 0
+    if (this.tapCandidate && this.pointers.size === 0) {
+      this.handleTap(event.clientX, event.clientY)
+    }
+    if (this.pointers.size === 0) this.tapCandidate = null
+  }
+
+  handleWheel(event) {
+    event.preventDefault()
+    if (this.locked) return
+    this.lastInteraction = performance.now()
+    this.setDistanceTarget(this.distanceTarget * Math.exp(event.deltaY * 0.0011))
+  }
+
+  pinchGap() {
+    const points = [...this.pointers.values()]
+    if (points.length < 2) return 0
+    return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y)
+  }
+
+  setDistanceTarget(value) {
+    this.distanceTarget = THREE.MathUtils.clamp(value, MIN_DISTANCE, this.maxDistance)
+  }
+
+  handleTap(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect()
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    this.raycaster.setFromCamera(ndc, this.camera)
+    const hits = this.raycaster.intersectObjects(this.markerGroup.children.filter((child) => child.visible))
+    const id = hits[0] && hits[0].object.userData.id
+    if (typeof id === 'string' && this.onMarkerSelect) this.onMarkerSelect(id)
+  }
+
+  tick(now) {
+    if (this.disposed) return
+    this.raf = requestAnimationFrame(this.tick)
+    const dt = THREE.MathUtils.clamp((now - this.lastFrameTime) / 1000, 0, 0.05)
+    this.lastFrameTime = now
+    if (this.paused) return
+
+    if (this.flight) {
+      const t = Math.min((now - this.flight.start) / this.flight.duration, 1)
+      const eased = easeInOutCubic(t)
+      this.view.lng = this.flight.fromLng + shortestLngDelta(this.flight.fromLng, this.flight.toLng) * eased
+      this.view.lat = THREE.MathUtils.lerp(this.flight.fromLat, this.flight.toLat, eased)
+      if (t >= 1) {
+        const thenDive = this.flight.thenDive
+        this.flight = null
+        if (thenDive) this.distanceTarget = MIN_DISTANCE
+      }
+    } else if (this.pointers.size === 0 && !this.locked) {
+      this.view.lng += this.velocity.lng * dt
+      this.view.lat = THREE.MathUtils.clamp(this.view.lat + this.velocity.lat * dt, -84, 84)
+      const decay = Math.exp(-3.2 * dt)
+      this.velocity.lng *= decay
+      this.velocity.lat *= decay
+
+      if (now - this.lastInteraction > 2600) {
+        this.view.lng += 1.6 * dt
+      }
+    }
+
+    this.distance += (this.distanceTarget - this.distance) * (1 - Math.exp(-7 * dt))
+    if (!this.diveFired && this.distance < DIVE_DISTANCE) {
+      this.diveFired = true
+      this.locked = true
+      this.distanceTarget = MIN_DISTANCE
+      if (this.onDive) this.onDive(this.getView())
+    }
+
+    this.camera.position.copy(latLngToVector3(this.view.lat, normalizeLng(this.view.lng), this.distance))
+    this.camera.lookAt(0, 0, 0)
+
+    const cameraDirection = this.camera.position.clone().normalize()
+    const markerScale = THREE.MathUtils.clamp(this.distance / 3, 0.6, 1.15)
+    this.markerGroup.children.forEach((sprite) => {
+      const facing = sprite.position.clone().normalize().dot(cameraDirection)
+      sprite.visible = facing > 0.12 && !this.hiddenMarkers.has(sprite.userData.id)
+      sprite.scale.setScalar(sprite.userData.baseSize * markerScale)
+    })
+
+    this.renderer.render(this.scene, this.camera)
+  }
+
+  getView() {
+    return { lng: normalizeLng(this.view.lng), lat: this.view.lat }
+  }
+
+  flyToAndDive(lng, lat, duration = 1100) {
+    if (this.locked) return
+    this.velocity = { lng: 0, lat: 0 }
+    this.lastInteraction = performance.now()
+    this.flight = {
+      fromLng: this.view.lng,
+      fromLat: this.view.lat,
+      toLng: lng,
+      toLat: lat,
+      start: performance.now(),
+      duration,
+      thenDive: true,
+    }
+  }
+
+  resetView(lng, lat) {
+    this.view = { lng, lat: THREE.MathUtils.clamp(lat, -84, 84) }
+    this.velocity = { lng: 0, lat: 0 }
+    this.flight = null
+    this.diveFired = false
+    this.locked = false
+    this.distance = 1.75
+    this.distanceTarget = this.fitDistance
+    this.lastInteraction = performance.now()
+  }
+
+  setMarkerHidden(id, hidden) {
+    if (hidden) this.hiddenMarkers.add(id)
+    else this.hiddenMarkers.delete(id)
+  }
+
+  setPaused(paused) {
+    this.paused = paused
+    if (!paused) this.lastFrameTime = performance.now()
+  }
+
+  resize(width, height) {
+    if (width <= 0 || height <= 0) return
+    this.renderer.setSize(width, height, false)
+    this.camera.aspect = width / height
+    this.camera.updateProjectionMatrix()
+
+    // 画面の狭い方の辺に地球全体が収まるカメラ距離を求める
+    // (半径1の球が半角θに収まる距離は 1/sinθ)。
+    const halfV = (this.camera.fov / 2) * DEG
+    const halfH = Math.atan(Math.tan(halfV) * this.camera.aspect)
+    const minHalf = Math.min(halfV, halfH)
+    this.fitDistance = Math.min(1.12 / Math.sin(minHalf), 8)
+    this.maxDistance = this.fitDistance * 1.25
+    if (!this.initialFitDone) {
+      this.initialFitDone = true
+      this.distance = this.fitDistance * 1.35
+      this.distanceTarget = this.fitDistance
+    } else if (!this.locked) {
+      this.distanceTarget = Math.min(this.distanceTarget, this.maxDistance)
+    }
+  }
+
+  dispose() {
+    this.disposed = true
+    cancelAnimationFrame(this.raf)
+    this.canvas.removeEventListener('pointerdown', this.handlePointerDown)
+    this.canvas.removeEventListener('pointermove', this.handlePointerMove)
+    this.canvas.removeEventListener('pointerup', this.handlePointerUp)
+    this.canvas.removeEventListener('pointercancel', this.handlePointerUp)
+    this.canvas.removeEventListener('wheel', this.handleWheel)
+    this.renderer.dispose()
+  }
+}
+
+// ------------------------------------------------------------------ app ----
+const SURFACE_ZOOM = 2.05
+const DIVE_START_ZOOM = 2.2
+const FADE_MS = 480
+
+const shell = document.getElementById('shell')
+const globeCanvas = document.getElementById('globeCanvas')
+const mapWrap = document.getElementById('mapWrap')
+const ghostBanner = document.getElementById('ghostBanner')
+const settingsCard = document.getElementById('settingsCard')
+const ghostToggle = document.getElementById('ghostToggle')
+const ghostToggleTrack = document.getElementById('ghostToggleTrack')
+const tokenCard = document.getElementById('tokenCard')
+const tokenInput = document.getElementById('tokenInput')
+const friendDetail = document.getElementById('friendDetail')
+const friendsScroller = document.getElementById('friendsScroller')
+const globeBtn = document.getElementById('globeBtn')
+const loadingOverlay = document.getElementById('loadingOverlay')
+
+let phase = 'loading'
+let ghostMode = false
+let selectedFriendId = null
+let engine = null
+let map = null
+let meMarkerElement = null
+let pendingFriend = null
+const friendCardById = new Map()
+
+function setPhase(next) {
+  phase = next
+  globeBtn.hidden = next !== 'map'
+  loadingOverlay.hidden = next !== 'loading'
+}
+
+function renderGhost() {
+  ghostBanner.hidden = !ghostMode
+  ghostToggle.setAttribute('aria-pressed', String(ghostMode))
+  ghostToggleTrack.classList.toggle('toggleOn', ghostMode)
+  if (engine) engine.setMarkerHidden('me', ghostMode)
+  if (meMarkerElement) meMarkerElement.style.display = ghostMode ? 'none' : ''
+}
+
+function renderFriendDetail() {
+  const friend = FRIENDS.find((item) => item.id === selectedFriendId) || null
+  friendCardById.forEach((card, id) => card.classList.toggle('friendCardActive', id === selectedFriendId))
+  if (!friend) {
+    friendDetail.hidden = true
+    friendDetail.replaceChildren()
+    return
+  }
+
+  const avatar = document.createElement('span')
+  avatar.className = 'friendDetailAvatar'
+  avatar.textContent = friend.emoji
+
+  const body = document.createElement('div')
+  body.className = 'friendDetailBody'
+  const name = document.createElement('strong')
+  name.textContent = friend.name
+  const meta = document.createElement('span')
+  meta.textContent = `${friend.place} ・ ${formatLastActive(friend.lastActiveMinutes)}`
+  const status = document.createElement('span')
+  status.textContent = friend.status
+  body.append(name, meta, status)
+
+  const actions = document.createElement('div')
+  actions.className = 'friendDetailActions'
+  const go = document.createElement('button')
+  go.className = 'primaryAction'
+  go.type = 'button'
+  go.textContent = '場所へ'
+  go.addEventListener('click', () => selectFriend(friend))
+  const close = document.createElement('button')
+  close.className = 'closeAction'
+  close.type = 'button'
+  close.setAttribute('aria-label', '閉じる')
+  close.textContent = '✕'
+  close.addEventListener('click', () => {
+    selectedFriendId = null
+    renderFriendDetail()
+  })
+  actions.append(go, close)
+
+  friendDetail.replaceChildren(avatar, body, actions)
+  friendDetail.hidden = false
+}
+
+function selectFriend(friend) {
+  selectedFriendId = friend.id
+  renderFriendDetail()
+  if (phase === 'map' && map) {
+    map.flyTo({ center: [friend.lng, friend.lat], zoom: 14, duration: 1600, essential: true })
+  } else if (phase === 'globe' && engine) {
+    pendingFriend = friend
+    engine.flyToAndDive(friend.lng, friend.lat)
+  }
+}
+
+function createMapAvatarElement(friend, isMe) {
+  const element = document.createElement('button')
+  element.type = 'button'
+  element.className = isMe ? 'mapFriend mapMe' : 'mapFriend'
+  element.setAttribute('aria-label', friend.name)
+
+  if (isMe) {
+    const pulse = document.createElement('span')
+    pulse.className = 'mePulse'
+    element.append(pulse)
+  }
+
+  const avatar = document.createElement('span')
+  avatar.className = 'mapFriendAvatar'
+  avatar.textContent = friend.emoji
+
+  const name = document.createElement('span')
+  name.className = 'mapFriendName'
+  name.textContent = isMe ? '自分' : friend.name
+
+  element.append(avatar, name)
+  element.addEventListener('click', (event) => {
+    event.stopPropagation()
+    if (isMe) {
+      selectedFriendId = null
+      renderFriendDetail()
+    } else {
+      selectFriend(friend)
+    }
+  })
+  return element
+}
+
+function handleDive(center) {
+  if (!map) {
+    // Mapboxが使えないときは少し戻して地球儀のまま続行する。
+    engine.resetView(center.lng, center.lat)
+    return
+  }
+  setPhase('diving')
+  map.jumpTo({ center: [center.lng, center.lat], zoom: DIVE_START_ZOOM, bearing: 0, pitch: 0 })
+  mapWrap.classList.add('mapWrapVisible')
+  window.setTimeout(() => {
+    setPhase('map')
+    engine.setPaused(true)
+    const pending = pendingFriend
+    pendingFriend = null
+    if (pending) {
+      map.flyTo({ center: [pending.lng, pending.lat], zoom: 13.5, duration: 2400, essential: true })
+    } else {
+      map.easeTo({ zoom: 4.4, duration: 1400 })
+    }
+  }, FADE_MS + 40)
+}
+
+function surfaceToGlobe() {
+  if (!map || !engine || phase !== 'map') return
+  setPhase('surfacing')
+  const center = map.getCenter()
+  engine.resetView(center.lng, center.lat)
+  engine.setPaused(false)
+  mapWrap.classList.remove('mapWrapVisible')
+  window.setTimeout(() => setPhase('globe'), FADE_MS + 40)
+}
+
+function createMap() {
+  if (!TOKEN || typeof mapboxgl === 'undefined') return null
+  mapboxgl.accessToken = TOKEN
+  const created = new mapboxgl.Map({
+    container: mapWrap,
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    projection: { name: 'globe' },
+    center: [ME.lng, ME.lat],
+    zoom: DIVE_START_ZOOM,
+    attributionControl: true,
+  })
+
+  created.on('style.load', () => {
+    created.setFog({
+      color: 'rgb(186, 210, 235)',
+      'high-color': 'rgb(36, 92, 223)',
+      'horizon-blend': 0.02,
+      'space-color': 'rgb(5, 7, 15)',
+      'star-intensity': 0.6,
+    })
+    if (!created.getSource('chieko-heat')) {
+      created.addSource('chieko-heat', { type: 'geojson', data: buildHeatData() })
+      created.addLayer({ id: 'chieko-heat', type: 'heatmap', source: 'chieko-heat', paint: HEAT_LAYER_PAINT })
+    }
+  })
+
+  created.on('zoomend', () => {
+    if (created.getZoom() < SURFACE_ZOOM) surfaceToGlobe()
+  })
+
+  FRIENDS.forEach((friend) => {
+    new mapboxgl.Marker({ element: createMapAvatarElement(friend, false), anchor: 'bottom' })
+      .setLngLat([friend.lng, friend.lat])
+      .addTo(created)
+  })
+  meMarkerElement = createMapAvatarElement(ME, true)
+  new mapboxgl.Marker({ element: meMarkerElement, anchor: 'bottom' }).setLngLat([ME.lng, ME.lat]).addTo(created)
+
+  return created
+}
+
+function buildFriendCards() {
+  FRIENDS.forEach((friend) => {
+    const card = document.createElement('button')
+    card.className = 'friendCard'
+    card.type = 'button'
+
+    const avatar = document.createElement('span')
+    avatar.className = 'friendCardAvatar'
+    avatar.textContent = friend.emoji
+
+    const body = document.createElement('span')
+    body.className = 'friendCardBody'
+    const name = document.createElement('strong')
+    name.textContent = friend.name
+    const meta = document.createElement('span')
+    meta.textContent = `${friend.place} ・ ${formatLastActive(friend.lastActiveMinutes)}`
+    body.append(name, meta)
+
+    card.append(avatar, body)
+    card.addEventListener('click', () => selectFriend(friend))
+    friendsScroller.append(card)
+    friendCardById.set(friend.id, card)
+  })
+}
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  settingsCard.hidden = !settingsCard.hidden
+})
+ghostToggle.addEventListener('click', () => {
+  ghostMode = !ghostMode
+  renderGhost()
+})
+globeBtn.addEventListener('click', () => {
+  if (map) map.easeTo({ zoom: 1.6, duration: 1000 })
+})
+document.getElementById('tokenSave').addEventListener('click', () => {
+  const value = tokenInput.value.trim()
+  if (!value) return
+  try { localStorage.setItem('chieko-mapbox-token', value) } catch { /* private mode */ }
+  const url = new URL(location.href)
+  url.searchParams.delete('token')
+  location.href = url.toString()
+})
+tokenInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') document.getElementById('tokenSave').click()
+})
+document.getElementById('tokenSkip').addEventListener('click', () => {
+  tokenCard.hidden = true
+})
+
+async function start() {
+  buildFriendCards()
+  tokenCard.hidden = Boolean(TOKEN)
+  map = createMap()
+
+  const earthTexture = await buildEarthTexture(TOKEN)
+  const markers = [
+    ...FRIENDS.map((friend) => ({ id: friend.id, lat: friend.lat, lng: friend.lng, image: createAvatarBadge(friend.emoji) })),
+    { id: 'me', lat: ME.lat, lng: ME.lng, image: createAvatarBadge(ME.emoji, { ring: '#fffc00' }), size: 0.125 },
+  ]
+  engine = new GlobeEngine({
+    canvas: globeCanvas,
+    earthTexture,
+    markers,
+    onDive: handleDive,
+    onMarkerSelect: (id) => {
+      const friend = FRIENDS.find((item) => item.id === id)
+      if (friend) selectFriend(friend)
+    },
+  })
+  engine.resize(shell.clientWidth, shell.clientHeight)
+  setPhase('globe')
+
+  const observer = new ResizeObserver(() => {
+    engine.resize(shell.clientWidth, shell.clientHeight)
+    if (map) map.resize()
+  })
+  observer.observe(shell)
+}
+
+start().catch((error) => {
+  console.error(error)
+  setPhase('globe')
+})
+</script>
+</body>
+</html>

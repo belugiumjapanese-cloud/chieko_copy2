@@ -166,17 +166,19 @@
 
 .tokenWarn {
   position: absolute;
-  top: 50%;
+  top: calc(112px + env(safe-area-inset-top));
   left: 50%;
   z-index: 6;
+  width: max-content;
+  max-width: calc(100% - 32px);
   margin: 0;
-  padding: 10px 16px;
-  font-size: 0.85rem;
+  padding: 8px 14px;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #ffffff;
   background: rgba(20, 22, 28, 0.85);
   border-radius: 14px;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   text-align: center;
 }
 

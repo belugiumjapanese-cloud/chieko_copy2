@@ -24,6 +24,7 @@ A Snap Map-inspired 3D globe experience built with Three.js and Mapbox. Demo rou
 - `globe/lib/earthTexture.ts`: stitches Mapbox satellite tiles and reprojects web mercator to an equirectangular texture for the sphere (with an offline fallback).
 - `globe/lib/friends.ts`: demo friend data, avatar badge canvas builder, relative-time formatting.
 - `globe/lib/heat.ts`: demo activity points and heatmap layer paint definition.
+- `globe/standalone/index.html`: self-contained, build-free version of the same experience (Three.js and Mapbox GL loaded from CDN). Open the file directly in a browser — no Node.js or dev server required. Enter a Mapbox token in the on-screen prompt (stored in localStorage) or pass it as `?token=pk....`; without a token it falls back to a stylized globe.
 
 Only `NEXT_PUBLIC_MAPBOX_TOKEN` is required (no Firebase). Pass `friends` / `me` props to replace the demo data.
 

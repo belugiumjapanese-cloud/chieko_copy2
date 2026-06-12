@@ -96,6 +96,9 @@ export class GlobeEngine {
   private view: GlobeView = { lng: 137, lat: 34 }
   private distance = 3.9
   private distanceTarget = 2.9
+  private fitDistance = 3.2
+  private maxDistance = MAX_DISTANCE
+  private initialFitDone = false
   private velocity = { lng: 0, lat: 0 }
   private pointers = new Map<number, { x: number; y: number }>()
   private lastPinchGap = 0
@@ -273,7 +276,7 @@ export class GlobeEngine {
   }
 
   private setDistanceTarget(value: number) {
-    this.distanceTarget = THREE.MathUtils.clamp(value, MIN_DISTANCE, MAX_DISTANCE)
+    this.distanceTarget = THREE.MathUtils.clamp(value, MIN_DISTANCE, this.maxDistance)
   }
 
   private handleTap(clientX: number, clientY: number) {
@@ -367,7 +370,7 @@ export class GlobeEngine {
     this.diveFired = false
     this.locked = false
     this.distance = 1.75
-    this.distanceTarget = 2.8
+    this.distanceTarget = this.fitDistance
     this.lastInteraction = performance.now()
   }
 
@@ -386,6 +389,21 @@ export class GlobeEngine {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
+
+    // 画面の狭い方の辺に地球全体が収まるカメラ距離を求める
+    // (半径1の球が半角θに収まる距離は 1/sinθ)。
+    const halfV = (this.camera.fov / 2) * DEG
+    const halfH = Math.atan(Math.tan(halfV) * this.camera.aspect)
+    const minHalf = Math.min(halfV, halfH)
+    this.fitDistance = Math.min(1.12 / Math.sin(minHalf), 8)
+    this.maxDistance = this.fitDistance * 1.25
+    if (!this.initialFitDone) {
+      this.initialFitDone = true
+      this.distance = this.fitDistance * 1.35
+      this.distanceTarget = this.fitDistance
+    } else if (!this.locked) {
+      this.distanceTarget = Math.min(this.distanceTarget, this.maxDistance)
+    }
   }
 
   dispose() {
