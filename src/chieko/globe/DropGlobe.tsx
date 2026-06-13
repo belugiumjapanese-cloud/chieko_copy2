@@ -23,6 +23,9 @@ type DropGlobeProps = {
   /** 親アプリの下部ナビ分だけUIを上げる(px) */
   bottomInset?: number
   onRequestDrop?: () => void
+  /** ライブラリ等から飛んできたとき、この座標へダイブする */
+  focusTarget?: { id?: string; lng: number; lat: number } | null
+  onFocusConsumed?: () => void
 }
 
 type Phase = 'loading' | 'globe' | 'diving' | 'map' | 'surfacing'
@@ -60,6 +63,8 @@ export function DropGlobe({
   topInset = 0,
   bottomInset = 0,
   onRequestDrop,
+  focusTarget = null,
+  onFocusConsumed,
 }: DropGlobeProps) {
   const globeCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
@@ -315,6 +320,22 @@ export function DropGlobe({
       map.setLayoutProperty('chieko-heat', 'visibility', heatOn ? 'visible' : 'none')
     }
   }, [heatOn])
+
+  // ----- ライブラリ等から渡されたピンへ飛ぶ -----
+  useEffect(() => {
+    if (!focusTarget || !engineReady) return
+    const drop = dropsRef.current.find((item) => item.id === focusTarget.id)
+    if (drop) {
+      selectDropRef.current?.(drop)
+    } else if (phaseRef.current === 'map' && mapRef.current) {
+      mapRef.current.flyTo({ center: [focusTarget.lng, focusTarget.lat], zoom: 14.5, duration: 1600, essential: true })
+    } else if (phaseRef.current === 'globe') {
+      engineRef.current?.flyToAndDive(focusTarget.lng, focusTarget.lat)
+    }
+    onFocusConsumed?.()
+    // フォーカス対象が変わったときだけ実行する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTarget, engineReady])
 
   const handleBackToGlobe = () => {
     mapRef.current?.easeTo({ zoom: 1.6, duration: 1000 })
