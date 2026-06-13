@@ -23,6 +23,17 @@ type LocationState = Coordinates & {
 
 const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
 
+function createManualDropMarker() {
+  const element = document.createElement('span')
+  element.className = styles.manualDropMarker
+
+  const drop = document.createElement('span')
+  drop.className = styles.manualDropMarkerDrop
+  element.append(drop)
+
+  return element
+}
+
 function ManualLocationPicker({
   value,
   mapboxToken,
@@ -65,7 +76,7 @@ function ManualLocationPicker({
     if (!mapRef.current || !value) return
 
     markerRef.current?.remove()
-    markerRef.current = new mapboxgl.Marker({ color: '#111f1a' })
+    markerRef.current = new mapboxgl.Marker({ element: createManualDropMarker(), anchor: 'bottom' })
       .setLngLat([value.lng, value.lat])
       .addTo(mapRef.current)
     mapRef.current.easeTo({ center: [value.lng, value.lat], zoom: 14 })

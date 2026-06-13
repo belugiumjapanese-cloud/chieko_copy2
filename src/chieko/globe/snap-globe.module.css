@@ -604,6 +604,19 @@
   cursor: pointer;
 }
 
+.mapDropPin::before {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 24px;
+  height: 8px;
+  content: '';
+  border: 2px solid rgba(215, 226, 218, 0.56);
+  border-radius: 50%;
+  transform: translateX(-50%) scale(0.2);
+  animation: mapDropRipple 0.82s ease-out both;
+}
+
 .mapDropPinImage {
   width: 54px;
   height: 54px;
@@ -612,10 +625,50 @@
   border: 3px solid #ffffff;
   border-radius: 8px;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.34);
+  transform-origin: center bottom;
+  animation: mapDropPinPlop 0.62s cubic-bezier(0.2, 0.88, 0.3, 1.18) both;
 }
 
 .mapDropPinActive .mapDropPinImage {
   border-color: #d7e2da;
+}
+
+@keyframes mapDropPinPlop {
+  0% {
+    opacity: 0;
+    transform: translateY(-34px) scale(0.82);
+  }
+
+  54% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  72% {
+    transform: translateY(5px) scale(1.08, 0.74);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes mapDropRipple {
+  0%,
+  36% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.2);
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(2.4, 1.55);
+  }
 }
 
 .emptyCard {
@@ -669,4 +722,11 @@
   background: rgba(215, 226, 218, 0.92);
   border: 1px solid rgba(16, 24, 20, 0.08);
   border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapDropPin::before,
+  .mapDropPinImage {
+    animation-duration: 1ms;
+  }
 }
