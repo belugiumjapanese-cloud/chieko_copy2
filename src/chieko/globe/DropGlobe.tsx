@@ -17,6 +17,7 @@ import styles from './snap-globe.module.css'
 
 type DropGlobeProps = {
   mapboxToken?: string
+  mapboxStyle?: string
   userId?: string
   /** 親アプリのヘッダー分だけUIを下げる(px) */
   topInset?: number
@@ -33,6 +34,10 @@ type Phase = 'loading' | 'globe' | 'diving' | 'map' | 'surfacing'
 const SURFACE_ZOOM = 2.05
 const DIVE_START_ZOOM = 2.2
 const FADE_MS = 480
+const DEFAULT_MAPBOX_STYLE =
+  process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL ??
+  process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
+  'mapbox://styles/belgium-jap/cmp8riesh001j01sngrwfbdsz'
 
 function createMapDropElement(drop: DropDoc, onSelect: () => void) {
   const element = document.createElement('button')
@@ -59,6 +64,7 @@ function createMapDropElement(drop: DropDoc, onSelect: () => void) {
 
 export function DropGlobe({
   mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
+  mapboxStyle = DEFAULT_MAPBOX_STYLE,
   userId,
   topInset = 0,
   bottomInset = 0,
@@ -163,7 +169,7 @@ export function DropGlobe({
       mapboxgl.accessToken = mapboxToken
       const map = new mapboxgl.Map({
         container: mapContainer,
-        style: 'mapbox://styles/mapbox/satellite-streets-v12',
+        style: mapboxStyle,
         projection: { name: 'globe' },
         center: [139.7, 35.66],
         zoom: DIVE_START_ZOOM,
@@ -173,11 +179,11 @@ export function DropGlobe({
 
       map.on('style.load', () => {
         map.setFog({
-          color: 'rgb(186, 210, 235)',
-          'high-color': 'rgb(36, 92, 223)',
-          'horizon-blend': 0.02,
-          'space-color': 'rgb(5, 7, 15)',
-          'star-intensity': 0.6,
+          color: 'rgb(214, 226, 218)',
+          'high-color': 'rgb(159, 185, 173)',
+          'horizon-blend': 0.035,
+          'space-color': 'rgb(8, 13, 11)',
+          'star-intensity': 0.18,
         })
         if (!map.getSource('chieko-heat')) {
           map.addSource('chieko-heat', { type: 'geojson', data: buildDropHeatData(dropsRef.current) })
@@ -413,7 +419,7 @@ export function DropGlobe({
       ) : null}
 
       {!mapboxToken ? (
-        <p className={styles.tokenWarn}>NEXT_PUBLIC_MAPBOX_TOKEN を設定すると衛星写真と地図が表示されます。</p>
+        <p className={styles.tokenWarn}>NEXT_PUBLIC_MAPBOX_TOKEN を設定するとMapboxの地図が表示されます。</p>
       ) : null}
 
       {phase !== 'loading' && drops.length === 0 ? (
