@@ -13,6 +13,7 @@ import styles from './chieko.module.css'
 type DropUploaderProps = {
   userId?: string
   mapboxToken?: string
+  mapboxStyle?: string
   onCreated?: (dropId: string) => void
 }
 
@@ -22,6 +23,10 @@ type LocationState = Coordinates & {
 }
 
 const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
+const DEFAULT_MAPBOX_STYLE =
+  process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL ??
+  process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
+  'mapbox://styles/belgium-jap/cmp8riesh001j01sngrwfbdsz'
 
 function createManualDropMarker() {
   const element = document.createElement('span')
@@ -37,10 +42,12 @@ function createManualDropMarker() {
 function ManualLocationPicker({
   value,
   mapboxToken,
+  mapboxStyle,
   onChange,
 }: {
   value: Coordinates | null
   mapboxToken: string
+  mapboxStyle: string
   onChange: (coordinates: Coordinates) => void
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -53,7 +60,7 @@ function ManualLocationPicker({
     mapboxgl.accessToken = mapboxToken
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: mapboxStyle,
       center: value ? [value.lng, value.lat] : DEFAULT_CENTER,
       zoom: value ? 14 : 11,
     })
@@ -70,7 +77,7 @@ function ManualLocationPicker({
       map.remove()
       mapRef.current = null
     }
-  }, [mapboxToken, onChange])
+  }, [mapboxToken, mapboxStyle, onChange])
 
   useEffect(() => {
     if (!mapRef.current || !value) return
@@ -89,7 +96,12 @@ function ManualLocationPicker({
   return <div ref={containerRef} className={styles.mapPicker} aria-label="場所指定マップ" />
 }
 
-export function DropUploader({ userId, mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '', onCreated }: DropUploaderProps) {
+export function DropUploader({
+  userId,
+  mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
+  mapboxStyle = DEFAULT_MAPBOX_STYLE,
+  onCreated,
+}: DropUploaderProps) {
   const activeUserId = userId ?? auth.currentUser?.uid ?? ''
   const [folders, setFolders] = useState<DropFolder[]>([])
   const [selectedFolderId, setSelectedFolderId] = useState('__new__')
@@ -262,7 +274,7 @@ export function DropUploader({ userId, mapboxToken = process.env.NEXT_PUBLIC_MAP
         {needsManualLocation ? (
           <div className={styles.stack}>
             <p className={styles.warning}>場所情報なし。地図をタップしてピンを置いてください。</p>
-            <ManualLocationPicker value={location} mapboxToken={mapboxToken} onChange={applyCoordinates} />
+            <ManualLocationPicker value={location} mapboxToken={mapboxToken} mapboxStyle={mapboxStyle} onChange={applyCoordinates} />
           </div>
         ) : null}
 
