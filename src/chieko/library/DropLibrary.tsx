@@ -47,13 +47,13 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
     }, CLOSE_MS)
   }
 
-  const categoryIcon = (category: PinCategory) => LIBRARY_CATEGORIES.find((item) => item.id === category)?.icon ?? '📍'
+  const categoryIcon = (category: PinCategory) => LIBRARY_CATEGORIES.find((item) => item.id === category)?.icon ?? 'PIN'
 
   return (
     <section className={styles.library} aria-label="ライブラリ">
       <div className={openId && !closing ? `${styles.home} ${styles.homeBehind}` : styles.home}>
-        <h2 className={styles.largeTitle}>ライブラリ</h2>
-        <p className={styles.subTitle}>保存した世界をぜんぶここに</p>
+        <h2 className={styles.largeTitle}>Drop Library</h2>
+        <p className={styles.subTitle}>保存した場所と、これから行きたい場所</p>
 
         <div className={styles.collectionList}>
           {LIBRARY_COLLECTIONS.map((collection) => (
@@ -63,7 +63,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
               type="button"
               onClick={() => openDetail(collection.id)}
             >
-              <span className={styles.rowIcon} style={{ background: `${collection.tint}33` }} aria-hidden>
+              <span className={styles.rowIcon} style={{ background: `${collection.tint}22`, color: collection.tint }} aria-hidden>
                 {collection.icon}
               </span>
               <span className={styles.rowBody}>
@@ -83,8 +83,8 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
         {onOpenSheet ? (
           <div className={styles.collectionList}>
             <button className={styles.collectionRow} type="button" onClick={() => onOpenSheet('folders')}>
-              <span className={styles.rowIcon} style={{ background: '#ffcf3f33' }} aria-hidden>
-                🗂️
+              <span className={styles.rowIcon} style={{ background: '#2f453e22', color: '#2f453e' }} aria-hidden>
+                FLD
               </span>
               <span className={styles.rowBody}>
                 <strong>Folders</strong>
@@ -97,8 +97,8 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
               </span>
             </button>
             <button className={styles.collectionRow} type="button" onClick={() => onOpenSheet('memories')}>
-              <span className={styles.rowIcon} style={{ background: '#57c7ff33' }} aria-hidden>
-                ✨
+              <span className={styles.rowIcon} style={{ background: '#596b7322', color: '#596b73' }} aria-hidden>
+                MEM
               </span>
               <span className={styles.rowBody}>
                 <strong>Memories</strong>
@@ -130,13 +130,13 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
           <header className={styles.detailHeader}>
             <button className={styles.backBtn} type="button" onClick={closeDetail}>
               <span aria-hidden>‹</span>
-              ライブラリ
+              Library
             </button>
           </header>
 
           <div className={styles.detailScroll}>
             <div className={styles.detailTitleRow}>
-              <span className={styles.detailIcon} aria-hidden>
+              <span className={styles.detailIcon} style={{ color: openCollection.tint }} aria-hidden>
                 {openCollection.icon}
               </span>
               <h2 className={styles.detailTitle}>{openCollection.name}</h2>
@@ -152,7 +152,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
                 onClick={() => setActiveCategory('all')}
               >
                 <span className={styles.categoryCircle} aria-hidden>
-                  🌐
+                  ALL
                 </span>
                 <span>All</span>
               </button>

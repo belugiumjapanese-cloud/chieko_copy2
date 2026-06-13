@@ -4,10 +4,8 @@
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  background: linear-gradient(180deg, #f3f8f5 0%, #e9f2ed 100%);
+  background: #edf1ed;
 }
-
-/* ---------- ホーム(ライブラリ一覧) ---------- */
 
 .home {
   position: absolute;
@@ -23,7 +21,7 @@
 }
 
 .homeBehind {
-  transform: scale(0.94) translateY(-8px);
+  transform: scale(0.96) translateY(-8px);
   opacity: 0.45;
   filter: blur(2px);
   pointer-events: none;
@@ -31,27 +29,25 @@
 
 .largeTitle {
   margin: 0 0 2px;
-  font-size: 2.05rem;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  color: #0f1814;
+  color: #101814;
+  font-size: 1.82rem;
+  font-weight: 880;
+  letter-spacing: 0;
 }
 
 .subTitle {
   margin: 0 0 14px;
+  color: #66736c;
   font-size: 0.82rem;
-  font-weight: 600;
-  color: #6b7a72;
+  font-weight: 620;
 }
 
 .collectionList {
-  margin-bottom: 22px;
-  background: rgba(255, 255, 255, 0.66);
-  border: 1px solid rgba(15, 24, 20, 0.06);
-  border-radius: 18px;
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  margin-bottom: 20px;
   overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(16, 24, 20, 0.08);
+  border-radius: 8px;
 }
 
 .collectionRow {
@@ -65,7 +61,7 @@
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid rgba(15, 24, 20, 0.07);
+  border-bottom: 1px solid rgba(16, 24, 20, 0.07);
   cursor: pointer;
   transition: background 0.18s ease;
 }
@@ -75,7 +71,7 @@
 }
 
 .collectionRow:active {
-  background: rgba(15, 24, 20, 0.05);
+  background: rgba(16, 24, 20, 0.05);
 }
 
 .rowIcon {
@@ -84,9 +80,11 @@
   justify-content: center;
   width: 42px;
   height: 42px;
-  font-size: 21px;
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px rgba(15, 24, 20, 0.06);
+  color: #2f453e;
+  font-size: 0.62rem;
+  font-weight: 860;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(16, 24, 20, 0.06);
 }
 
 .rowBody {
@@ -96,40 +94,40 @@
 }
 
 .rowBody strong {
+  color: #101814;
   font-size: 0.98rem;
-  font-weight: 800;
-  color: #0f1814;
+  font-weight: 820;
 }
 
 .rowBody span {
-  font-size: 0.74rem;
-  color: #6b7a72;
-  white-space: nowrap;
   overflow: hidden;
+  color: #66736c;
+  font-size: 0.74rem;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rowAside {
   display: flex;
   gap: 8px;
   align-items: center;
+  color: #7a867f;
   font-size: 0.8rem;
-  font-weight: 700;
-  color: #93a39a;
+  font-weight: 760;
 }
 
 .chevron {
+  color: #9aa69f;
   font-size: 1.15rem;
   line-height: 1;
-  color: #b3c0b8;
 }
 
 .sectionTitle {
   margin: 0 0 10px;
-  font-size: 1.12rem;
-  font-weight: 900;
-  letter-spacing: -0.01em;
-  color: #0f1814;
+  color: #101814;
+  font-size: 1.04rem;
+  font-weight: 860;
+  letter-spacing: 0;
 }
 
 .recentGrid {
@@ -151,26 +149,31 @@
   width: 100%;
   aspect-ratio: 1.25;
   object-fit: cover;
-  background: #dfe9e3;
-  border-radius: 14px;
-  box-shadow: 0 8px 18px rgba(15, 24, 20, 0.12);
+  display: block;
+  background: #dfe6e0;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(16, 24, 20, 0.1);
+}
+
+.recentCard strong,
+.recentCard span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .recentCard strong {
-  display: block;
   margin-top: 7px;
+  color: #101814;
   font-size: 0.82rem;
-  font-weight: 800;
-  color: #0f1814;
+  font-weight: 820;
 }
 
 .recentCard span {
-  display: block;
+  color: #66736c;
   font-size: 0.72rem;
-  color: #6b7a72;
 }
-
-/* ---------- 詳細(コレクション)ビュー ---------- */
 
 .detail {
   position: absolute;
@@ -178,9 +181,9 @@
   z-index: 5;
   display: flex;
   flex-direction: column;
-  background: rgba(242, 248, 244, 0.78);
-  backdrop-filter: blur(26px) saturate(1.7);
-  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  background: rgba(237, 241, 237, 0.92);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
   animation: detailIn 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
@@ -190,8 +193,8 @@
 
 @keyframes detailIn {
   from {
-    opacity: 0.4;
-    transform: translateX(72%);
+    opacity: 0.45;
+    transform: translateX(70%);
   }
 
   to {
@@ -208,7 +211,7 @@
 
   to {
     opacity: 0.3;
-    transform: translateX(78%);
+    transform: translateX(76%);
   }
 }
 
@@ -224,16 +227,14 @@
   gap: 2px;
   align-items: center;
   padding: 7px 12px 7px 7px;
+  color: #101814;
   font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: #0f1814;
-  background: rgba(255, 255, 255, 0.72);
-  border: none;
-  border-radius: 18px;
-  box-shadow: 0 4px 12px rgba(15, 24, 20, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  font-size: 0.86rem;
+  font-weight: 820;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(16, 24, 20, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 6px 14px rgba(16, 24, 20, 0.08);
   cursor: pointer;
 }
 
@@ -261,30 +262,38 @@
 }
 
 .detailIcon {
-  font-size: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  padding-inline: 6px;
+  font-size: 0.68rem;
+  font-weight: 860;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(16, 24, 20, 0.08);
+  border-radius: 8px;
 }
 
 .detailTitle {
   margin: 0;
-  font-size: 1.7rem;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  color: #0f1814;
+  color: #101814;
+  font-size: 1.55rem;
+  font-weight: 880;
+  letter-spacing: 0;
 }
 
 .detailMeta {
   margin: 0 0 12px;
+  color: #66736c;
   font-size: 0.78rem;
-  font-weight: 600;
-  color: #6b7a72;
+  font-weight: 620;
 }
-
-/* 丸いカテゴリボタンのレール */
 
 .categoryRail {
   display: flex;
   flex: none;
-  gap: 14px;
+  gap: 13px;
   margin: 0 -16px 14px;
   padding: 6px 16px 10px;
   overflow-x: auto;
@@ -313,37 +322,36 @@
   justify-content: center;
   width: 56px;
   height: 56px;
-  font-size: 24px;
-  background: rgba(255, 255, 255, 0.72);
+  color: #2f453e;
+  font-size: 0.62rem;
+  font-weight: 860;
+  background: rgba(255, 255, 255, 0.78);
   border-radius: 50%;
-  box-shadow: 0 6px 14px rgba(15, 24, 20, 0.1), inset 0 0 0 1px rgba(15, 24, 20, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, background 0.28s ease;
+  box-shadow: 0 6px 14px rgba(16, 24, 20, 0.08), inset 0 0 0 1px rgba(16, 24, 20, 0.05);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, background 0.24s ease;
 }
 
-.categoryBtn span {
+.categoryBtn > span:last-child {
+  color: #5d6962;
   font-size: 0.68rem;
   font-weight: 800;
-  color: #5d6c64;
   transition: color 0.2s ease;
 }
 
 .categoryBtn:active .categoryCircle {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
 
 .categoryBtnActive .categoryCircle {
-  background: #0f1814;
-  box-shadow: 0 0 0 3px #ffcf3f, 0 8px 18px rgba(15, 24, 20, 0.28);
-  transform: scale(1.08) translateY(-2px);
+  color: #f7faf7;
+  background: #2f453e;
+  box-shadow: 0 0 0 2px #d7e2da, 0 8px 18px rgba(16, 24, 20, 0.22);
+  transform: translateY(-2px);
 }
 
-.categoryBtnActive span {
-  color: #0f1814;
+.categoryBtnActive > span:last-child {
+  color: #101814;
 }
-
-/* ピングリッド */
 
 .pinGrid {
   display: grid;
@@ -354,13 +362,13 @@
 .pinCard {
   position: relative;
   padding: 0;
+  overflow: hidden;
   font-family: inherit;
   text-align: left;
   background: rgba(255, 255, 255, 0.82);
-  border: none;
-  border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(15, 24, 20, 0.12);
-  overflow: hidden;
+  border: 1px solid rgba(16, 24, 20, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(16, 24, 20, 0.1);
   cursor: pointer;
   animation: pinIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -368,7 +376,7 @@
 @keyframes pinIn {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.96);
+    transform: translateY(14px) scale(0.98);
   }
 
   to {
@@ -378,11 +386,11 @@
 }
 
 .pinCard img {
+  display: block;
   width: 100%;
   aspect-ratio: 1.15;
   object-fit: cover;
-  background: #dfe9e3;
-  display: block;
+  background: #dfe6e0;
 }
 
 .pinCategoryChip {
@@ -392,12 +400,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  min-width: 30px;
   height: 30px;
-  font-size: 15px;
-  background: rgba(255, 255, 255, 0.78);
-  border-radius: 50%;
-  box-shadow: 0 3px 8px rgba(15, 24, 20, 0.2);
+  padding-inline: 6px;
+  color: #2f453e;
+  font-size: 0.54rem;
+  font-weight: 880;
+  background: rgba(247, 250, 247, 0.86);
+  border: 1px solid rgba(16, 24, 20, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(16, 24, 20, 0.18);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -408,22 +420,29 @@
   padding: 8px 10px 10px;
 }
 
+.pinBody strong,
+.pinBody span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pinBody strong {
+  color: #101814;
   font-size: 0.82rem;
-  font-weight: 800;
-  color: #0f1814;
+  font-weight: 820;
 }
 
 .pinBody span {
+  color: #66736c;
   font-size: 0.7rem;
-  color: #6b7a72;
 }
 
 .pinEmpty {
   grid-column: 1 / -1;
   padding: 26px 0;
+  color: #7a867f;
   font-size: 0.84rem;
   font-weight: 700;
-  color: #93a39a;
   text-align: center;
 }

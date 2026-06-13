@@ -29,9 +29,9 @@ const navItems: Array<{ id: AppTab; label: string; Icon: LucideIcon }> = [
 ]
 
 const communityCards = [
-  { title: 'City Details', meta: '803 members', tone: '#57c7ff' },
-  { title: 'Architecture Club', meta: '412 pins', tone: '#ffcf3f' },
-  { title: 'Cafe windows', meta: '88 new drops', tone: '#ff8db3' },
+  { title: 'City Details', meta: '803 members', tone: '#2f453e' },
+  { title: 'Architecture Club', meta: '412 pins', tone: '#7f7566' },
+  { title: 'Cafe Windows', meta: '88 new drops', tone: '#596b73' },
 ]
 
 function DropGlobeSurface({
@@ -62,7 +62,7 @@ function CommunityView({ onBackToMap }: { onBackToMap: () => void }) {
       <div className={styles.panelHeader}>
         <div>
           <span className={styles.eyebrow}>Community</span>
-          <h2>みんなの地図</h2>
+          <h2>Shared worlds</h2>
         </div>
         <button className={styles.smallIconButton} type="button" onClick={onBackToMap} aria-label="地図へ戻る">
           <MapPinned size={18} />
@@ -72,7 +72,7 @@ function CommunityView({ onBackToMap }: { onBackToMap: () => void }) {
         <div className={styles.communityGlobe} />
         <div>
           <strong>City Details</strong>
-          <span>看板、窓、階段、街の小さい発見を共有</span>
+          <span>Signs, windows, stairs, and the small discoveries that make a city feel personal.</span>
         </div>
       </div>
       <div className={styles.cardStack}>
@@ -146,7 +146,7 @@ function ProfileView() {
 function Sheet({ mode, onClose }: { mode: SheetMode; onClose: () => void }) {
   if (!mode) return null
 
-  const title = mode === 'drop' ? 'Dropする' : mode === 'memories' ? 'まだDropしていない記憶' : 'Folders'
+  const title = mode === 'drop' ? 'New Drop' : mode === 'memories' ? 'Undropped memories' : 'Folders'
 
   return (
     <div className={styles.sheetBackdrop} role="presentation" onClick={onClose}>
@@ -184,7 +184,7 @@ export function ChiekoPageClient() {
       <div className={styles.phoneApp}>
         <header className={styles.statusBar}>
           <span>Drop</span>
-          <span className={firebaseReady ? styles.ready : styles.previewOnly}>{firebaseReady ? 'Firebase ready' : 'Preview'}</span>
+          <span className={firebaseReady ? styles.ready : styles.previewOnly}>{firebaseReady ? 'Live' : 'Preview'}</span>
         </header>
 
         <div className={styles.memoryBannerSlot}>
@@ -228,7 +228,7 @@ export function ChiekoPageClient() {
 
         <button className={styles.dropFab} type="button" onClick={() => setSheetMode('drop')} aria-label="Dropする">
           <Plus aria-hidden="true" size={30} />
-          <Camera aria-hidden="true" size={17} />
+          <Camera aria-hidden="true" size={16} />
         </button>
 
         <Sheet mode={sheetMode} onClose={() => setSheetMode(null)} />
