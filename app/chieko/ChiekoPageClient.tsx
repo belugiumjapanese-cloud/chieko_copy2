@@ -34,6 +34,17 @@ const communityCards = [
   { title: 'Cafe Windows', meta: '88 new drops', tone: '#596b73' },
 ]
 
+function DropSplash() {
+  return (
+    <div className={styles.dropSplash} aria-hidden="true">
+      <span className={styles.dropSplashDrop} />
+      <span className={styles.dropSplashRing} />
+      <span className={styles.dropSplashRing} />
+      <span className={styles.dropSplashMist} />
+    </div>
+  )
+}
+
 function DropGlobeSurface({
   onOpenSheet,
   focusTarget,
@@ -143,7 +154,7 @@ function ProfileView() {
   )
 }
 
-function Sheet({ mode, onClose }: { mode: SheetMode; onClose: () => void }) {
+function Sheet({ mode, onClose, onDropCreated }: { mode: SheetMode; onClose: () => void; onDropCreated: () => void }) {
   if (!mode) return null
 
   const title = mode === 'drop' ? 'New Drop' : mode === 'memories' ? 'Undropped memories' : 'Folders'
@@ -159,7 +170,7 @@ function Sheet({ mode, onClose }: { mode: SheetMode; onClose: () => void }) {
           </button>
         </div>
         <div className={styles.sheetBody}>
-          {mode === 'drop' ? <DropUploader /> : null}
+          {mode === 'drop' ? <DropUploader onCreated={onDropCreated} /> : null}
           {mode === 'memories' ? <UndropedMemories /> : null}
           {mode === 'folders' ? <FolderList /> : null}
         </div>
@@ -172,7 +183,32 @@ export function ChiekoPageClient() {
   const [activeTab, setActiveTab] = useState<AppTab>('drop')
   const [sheetMode, setSheetMode] = useState<SheetMode>(null)
   const [pinFocus, setPinFocus] = useState<PinFocus>(null)
+  const [dropSplashId, setDropSplashId] = useState(0)
   const firebaseReady = hasFirebaseConfig()
+
+  const playDropSplash = () => {
+    setDropSplashId((current) => current + 1)
+  }
+
+  const openDropSheet = () => {
+    setActiveTab('drop')
+    playDropSplash()
+    window.setTimeout(() => setSheetMode('drop'), 320)
+  }
+
+  const handleOpenSheet = (mode: SheetMode) => {
+    if (mode === 'drop') {
+      openDropSheet()
+      return
+    }
+    setSheetMode(mode)
+  }
+
+  const handleDropCreated = () => {
+    setActiveTab('drop')
+    setSheetMode(null)
+    playDropSplash()
+  }
 
   const handleOpenPin = (pin: LibraryPin) => {
     setPinFocus({ id: pin.id, lng: pin.lng, lat: pin.lat })
@@ -193,12 +229,14 @@ export function ChiekoPageClient() {
 
         <div className={styles.screenSlot}>
           {activeTab === 'drop' ? (
-            <DropGlobeSurface onOpenSheet={setSheetMode} focusTarget={pinFocus} onFocusConsumed={() => setPinFocus(null)} />
+            <DropGlobeSurface onOpenSheet={handleOpenSheet} focusTarget={pinFocus} onFocusConsumed={() => setPinFocus(null)} />
           ) : null}
           {activeTab === 'community' ? <CommunityView onBackToMap={() => setActiveTab('drop')} /> : null}
-          {activeTab === 'library' ? <LibraryView onOpenSheet={setSheetMode} onOpenPin={handleOpenPin} /> : null}
+          {activeTab === 'library' ? <LibraryView onOpenSheet={handleOpenSheet} onOpenPin={handleOpenPin} /> : null}
           {activeTab === 'profile' ? <ProfileView /> : null}
         </div>
+
+        {dropSplashId > 0 ? <DropSplash key={dropSplashId} /> : null}
 
         <nav className={styles.bottomNav} aria-label="Primary">
           {navItems.slice(0, 2).map(({ id, label, Icon }) => (
@@ -226,12 +264,12 @@ export function ChiekoPageClient() {
           ))}
         </nav>
 
-        <button className={styles.dropFab} type="button" onClick={() => setSheetMode('drop')} aria-label="Dropする">
+        <button className={styles.dropFab} type="button" onClick={openDropSheet} aria-label="Dropする">
           <Plus aria-hidden="true" size={30} />
           <Camera aria-hidden="true" size={16} />
         </button>
 
-        <Sheet mode={sheetMode} onClose={() => setSheetMode(null)} />
+        <Sheet mode={sheetMode} onClose={() => setSheetMode(null)} onDropCreated={handleDropCreated} />
       </div>
     </main>
   )
