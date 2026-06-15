@@ -13,6 +13,13 @@ import { DEMO_DROPS, DEMO_FOLDERS } from './lib/demoDrops'
 import { buildEarthTexture } from './lib/earthTexture'
 import { GlobeEngine, type GlobeView } from './lib/globeEngine'
 import { buildDropHeatData, HEAT_LAYER_PAINT } from './lib/heat'
+import {
+  DEFAULT_MAP_THEME_ID,
+  DROP_MAP_THEMES,
+  applyDropMapTheme,
+  getDropMapTheme,
+  isDropMapThemeId,
+} from './lib/mapThemes'
 import styles from './snap-globe.module.css'
 
 type DropGlobeProps = {
@@ -34,6 +41,7 @@ type Phase = 'loading' | 'globe' | 'diving' | 'map' | 'surfacing'
 const SURFACE_ZOOM = 2.05
 const DIVE_START_ZOOM = 2.2
 const FADE_MS = 480
+const THEME_STORAGE_KEY = 'chieko-drop-map-theme'
 const DEFAULT_MAPBOX_STYLE =
   process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL ??
   process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
@@ -95,10 +103,24 @@ export function DropGlobe({
   const [selectedDropId, setSelectedDropId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [heatOn, setHeatOn] = useState(true)
+  const [activeThemeId, setActiveThemeId] = useState(DEFAULT_MAP_THEME_ID)
+
+  const activeTheme = useMemo(() => getDropMapTheme(activeThemeId), [activeThemeId])
 
   const setPhase = (next: Phase) => {
     phaseRef.current = next
     setPhaseState(next)
+  }
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (savedTheme && isDropMapThemeId(savedTheme)) setActiveThemeId(savedTheme)
+  }, [])
+
+  const handleThemeChange = (themeId: string) => {
+    if (!isDropMapThemeId(themeId)) return
+    setActiveThemeId(themeId)
+    window.localStorage.setItem(THEME_STORAGE_KEY, themeId)
   }
 
   const filteredDrops = useMemo(
@@ -119,7 +141,7 @@ export function DropGlobe({
     }
   }
 
-  // ----- 地球儀とMapboxの初期化(マウント時に一度だけ) -----
+  // ----- 地球儀とMapboxの初期化 / テーマ変更時の再生成 -----
   useEffect(() => {
     const canvas = globeCanvasRef.current
     const shell = shellRef.current
@@ -127,6 +149,9 @@ export function DropGlobe({
     if (!canvas || !shell || !mapContainer) return
 
     let cancelled = false
+    setEngineReady(false)
+    setMapVisible(false)
+    setPhase('loading')
 
     const handleDive = (center: GlobeView) => {
       const map = mapRef.current
@@ -178,12 +203,13 @@ export function DropGlobe({
       mapRef.current = map
 
       map.on('style.load', () => {
+        applyDropMapTheme(map, activeTheme)
         map.setFog({
-          color: 'rgb(214, 226, 218)',
-          'high-color': 'rgb(159, 185, 173)',
+          color: activeTheme.colors.fog,
+          'high-color': activeTheme.colors.highFog,
           'horizon-blend': 0.035,
-          'space-color': 'rgb(8, 13, 11)',
-          'star-intensity': 0.18,
+          'space-color': activeTheme.colors.space,
+          'star-intensity': activeTheme.id === 'ink' ? 0.32 : 0.18,
         })
         if (!map.getSource('chieko-heat')) {
           map.addSource('chieko-heat', { type: 'geojson', data: buildDropHeatData(dropsRef.current) })
@@ -199,7 +225,7 @@ export function DropGlobe({
       map.on('click', () => setSelectedDropId(null))
     }
 
-    buildEarthTexture(mapboxToken)
+    buildEarthTexture(mapboxToken, { styleUrl: mapboxStyle, palette: activeTheme.globe })
       .then((earthTexture) => {
         if (cancelled || !globeCanvasRef.current) return
         engineRef.current = new GlobeEngine({
@@ -234,9 +260,7 @@ export function DropGlobe({
       mapRef.current?.remove()
       mapRef.current = null
     }
-    // マウント時に一度だけ初期化する。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [activeTheme, mapboxStyle, mapboxToken])
 
   // ----- Dropデータの読み込み(ログイン時はFirestore、未ログインはデモ) -----
   useEffect(() => {
@@ -415,6 +439,29 @@ export function DropGlobe({
             </span>
           </button>
           <p className={styles.settingHint}>Dropした場所が地図上で熱として光ります。</p>
+          <div className={styles.themeSection}>
+            <span className={styles.themeLabel}>地図の色</span>
+            <div className={styles.themeGrid} aria-label="地図の色テーマ">
+              {DROP_MAP_THEMES.map((theme) => (
+                <button
+                  className={theme.id === activeTheme.id ? `${styles.themeButton} ${styles.themeButtonActive}` : styles.themeButton}
+                  key={theme.id}
+                  type="button"
+                  aria-pressed={theme.id === activeTheme.id}
+                  onClick={() => handleThemeChange(theme.id)}
+                >
+                  <span
+                    className={styles.themeSwatch}
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.colors.water} 0 48%, ${theme.colors.land} 49% 100%)`,
+                    }}
+                    aria-hidden
+                  />
+                  <span>{theme.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
 
