@@ -17,10 +17,10 @@ type StyleParts = {
 const DEFAULT_PALETTE: EarthTexturePalette = {
   oceanTop: '#0c2034',
   oceanMid: '#123150',
-  oceanBottom: '#0c2034',
+  oceanBottom: '#071018',
   grid: 'rgba(110, 160, 210, 0.18)',
   tint: '#d7e2da',
-  tintAlpha: 0.16,
+  tintAlpha: 0.08,
 }
 
 function parseMapboxStyleUrl(styleUrl?: string): StyleParts | null {
@@ -54,15 +54,15 @@ function loadTile(url: string) {
   })
 }
 
-function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height: number, palette: EarthTexturePalette) {
+function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const gradient = ctx.createLinearGradient(0, 0, 0, height)
-  gradient.addColorStop(0, palette.oceanTop)
-  gradient.addColorStop(0.5, palette.oceanMid)
-  gradient.addColorStop(1, palette.oceanBottom)
+  gradient.addColorStop(0, DEFAULT_PALETTE.oceanTop)
+  gradient.addColorStop(0.5, DEFAULT_PALETTE.oceanMid)
+  gradient.addColorStop(1, DEFAULT_PALETTE.oceanBottom)
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
 
-  ctx.strokeStyle = palette.grid
+  ctx.strokeStyle = DEFAULT_PALETTE.grid
   ctx.lineWidth = 1
   for (let i = 1; i < 12; i++) {
     const y = (height / 12) * i
@@ -85,21 +85,14 @@ function tintTexture(ctx: CanvasRenderingContext2D, width: number, height: numbe
 
   ctx.save()
   ctx.globalCompositeOperation = 'soft-light'
-  ctx.globalAlpha = palette.tintAlpha
+  ctx.globalAlpha = Math.min(0.08, palette.tintAlpha)
   ctx.fillStyle = palette.tint
   ctx.fillRect(0, 0, width, height)
   ctx.restore()
 
   ctx.save()
-  ctx.globalCompositeOperation = 'multiply'
-  ctx.globalAlpha = Math.min(0.12, palette.tintAlpha * 0.6)
-  ctx.fillStyle = palette.oceanMid
-  ctx.fillRect(0, 0, width, height)
-  ctx.restore()
-
-  ctx.save()
   ctx.globalCompositeOperation = 'screen'
-  ctx.globalAlpha = Math.min(0.06, palette.tintAlpha * 0.25)
+  ctx.globalAlpha = Math.min(0.03, palette.tintAlpha * 0.25)
   ctx.fillStyle = palette.tint
   ctx.fillRect(0, 0, width, height)
   ctx.restore()
@@ -109,11 +102,14 @@ function sharpenTexture(ctx: CanvasRenderingContext2D, width: number, height: nu
   const image = ctx.getImageData(0, 0, width, height)
   const data = image.data
   for (let i = 0; i < data.length; i += 4) {
-    const average = (data[i] + data[i + 1] + data[i + 2]) / 3
-    const contrast = 1.08
-    data[i] = Math.max(0, Math.min(255, 128 + (data[i] - 128) * contrast + (data[i] - average) * 0.12))
-    data[i + 1] = Math.max(0, Math.min(255, 128 + (data[i + 1] - 128) * contrast + (data[i + 1] - average) * 0.12))
-    data[i + 2] = Math.max(0, Math.min(255, 128 + (data[i + 2] - 128) * contrast + (data[i + 2] - average) * 0.12))
+    const red = data[i]
+    const green = data[i + 1]
+    const blue = data[i + 2]
+    const average = (red + green + blue) / 3
+    const contrast = 1.06
+    data[i] = Math.max(0, Math.min(255, 128 + (red - 128) * contrast + (red - average) * 0.08))
+    data[i + 1] = Math.max(0, Math.min(255, 128 + (green - 128) * contrast + (green - average) * 0.08))
+    data[i + 2] = Math.max(0, Math.min(255, 128 + (blue - 128) * contrast + (blue - average) * 0.08))
   }
   ctx.putImageData(image, 0, 0)
 }
@@ -135,7 +131,7 @@ export async function buildEarthTexture(
   const outputCtx = output.getContext('2d')
   if (!outputCtx) return output
 
-  paintFallbackOcean(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, palette)
+  paintFallbackOcean(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT)
   if (!token) return output
 
   const style = parseMapboxStyleUrl(options.styleUrl)
@@ -147,7 +143,7 @@ export async function buildEarthTexture(
   const mercatorCtx = mercator.getContext('2d')
   if (!mercatorCtx) return output
 
-  mercatorCtx.fillStyle = palette.oceanMid
+  mercatorCtx.fillStyle = DEFAULT_PALETTE.oceanMid
   mercatorCtx.fillRect(0, 0, mercator.width, mercator.height)
 
   const loads: Promise<void>[] = []
