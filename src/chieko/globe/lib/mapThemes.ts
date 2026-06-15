@@ -1,5 +1,3 @@
-import type mapboxgl from 'mapbox-gl'
-
 export type DropMapThemeId = 'sage' | 'ink' | 'marine' | 'dusk' | 'clay' | 'moss' | 'plum' | 'bloom'
 
 export type DropMapTheme = {
@@ -28,6 +26,18 @@ export type DropMapTheme = {
     tint: string
     tintAlpha: number
   }
+}
+
+type ThemeableMapLayer = {
+  id: string
+  type?: string
+  'source-layer'?: string
+}
+
+type ThemeableMap = {
+  getStyle: () => { layers?: ThemeableMapLayer[] }
+  setPaintProperty: (layerId: string, property: string, value: string | number) => unknown
+  setConfigProperty?: (importId: string, configName: string, value: unknown) => unknown
 }
 
 export const DEFAULT_MAP_THEME_ID: DropMapThemeId = 'sage'
@@ -259,7 +269,7 @@ export function getDropMapTheme(themeId: string): DropMapTheme {
   return DROP_MAP_THEMES.find((theme) => theme.id === themeId) ?? DROP_MAP_THEMES[0]
 }
 
-function paint(map: mapboxgl.Map, layerId: string, property: string, value: string | number) {
+function paint(map: ThemeableMap, layerId: string, property: string, value: string | number) {
   try {
     map.setPaintProperty(layerId, property, value)
   } catch {
@@ -267,25 +277,20 @@ function paint(map: mapboxgl.Map, layerId: string, property: string, value: stri
   }
 }
 
-function layerText(layer: { id: string; type?: string; 'source-layer'?: string }) {
+function layerText(layer: ThemeableMapLayer) {
   return `${layer.id} ${layer['source-layer'] ?? ''}`.toLowerCase()
 }
 
-export function applyDropMapTheme(map: mapboxgl.Map, theme: DropMapTheme) {
-  const configurableMap = map as mapboxgl.Map & {
-    setConfigProperty?: (importId: string, configName: string, value: unknown) => void
-  }
-
+export function applyDropMapTheme(map: ThemeableMap, theme: DropMapTheme) {
   try {
-    configurableMap.setConfigProperty?.('basemap', 'theme', theme.standardTheme)
-    configurableMap.setConfigProperty?.('basemap', 'lightPreset', theme.lightPreset)
+    map.setConfigProperty?.('basemap', 'theme', theme.standardTheme)
+    map.setConfigProperty?.('basemap', 'lightPreset', theme.lightPreset)
   } catch {
     // Non-standard custom styles do not support basemap config.
   }
 
   const layers = map.getStyle().layers ?? []
-  layers.forEach((rawLayer) => {
-    const layer = rawLayer as { id: string; type?: string; 'source-layer'?: string }
+  layers.forEach((layer) => {
     const label = layerText(layer)
 
     if (layer.type === 'background') {
