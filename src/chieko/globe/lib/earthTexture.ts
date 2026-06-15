@@ -23,6 +23,9 @@ const DEFAULT_PALETTE: EarthTexturePalette = {
   tintAlpha: 0.08,
 }
 
+const FALLBACK_LAND = '#8ea596'
+const FALLBACK_LAND_DARK = '#60756a'
+
 function parseMapboxStyleUrl(styleUrl?: string): StyleParts | null {
   if (!styleUrl) return null
 
@@ -54,6 +57,57 @@ function loadTile(url: string) {
   })
 }
 
+function xy(lng: number, lat: number, width: number, height: number) {
+  return [((lng + 180) / 360) * width, ((90 - lat) / 180) * height] as const
+}
+
+function drawLand(ctx: CanvasRenderingContext2D, width: number, height: number, points: [number, number][]) {
+  ctx.beginPath()
+  points.forEach(([lng, lat], index) => {
+    const [x, y] = xy(lng, lat, width, height)
+    if (index === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
+  })
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+}
+
+function drawFallbackContinents(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  ctx.save()
+  ctx.fillStyle = FALLBACK_LAND
+  ctx.strokeStyle = FALLBACK_LAND_DARK
+  ctx.lineWidth = 3
+  ctx.globalAlpha = 0.78
+
+  drawLand(ctx, width, height, [
+    [-168, 72], [-130, 70], [-102, 58], [-80, 48], [-60, 34], [-82, 16], [-100, 8], [-116, 22], [-130, 44], [-160, 54],
+  ])
+  drawLand(ctx, width, height, [
+    [-82, 12], [-54, 7], [-36, -12], [-48, -38], [-68, -55], [-78, -32], [-72, -10],
+  ])
+  drawLand(ctx, width, height, [
+    [-18, 36], [18, 34], [36, 12], [30, -30], [18, -35], [2, -20], [-12, 8],
+  ])
+  drawLand(ctx, width, height, [
+    [-12, 58], [34, 70], [92, 64], [148, 54], [156, 28], [116, 10], [78, 6], [44, 24], [14, 42],
+  ])
+  drawLand(ctx, width, height, [
+    [70, 22], [90, 26], [100, 8], [82, 6],
+  ])
+  drawLand(ctx, width, height, [
+    [112, -12], [154, -18], [150, -42], [118, -38], [104, -26],
+  ])
+  drawLand(ctx, width, height, [
+    [-50, 76], [-20, 72], [-34, 62], [-58, 64],
+  ])
+
+  ctx.globalAlpha = 0.42
+  ctx.fillStyle = '#d7e2da'
+  drawLand(ctx, width, height, [[-180, -63], [-90, -70], [0, -66], [90, -70], [180, -63], [180, -88], [-180, -88]])
+  ctx.restore()
+}
+
 function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const gradient = ctx.createLinearGradient(0, 0, 0, height)
   gradient.addColorStop(0, DEFAULT_PALETTE.oceanTop)
@@ -78,6 +132,8 @@ function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height
     ctx.lineTo(x, height)
     ctx.stroke()
   }
+
+  drawFallbackContinents(ctx, width, height)
 }
 
 function tintTexture(ctx: CanvasRenderingContext2D, width: number, height: number, palette: EarthTexturePalette) {
