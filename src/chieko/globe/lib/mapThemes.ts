@@ -1,4 +1,4 @@
-export type DropMapThemeId = 'drop'
+export type DropMapThemeId = 'drop' | 'sage' | 'ink' | 'marine' | 'dusk' | 'clay' | 'moss' | 'plum' | 'bloom'
 
 export type DropMapTheme = {
   id: DropMapThemeId
