@@ -88,6 +88,7 @@ export class GlobeEngine {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
   private camera: THREE.PerspectiveCamera
+  private earthMaterial: THREE.MeshBasicMaterial
   private markerGroup = new THREE.Group()
   private markerById = new Map<string, THREE.Sprite>()
   private hiddenMarkers = new Set<string>()
@@ -127,11 +128,10 @@ export class GlobeEngine {
 
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.05, 120)
 
-    const texture = new THREE.CanvasTexture(options.earthTexture)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy()
+    const texture = this.createTexture(options.earthTexture)
+    this.earthMaterial = new THREE.MeshBasicMaterial({ map: texture })
 
-    const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 96), new THREE.MeshBasicMaterial({ map: texture }))
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 96), this.earthMaterial)
     this.scene.add(earth)
 
     const atmosphere = new THREE.Mesh(
@@ -167,6 +167,13 @@ export class GlobeEngine {
     this.bindEvents()
     this.lastFrameTime = performance.now()
     this.raf = requestAnimationFrame(this.tick)
+  }
+
+  private createTexture(canvas: HTMLCanvasElement) {
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy()
+    return texture
   }
 
   private buildStars() {
@@ -372,6 +379,13 @@ export class GlobeEngine {
     this.distance = 1.75
     this.distanceTarget = this.fitDistance
     this.lastInteraction = performance.now()
+  }
+
+  setEarthTexture(earthTexture: HTMLCanvasElement) {
+    const previous = this.earthMaterial.map
+    this.earthMaterial.map = this.createTexture(earthTexture)
+    this.earthMaterial.needsUpdate = true
+    previous?.dispose()
   }
 
   setMarkers(inputs: GlobeMarkerInput[]) {

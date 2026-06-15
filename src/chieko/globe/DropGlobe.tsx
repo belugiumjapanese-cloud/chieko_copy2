@@ -17,8 +17,12 @@ import {
   DEFAULT_MAP_THEME_ID,
   DROP_MAP_THEMES,
   applyDropMapTheme,
+  createCustomMapTheme,
   getDropMapTheme,
   isDropMapThemeId,
+  type DropMapColorKey,
+  type DropMapTheme,
+  type DropMapThemeColors,
 } from './lib/mapThemes'
 import styles from './snap-globe.module.css'
 
@@ -42,10 +46,25 @@ const SURFACE_ZOOM = 2.05
 const DIVE_START_ZOOM = 2.2
 const FADE_MS = 480
 const THEME_STORAGE_KEY = 'chieko-drop-map-theme'
+const CUSTOM_COLORS_STORAGE_KEY = 'chieko-drop-map-custom-colors'
+const DEFAULT_THEME = getDropMapTheme(DEFAULT_MAP_THEME_ID)
 const DEFAULT_MAPBOX_STYLE =
   process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL ??
   process.env.NEXT_PUBLIC_MAPBOX_STYLE ??
   'mapbox://styles/belgium-jap/cmp8riesh001j01sngrwfbdsz'
+
+const CUSTOM_COLOR_FIELDS: { key: DropMapColorKey; label: string }[] = [
+  { key: 'water', label: '海' },
+  { key: 'land', label: '陸' },
+  { key: 'park', label: '公園' },
+  { key: 'road', label: '道路' },
+  { key: 'building', label: '建物' },
+  { key: 'text', label: '文字' },
+  { key: 'halo', label: '文字ふち' },
+  { key: 'fog', label: '空気感' },
+  { key: 'highFog', label: '遠景' },
+  { key: 'space', label: '宇宙' },
+]
 
 function createMapDropElement(drop: DropDoc, onSelect: () => void) {
   const element = document.createElement('button')
@@ -70,6 +89,24 @@ function createMapDropElement(drop: DropDoc, onSelect: () => void) {
   return element
 }
 
+function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+}
+
+function readStoredColors(baseColors: DropMapThemeColors): DropMapThemeColors {
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_COLORS_STORAGE_KEY)
+    if (!raw) return baseColors
+    const parsed = JSON.parse(raw) as Partial<Record<DropMapColorKey, unknown>>
+    return CUSTOM_COLOR_FIELDS.reduce<DropMapThemeColors>(
+      (colors, field) => ({ ...colors, [field.key]: isHexColor(parsed[field.key]) ? parsed[field.key] : colors[field.key] }),
+      { ...baseColors },
+    )
+  } catch {
+    return baseColors
+  }
+}
+
 export function DropGlobe({
   mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
   mapboxStyle = DEFAULT_MAPBOX_STYLE,
@@ -92,6 +129,7 @@ export function DropGlobe({
   const selectDropRef = useRef<(drop: DropDoc) => void>()
   const heatOnRef = useRef(true)
   const dropsRef = useRef<DropDoc[]>([])
+  const activeThemeRef = useRef<DropMapTheme>(DEFAULT_THEME)
 
   const [phase, setPhaseState] = useState<Phase>('loading')
   const [engineReady, setEngineReady] = useState(false)
@@ -104,23 +142,82 @@ export function DropGlobe({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [heatOn, setHeatOn] = useState(true)
   const [activeThemeId, setActiveThemeId] = useState(DEFAULT_MAP_THEME_ID)
+  const [customColors, setCustomColors] = useState<DropMapThemeColors>(DEFAULT_THEME.colors)
 
-  const activeTheme = useMemo(() => getDropMapTheme(activeThemeId), [activeThemeId])
+  const activeTheme = useMemo(
+    () => createCustomMapTheme(getDropMapTheme(activeThemeId), customColors),
+    [activeThemeId, customColors],
+  )
 
   const setPhase = useCallback((next: Phase) => {
     phaseRef.current = next
     setPhaseState(next)
   }, [])
 
+  const applyThemeToMap = useCallback((theme: DropMapTheme) => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+    applyDropMapTheme(map, theme)
+    map.setFog({
+      color: theme.colors.fog,
+      'high-color': theme.colors.highFog,
+      'horizon-blend': 0.035,
+      'space-color': theme.colors.space,
+      'star-intensity': theme.id === 'ink' ? 0.32 : 0.18,
+    })
+  }, [])
+
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
-    if (savedTheme && isDropMapThemeId(savedTheme)) setActiveThemeId(savedTheme)
+    const nextThemeId = savedTheme && isDropMapThemeId(savedTheme) ? savedTheme : DEFAULT_MAP_THEME_ID
+    const nextTheme = getDropMapTheme(nextThemeId)
+    setActiveThemeId(nextThemeId)
+    setCustomColors(readStoredColors(nextTheme.colors))
   }, [])
+
+  useEffect(() => {
+    activeThemeRef.current = activeTheme
+    applyThemeToMap(activeTheme)
+  }, [activeTheme, applyThemeToMap])
+
+  useEffect(() => {
+    if (!engineReady) return
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      buildEarthTexture(mapboxToken, { styleUrl: mapboxStyle, palette: activeTheme.globe })
+        .then((earthTexture) => {
+          if (!cancelled) engineRef.current?.setEarthTexture(earthTexture)
+        })
+        .catch(() => undefined)
+    }, 420)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [activeTheme, engineReady, mapboxStyle, mapboxToken])
 
   const handleThemeChange = (themeId: string) => {
     if (!isDropMapThemeId(themeId)) return
+    const nextTheme = getDropMapTheme(themeId)
     setActiveThemeId(themeId)
+    setCustomColors(nextTheme.colors)
     window.localStorage.setItem(THEME_STORAGE_KEY, themeId)
+    window.localStorage.setItem(CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(nextTheme.colors))
+  }
+
+  const handleCustomColorChange = (key: DropMapColorKey, value: string) => {
+    if (!isHexColor(value)) return
+    setCustomColors((current) => {
+      const next = { ...current, [key]: value }
+      window.localStorage.setItem(CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleResetCustomColors = () => {
+    const nextColors = getDropMapTheme(activeThemeId).colors
+    setCustomColors(nextColors)
+    window.localStorage.setItem(CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(nextColors))
   }
 
   const filteredDrops = useMemo(
@@ -141,7 +238,7 @@ export function DropGlobe({
     }
   }
 
-  // ----- 地球儀とMapboxの初期化 / テーマ変更時の再生成 -----
+  // ----- 地球儀とMapboxの初期化 -----
   useEffect(() => {
     const canvas = globeCanvasRef.current
     const shell = shellRef.current
@@ -203,14 +300,8 @@ export function DropGlobe({
       mapRef.current = map
 
       map.on('style.load', () => {
-        applyDropMapTheme(map, activeTheme)
-        map.setFog({
-          color: activeTheme.colors.fog,
-          'high-color': activeTheme.colors.highFog,
-          'horizon-blend': 0.035,
-          'space-color': activeTheme.colors.space,
-          'star-intensity': activeTheme.id === 'ink' ? 0.32 : 0.18,
-        })
+        const theme = activeThemeRef.current
+        applyThemeToMap(theme)
         if (!map.getSource('chieko-heat')) {
           map.addSource('chieko-heat', { type: 'geojson', data: buildDropHeatData(dropsRef.current) })
           map.addLayer({ id: 'chieko-heat', type: 'heatmap', source: 'chieko-heat', paint: HEAT_LAYER_PAINT as never })
@@ -225,7 +316,7 @@ export function DropGlobe({
       map.on('click', () => setSelectedDropId(null))
     }
 
-    buildEarthTexture(mapboxToken, { styleUrl: mapboxStyle, palette: activeTheme.globe })
+    buildEarthTexture(mapboxToken, { styleUrl: mapboxStyle, palette: activeThemeRef.current.globe })
       .then((earthTexture) => {
         if (cancelled || !globeCanvasRef.current) return
         engineRef.current = new GlobeEngine({
@@ -260,7 +351,7 @@ export function DropGlobe({
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [activeTheme, mapboxStyle, mapboxToken, setPhase])
+  }, [applyThemeToMap, mapboxStyle, mapboxToken, setPhase])
 
   // ----- Dropデータの読み込み(ログイン時はFirestore、未ログインはデモ) -----
   useEffect(() => {
@@ -380,7 +471,7 @@ export function DropGlobe({
 
       <header className={styles.topBar}>
         <div className={styles.searchPill} role="search">
-          <span aria-hidden>🔍</span>
+          <span aria-hidden>検索</span>
           <span>場所、Dropを検索</span>
         </div>
         <button
@@ -389,7 +480,7 @@ export function DropGlobe({
           aria-label="マップ設定"
           onClick={() => setSettingsOpen((open) => !open)}
         >
-          ⚙️
+          設定
         </button>
       </header>
 
@@ -432,7 +523,7 @@ export function DropGlobe({
           <strong>マップ設定</strong>
           <button className={styles.settingRow} type="button" onClick={() => setHeatOn((value) => !value)} aria-pressed={heatOn}>
             <span>
-              <span aria-hidden>🔥</span> 足あとヒート
+              <span aria-hidden>heat</span> 足あとヒート
             </span>
             <span className={heatOn ? `${styles.toggle} ${styles.toggleOn}` : styles.toggle}>
               <span className={styles.toggleKnob} />
@@ -462,6 +553,27 @@ export function DropGlobe({
               ))}
             </div>
           </div>
+          <div className={styles.customColorSection}>
+            <div className={styles.customColorHeader}>
+              <span className={styles.themeLabel}>細かく調整</span>
+              <button className={styles.resetColorsButton} type="button" onClick={handleResetCustomColors}>
+                Reset
+              </button>
+            </div>
+            <div className={styles.customColorGrid} aria-label="地図色の詳細設定">
+              {CUSTOM_COLOR_FIELDS.map((field) => (
+                <label className={styles.colorControl} key={field.key}>
+                  <span>{field.label}</span>
+                  <input
+                    type="color"
+                    value={customColors[field.key]}
+                    aria-label={`${field.label}の色`}
+                    onChange={(event) => handleCustomColorChange(field.key, event.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -475,7 +587,7 @@ export function DropGlobe({
           <p>写真をDropすると、あなたの地球に思い出のピンが立ちます。</p>
           {onRequestDrop ? (
             <button className={styles.primaryAction} type="button" onClick={onRequestDrop}>
-              📸 最初のDropをする
+              最初のDropをする
             </button>
           ) : null}
         </div>
@@ -524,7 +636,7 @@ export function DropGlobe({
 
       {phase === 'map' ? (
         <button className={styles.globeBtn} type="button" aria-label="地球儀に戻る" onClick={handleBackToGlobe}>
-          🌍
+          Globe
         </button>
       ) : null}
 
