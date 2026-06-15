@@ -278,10 +278,11 @@ export function createCustomMapTheme(baseTheme: DropMapTheme, colors: DropMapThe
     colors: { ...colors },
     globe: {
       ...baseTheme.globe,
-      oceanTop: colors.water,
+      oceanTop: colors.space,
       oceanMid: colors.water,
+      oceanBottom: colors.space,
       tint: colors.land,
-      tintAlpha: 0.2,
+      tintAlpha: 0.14,
     },
   }
 }
