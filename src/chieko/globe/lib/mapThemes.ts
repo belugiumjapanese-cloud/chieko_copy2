@@ -281,7 +281,9 @@ function layerText(layer: ThemeableMapLayer) {
   return `${layer.id} ${layer['source-layer'] ?? ''}`.toLowerCase()
 }
 
-export function applyDropMapTheme(map: ThemeableMap, theme: DropMapTheme) {
+export function applyDropMapTheme(mapInstance: unknown, theme: DropMapTheme) {
+  const map = mapInstance as ThemeableMap
+
   try {
     map.setConfigProperty?.('basemap', 'theme', theme.standardTheme)
     map.setConfigProperty?.('basemap', 'lightPreset', theme.lightPreset)
@@ -289,7 +291,7 @@ export function applyDropMapTheme(map: ThemeableMap, theme: DropMapTheme) {
     // Non-standard custom styles do not support basemap config.
   }
 
-  const layers = map.getStyle().layers ?? []
+  const layers = (map.getStyle().layers ?? []) as ThemeableMapLayer[]
   layers.forEach((layer) => {
     const label = layerText(layer)
 
