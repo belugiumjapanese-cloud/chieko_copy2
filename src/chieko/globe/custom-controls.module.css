@@ -1,0 +1,85 @@
+.settingsCardScrollable {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.customColorSection {
+  display: grid;
+  gap: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(16, 24, 20, 0.08);
+}
+
+.customColorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.resetColorsButton {
+  min-height: 26px;
+  padding: 4px 8px;
+  color: #2f453e;
+  font-size: 0.68rem;
+  font-weight: 850;
+  background: rgba(47, 69, 62, 0.08);
+  border: 1px solid rgba(47, 69, 62, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.customColorGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.colorControl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 5px 6px 5px 9px;
+  color: #21302a;
+  font-size: 0.72rem;
+  font-weight: 820;
+  background: rgba(16, 24, 20, 0.045);
+  border: 1px solid rgba(16, 24, 20, 0.08);
+  border-radius: 8px;
+}
+
+.colorControl span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colorControl input {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.colorControl input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.colorControl input::-webkit-color-swatch {
+  border: 1px solid rgba(16, 24, 20, 0.18);
+  border-radius: 8px;
+}
+
+@media (max-height: 680px) {
+  .settingsCardScrollable {
+    max-height: calc(100vh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
