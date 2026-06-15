@@ -39,7 +39,12 @@ type ThemeableMapLayer = {
 
 type ThemeableMap = {
   getStyle: () => { layers?: ThemeableMapLayer[] }
-  setPaintProperty: (layerId: string, property: string, value: string | number) => unknown
+  getSource?: (sourceId: string) => unknown
+  addSource?: (sourceId: string, source: unknown) => unknown
+  getLayer?: (layerId: string) => unknown
+  addLayer?: (layer: unknown, beforeId?: string) => unknown
+  moveLayer?: (layerId: string, beforeId?: string) => unknown
+  setPaintProperty: (layerId: string, property: string, value: string | number | unknown[]) => unknown
   setConfigProperty?: (importId: string, configName: string, value: unknown) => unknown
 }
 
@@ -75,6 +80,15 @@ export const DROP_MAP_THEMES: DropMapTheme[] = [
   },
 ]
 
+const DROP_COLOR_SOURCE_ID = 'drop-custom-streets'
+const DROP_COLOR_LAYERS = [
+  'drop-custom-water',
+  'drop-custom-park',
+  'drop-custom-building',
+  'drop-custom-road-casing',
+  'drop-custom-road',
+]
+
 export function isDropMapThemeId(value: string): value is DropMapThemeId {
   return DROP_MAP_THEMES.some((theme) => theme.id === value)
 }
@@ -95,7 +109,7 @@ export function createCustomMapTheme(baseTheme: DropMapTheme, colors: DropMapThe
   }
 }
 
-function paint(map: ThemeableMap, layerId: string, property: string, value: string | number) {
+function paint(map: ThemeableMap, layerId: string, property: string, value: string | number | unknown[]) {
   try {
     map.setPaintProperty(layerId, property, value)
   } catch {
@@ -105,6 +119,87 @@ function paint(map: ThemeableMap, layerId: string, property: string, value: stri
 
 function layerText(layer: ThemeableMapLayer) {
   return `${layer.id} ${layer['source-layer'] ?? ''}`.toLowerCase()
+}
+
+function firstSymbolLayerId(map: ThemeableMap) {
+  return (map.getStyle().layers ?? []).find((layer) => layer.type === 'symbol')?.id
+}
+
+function ensureDropColorLayers(map: ThemeableMap) {
+  if (!map.addSource || !map.getSource || !map.addLayer || !map.getLayer) return
+
+  try {
+    if (!map.getSource(DROP_COLOR_SOURCE_ID)) {
+      map.addSource(DROP_COLOR_SOURCE_ID, { type: 'vector', url: 'mapbox://mapbox.mapbox-streets-v8' })
+    }
+  } catch {
+    return
+  }
+
+  const beforeId = firstSymbolLayerId(map)
+  const add = (layer: Record<string, unknown>) => {
+    try {
+      if (!map.getLayer?.(layer.id as string)) map.addLayer?.(layer, beforeId)
+      else if (map.moveLayer && beforeId) map.moveLayer(layer.id as string, beforeId)
+    } catch {
+      // If one overlay cannot be added on a specific style, keep the others working.
+    }
+  }
+
+  add({
+    id: 'drop-custom-water',
+    type: 'fill',
+    source: DROP_COLOR_SOURCE_ID,
+    'source-layer': 'water',
+    paint: { 'fill-opacity': 0.92 },
+  })
+  add({
+    id: 'drop-custom-park',
+    type: 'fill',
+    source: DROP_COLOR_SOURCE_ID,
+    'source-layer': 'landuse',
+    filter: ['in', ['get', 'class'], ['literal', ['park', 'wood', 'grass', 'scrub', 'cemetery', 'golf_course']]],
+    paint: { 'fill-opacity': 0.82 },
+  })
+  add({
+    id: 'drop-custom-building',
+    type: 'fill',
+    source: DROP_COLOR_SOURCE_ID,
+    'source-layer': 'building',
+    minzoom: 12,
+    paint: { 'fill-opacity': 0.78 },
+  })
+  add({
+    id: 'drop-custom-road-casing',
+    type: 'line',
+    source: DROP_COLOR_SOURCE_ID,
+    'source-layer': 'road',
+    minzoom: 5,
+    paint: {
+      'line-opacity': 0.55,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 10, 1.8, 14, 5.5, 18, 18],
+    },
+  })
+  add({
+    id: 'drop-custom-road',
+    type: 'line',
+    source: DROP_COLOR_SOURCE_ID,
+    'source-layer': 'road',
+    minzoom: 5,
+    paint: {
+      'line-opacity': 0.94,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.35, 10, 1.1, 14, 3.3, 18, 12],
+    },
+  })
+}
+
+function applyDropColorLayers(map: ThemeableMap, theme: DropMapTheme) {
+  ensureDropColorLayers(map)
+  paint(map, 'drop-custom-water', 'fill-color', theme.colors.water)
+  paint(map, 'drop-custom-park', 'fill-color', theme.colors.park)
+  paint(map, 'drop-custom-building', 'fill-color', theme.colors.building)
+  paint(map, 'drop-custom-road-casing', 'line-color', theme.colors.halo)
+  paint(map, 'drop-custom-road', 'line-color', theme.colors.road)
 }
 
 export function applyDropMapTheme(mapInstance: unknown, theme: DropMapTheme) {
@@ -122,9 +217,11 @@ export function applyDropMapTheme(mapInstance: unknown, theme: DropMapTheme) {
     const label = layerText(layer)
 
     if (layer.type === 'background') {
-      paint(map, layer.id, 'background-color', theme.colors.background)
+      paint(map, layer.id, 'background-color', theme.colors.land)
       return
     }
+
+    if (DROP_COLOR_LAYERS.includes(layer.id)) return
 
     if (layer.type === 'fill') {
       if (label.includes('water')) paint(map, layer.id, 'fill-color', theme.colors.water)
@@ -150,4 +247,6 @@ export function applyDropMapTheme(mapInstance: unknown, theme: DropMapTheme) {
       paint(map, layer.id, 'icon-color', theme.colors.text)
     }
   })
+
+  applyDropColorLayers(map, theme)
 }
