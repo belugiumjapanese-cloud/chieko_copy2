@@ -28,6 +28,9 @@ export type DropMapTheme = {
   }
 }
 
+export type DropMapThemeColors = DropMapTheme['colors']
+export type DropMapColorKey = keyof DropMapThemeColors
+
 type ThemeableMapLayer = {
   id: string
   type?: string
@@ -267,6 +270,20 @@ export function isDropMapThemeId(value: string): value is DropMapThemeId {
 
 export function getDropMapTheme(themeId: string): DropMapTheme {
   return DROP_MAP_THEMES.find((theme) => theme.id === themeId) ?? DROP_MAP_THEMES[0]
+}
+
+export function createCustomMapTheme(baseTheme: DropMapTheme, colors: DropMapThemeColors): DropMapTheme {
+  return {
+    ...baseTheme,
+    colors: { ...colors },
+    globe: {
+      ...baseTheme.globe,
+      oceanTop: colors.water,
+      oceanMid: colors.water,
+      tint: colors.land,
+      tintAlpha: 0.2,
+    },
+  }
 }
 
 function paint(map: ThemeableMap, layerId: string, property: string, value: string | number) {
