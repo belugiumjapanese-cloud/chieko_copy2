@@ -1,6 +1,6 @@
 import type { DropMapTheme } from './mapThemes'
 
-const TILE_ZOOM = 2
+const TILE_ZOOM = 3
 const GRID = 1 << TILE_ZOOM
 const TILE_SIZE = 512
 const MAX_MERCATOR_LAT = 85.051129
@@ -91,11 +91,31 @@ function tintTexture(ctx: CanvasRenderingContext2D, width: number, height: numbe
   ctx.restore()
 
   ctx.save()
+  ctx.globalCompositeOperation = 'multiply'
+  ctx.globalAlpha = Math.min(0.12, palette.tintAlpha * 0.6)
+  ctx.fillStyle = palette.oceanMid
+  ctx.fillRect(0, 0, width, height)
+  ctx.restore()
+
+  ctx.save()
   ctx.globalCompositeOperation = 'screen'
-  ctx.globalAlpha = Math.min(0.08, palette.tintAlpha * 0.3)
+  ctx.globalAlpha = Math.min(0.06, palette.tintAlpha * 0.25)
   ctx.fillStyle = palette.tint
   ctx.fillRect(0, 0, width, height)
   ctx.restore()
+}
+
+function sharpenTexture(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const image = ctx.getImageData(0, 0, width, height)
+  const data = image.data
+  for (let i = 0; i < data.length; i += 4) {
+    const average = (data[i] + data[i + 1] + data[i + 2]) / 3
+    const contrast = 1.08
+    data[i] = Math.max(0, Math.min(255, 128 + (data[i] - 128) * contrast + (data[i] - average) * 0.12))
+    data[i + 1] = Math.max(0, Math.min(255, 128 + (data[i + 1] - 128) * contrast + (data[i + 1] - average) * 0.12))
+    data[i + 2] = Math.max(0, Math.min(255, 128 + (data[i + 2] - 128) * contrast + (data[i + 2] - average) * 0.12))
+  }
+  ctx.putImageData(image, 0, 0)
 }
 
 /**
@@ -145,6 +165,8 @@ export async function buildEarthTexture(
   const results = await Promise.allSettled(loads)
   if (!results.some((result) => result.status === 'fulfilled')) return output
 
+  outputCtx.imageSmoothingEnabled = true
+  outputCtx.imageSmoothingQuality = 'high'
   for (let row = 0; row < OUTPUT_HEIGHT; row++) {
     const lat = 90 - ((row + 0.5) * 180) / OUTPUT_HEIGHT
     const clamped = Math.max(-MAX_MERCATOR_LAT, Math.min(MAX_MERCATOR_LAT, lat))
@@ -154,6 +176,7 @@ export async function buildEarthTexture(
     outputCtx.drawImage(mercator, 0, sourceY, mercator.width, 1, 0, row, OUTPUT_WIDTH, 1)
   }
 
+  sharpenTexture(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT)
   tintTexture(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, palette)
 
   return output
