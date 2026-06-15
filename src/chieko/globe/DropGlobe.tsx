@@ -3,7 +3,7 @@
 import { onAuthStateChanged } from 'firebase/auth'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { listDrops, listFolders } from '../lib/dropService'
 import { auth, hasFirebaseConfig } from '../lib/firebase'
 import { calculateStats, formatDropDate } from '../lib/geo'
@@ -107,10 +107,10 @@ export function DropGlobe({
 
   const activeTheme = useMemo(() => getDropMapTheme(activeThemeId), [activeThemeId])
 
-  const setPhase = (next: Phase) => {
+  const setPhase = useCallback((next: Phase) => {
     phaseRef.current = next
     setPhaseState(next)
-  }
+  }, [])
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
@@ -260,7 +260,7 @@ export function DropGlobe({
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [activeTheme, mapboxStyle, mapboxToken])
+  }, [activeTheme, mapboxStyle, mapboxToken, setPhase])
 
   // ----- Dropデータの読み込み(ログイン時はFirestore、未ログインはデモ) -----
   useEffect(() => {
