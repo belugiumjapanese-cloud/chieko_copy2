@@ -73,12 +73,12 @@ function drawLand(ctx: CanvasRenderingContext2D, width: number, height: number, 
   ctx.stroke()
 }
 
-function drawFallbackContinents(ctx: CanvasRenderingContext2D, width: number, height: number) {
+function drawFallbackContinents(ctx: CanvasRenderingContext2D, width: number, height: number, alpha = 0.78) {
   ctx.save()
   ctx.fillStyle = FALLBACK_LAND
   ctx.strokeStyle = FALLBACK_LAND_DARK
   ctx.lineWidth = 3
-  ctx.globalAlpha = 0.78
+  ctx.globalAlpha = alpha
 
   drawLand(ctx, width, height, [
     [-168, 72], [-130, 70], [-102, 58], [-80, 48], [-60, 34], [-82, 16], [-100, 8], [-116, 22], [-130, 44], [-160, 54],
@@ -102,7 +102,7 @@ function drawFallbackContinents(ctx: CanvasRenderingContext2D, width: number, he
     [-50, 76], [-20, 72], [-34, 62], [-58, 64],
   ])
 
-  ctx.globalAlpha = 0.42
+  ctx.globalAlpha = alpha * 0.54
   ctx.fillStyle = '#d7e2da'
   drawLand(ctx, width, height, [[-180, -63], [-90, -70], [0, -66], [90, -70], [180, -63], [180, -88], [-180, -88]])
   ctx.restore()
@@ -133,7 +133,7 @@ function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height
     ctx.stroke()
   }
 
-  drawFallbackContinents(ctx, width, height)
+  drawFallbackContinents(ctx, width, height, 0.82)
 }
 
 function tintTexture(ctx: CanvasRenderingContext2D, width: number, height: number, palette: EarthTexturePalette) {
@@ -230,6 +230,7 @@ export async function buildEarthTexture(
 
   sharpenTexture(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT)
   tintTexture(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, palette)
+  drawFallbackContinents(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, 0.36)
 
   return output
 }
