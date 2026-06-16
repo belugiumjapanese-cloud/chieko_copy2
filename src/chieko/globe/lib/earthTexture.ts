@@ -23,9 +23,6 @@ const DEFAULT_PALETTE: EarthTexturePalette = {
   tintAlpha: 0.08,
 }
 
-const FALLBACK_LAND = '#8ea596'
-const FALLBACK_LAND_DARK = '#60756a'
-
 function parseMapboxStyleUrl(styleUrl?: string): StyleParts | null {
   if (!styleUrl) return null
 
@@ -73,10 +70,16 @@ function drawLand(ctx: CanvasRenderingContext2D, width: number, height: number, 
   ctx.stroke()
 }
 
-function drawFallbackContinents(ctx: CanvasRenderingContext2D, width: number, height: number, alpha = 0.78) {
+function drawFallbackContinents(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  palette: EarthTexturePalette,
+  alpha = 0.78,
+) {
   ctx.save()
-  ctx.fillStyle = FALLBACK_LAND
-  ctx.strokeStyle = FALLBACK_LAND_DARK
+  ctx.fillStyle = palette.tint
+  ctx.strokeStyle = palette.oceanBottom
   ctx.lineWidth = 3
   ctx.globalAlpha = alpha
 
@@ -103,20 +106,20 @@ function drawFallbackContinents(ctx: CanvasRenderingContext2D, width: number, he
   ])
 
   ctx.globalAlpha = alpha * 0.54
-  ctx.fillStyle = '#d7e2da'
+  ctx.fillStyle = palette.tint
   drawLand(ctx, width, height, [[-180, -63], [-90, -70], [0, -66], [90, -70], [180, -63], [180, -88], [-180, -88]])
   ctx.restore()
 }
 
-function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height: number) {
+function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height: number, palette: EarthTexturePalette) {
   const gradient = ctx.createLinearGradient(0, 0, 0, height)
-  gradient.addColorStop(0, DEFAULT_PALETTE.oceanTop)
-  gradient.addColorStop(0.5, DEFAULT_PALETTE.oceanMid)
-  gradient.addColorStop(1, DEFAULT_PALETTE.oceanBottom)
+  gradient.addColorStop(0, palette.oceanTop)
+  gradient.addColorStop(0.5, palette.oceanMid)
+  gradient.addColorStop(1, palette.oceanBottom)
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
 
-  ctx.strokeStyle = DEFAULT_PALETTE.grid
+  ctx.strokeStyle = palette.grid
   ctx.lineWidth = 1
   for (let i = 1; i < 12; i++) {
     const y = (height / 12) * i
@@ -133,7 +136,7 @@ function paintFallbackOcean(ctx: CanvasRenderingContext2D, width: number, height
     ctx.stroke()
   }
 
-  drawFallbackContinents(ctx, width, height, 0.82)
+  drawFallbackContinents(ctx, width, height, palette, 0.86)
 }
 
 function tintTexture(ctx: CanvasRenderingContext2D, width: number, height: number, palette: EarthTexturePalette) {
@@ -141,14 +144,14 @@ function tintTexture(ctx: CanvasRenderingContext2D, width: number, height: numbe
 
   ctx.save()
   ctx.globalCompositeOperation = 'soft-light'
-  ctx.globalAlpha = Math.min(0.08, palette.tintAlpha)
-  ctx.fillStyle = palette.tint
+  ctx.globalAlpha = Math.min(0.18, palette.tintAlpha)
+  ctx.fillStyle = palette.oceanMid
   ctx.fillRect(0, 0, width, height)
   ctx.restore()
 
   ctx.save()
   ctx.globalCompositeOperation = 'screen'
-  ctx.globalAlpha = Math.min(0.03, palette.tintAlpha * 0.25)
+  ctx.globalAlpha = Math.min(0.08, palette.tintAlpha * 0.35)
   ctx.fillStyle = palette.tint
   ctx.fillRect(0, 0, width, height)
   ctx.restore()
@@ -187,7 +190,7 @@ export async function buildEarthTexture(
   const outputCtx = output.getContext('2d')
   if (!outputCtx) return output
 
-  paintFallbackOcean(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT)
+  paintFallbackOcean(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, palette)
   if (!token) return output
 
   const style = parseMapboxStyleUrl(options.styleUrl)
@@ -199,7 +202,7 @@ export async function buildEarthTexture(
   const mercatorCtx = mercator.getContext('2d')
   if (!mercatorCtx) return output
 
-  mercatorCtx.fillStyle = DEFAULT_PALETTE.oceanMid
+  mercatorCtx.fillStyle = palette.oceanMid
   mercatorCtx.fillRect(0, 0, mercator.width, mercator.height)
 
   const loads: Promise<void>[] = []
@@ -230,7 +233,7 @@ export async function buildEarthTexture(
 
   sharpenTexture(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT)
   tintTexture(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, palette)
-  drawFallbackContinents(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, 0.36)
+  drawFallbackContinents(outputCtx, OUTPUT_WIDTH, OUTPUT_HEIGHT, palette, 0.46)
 
   return output
 }
