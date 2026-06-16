@@ -10,7 +10,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { DropGlobe, DropLibrary, DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
 import { hasFirebaseConfig } from '../../src/chieko/lib/firebase'
 import type { LibraryPin } from '../../src/chieko/library/libraryData'
@@ -120,7 +120,7 @@ function LibraryView({
 }
 
 function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
-  const handlePreviewKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handlePreviewKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     onOpenWorld()
