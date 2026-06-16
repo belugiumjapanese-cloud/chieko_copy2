@@ -50,10 +50,12 @@ function DropGlobeSurface({
   onOpenSheet,
   focusTarget,
   onFocusConsumed,
+  showGlobeSignal,
 }: {
   onOpenSheet: (mode: SheetMode) => void
   focusTarget: PinFocus
   onFocusConsumed: () => void
+  showGlobeSignal: number
 }) {
   return (
     <section className={styles.mapScreen} aria-label="Drop globe">
@@ -63,6 +65,7 @@ function DropGlobeSurface({
         onRequestDrop={() => onOpenSheet('drop')}
         focusTarget={focusTarget}
         onFocusConsumed={onFocusConsumed}
+        showGlobeSignal={showGlobeSignal}
       />
     </section>
   )
@@ -116,7 +119,7 @@ function LibraryView({
   )
 }
 
-function ProfileView() {
+function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
   return (
     <section className={styles.panelScreen} aria-label="Profile">
       <div className={styles.profileTop}>
@@ -131,6 +134,18 @@ function ProfileView() {
           <p>Facade hunter. Windows, corners, street textures.</p>
         </div>
       </div>
+
+      <button className={styles.profileGlobePreview} type="button" onClick={onOpenWorld}>
+        <span className={styles.profileMiniGlobe} aria-hidden>
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
+        <strong>自分の世界を見る</strong>
+        <small>3D globe preview</small>
+      </button>
+
       <div className={styles.profileStats}>
         <span>
           <strong>12</strong>
@@ -149,7 +164,7 @@ function ProfileView() {
         <span />
         <span />
         <span />
-        <strong>My World</strong>
+        <strong>Folders</strong>
       </div>
     </section>
   )
@@ -185,6 +200,7 @@ export function ChiekoPageClient() {
   const [sheetMode, setSheetMode] = useState<SheetMode>(null)
   const [pinFocus, setPinFocus] = useState<PinFocus>(null)
   const [dropSplashId, setDropSplashId] = useState(0)
+  const [showGlobeSignal, setShowGlobeSignal] = useState(0)
   const firebaseReady = hasFirebaseConfig()
 
   const playDropSplash = () => {
@@ -216,6 +232,11 @@ export function ChiekoPageClient() {
     setActiveTab('drop')
   }
 
+  const handleOpenWorld = () => {
+    setActiveTab('drop')
+    setShowGlobeSignal((current) => current + 1)
+  }
+
   return (
     <main className={`${styles.shell} ${overrideStyles.dropUiOverridesRoot}`}>
       <div className={styles.phoneApp}>
@@ -230,11 +251,16 @@ export function ChiekoPageClient() {
 
         <div className={styles.screenSlot}>
           {activeTab === 'drop' ? (
-            <DropGlobeSurface onOpenSheet={handleOpenSheet} focusTarget={pinFocus} onFocusConsumed={() => setPinFocus(null)} />
+            <DropGlobeSurface
+              onOpenSheet={handleOpenSheet}
+              focusTarget={pinFocus}
+              onFocusConsumed={() => setPinFocus(null)}
+              showGlobeSignal={showGlobeSignal}
+            />
           ) : null}
           {activeTab === 'community' ? <CommunityView onBackToMap={() => setActiveTab('drop')} /> : null}
           {activeTab === 'library' ? <LibraryView onOpenSheet={handleOpenSheet} onOpenPin={handleOpenPin} /> : null}
-          {activeTab === 'profile' ? <ProfileView /> : null}
+          {activeTab === 'profile' ? <ProfileView onOpenWorld={handleOpenWorld} /> : null}
         </div>
 
         {dropSplashId > 0 ? <DropSplash key={dropSplashId} /> : null}
