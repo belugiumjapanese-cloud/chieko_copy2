@@ -69,8 +69,8 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
   return (
     <section className={styles.library} aria-label="ライブラリ">
       <div className={openId && !closing ? `${styles.home} ${styles.homeBehind}` : styles.home}>
-        <h2 className={styles.largeTitle}>Drop Library</h2>
-        <p className={styles.subTitle}>保存した場所と、これから行きたい場所</p>
+        <h2 className={styles.largeTitle}>Memory Shelf</h2>
+        <p className={styles.subTitle}>写真、場所、行きたいところを静かに並べる棚</p>
 
         <div className={styles.collectionList}>
           {LIBRARY_COLLECTIONS.map((collection) => {
@@ -110,7 +110,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
               </span>
               <span className={styles.rowBody}>
                 <strong>Folders</strong>
-                <span>To Visit / Wish / Cafe / Shops</span>
+                <span>Collections for cafe, shops, architecture, wish</span>
               </span>
               <span className={styles.rowAside}>
                 <span className={styles.chevron} aria-hidden>
@@ -136,7 +136,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
           </div>
         ) : null}
 
-        <h3 className={styles.sectionTitle}>最近のDrop</h3>
+        <h3 className={styles.sectionTitle}>Recent Drops</h3>
         <div className={styles.recentGrid}>
           {recentPins.map((pin) => (
             <button className={styles.recentCard} key={pin.id} type="button" onClick={() => onOpenPin?.(pin)}>
@@ -156,7 +156,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
           <header className={styles.detailHeader}>
             <button className={styles.backBtn} type="button" onClick={closeDetail}>
               <span aria-hidden>‹</span>
-              Library
+              Shelf
             </button>
           </header>
 
@@ -168,7 +168,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
               <h2 className={styles.detailTitle}>{openCollection.name}</h2>
             </div>
             <p className={styles.detailMeta}>
-              {openCollection.description} ・ {filteredPins.length} pins
+              {openCollection.description} · {filteredPins.length} pins
             </p>
 
             <div className={styles.categoryRail} aria-label="カテゴリー">
@@ -219,7 +219,7 @@ export function DropLibrary({ onOpenPin, onOpenSheet }: DropLibraryProps) {
                     <strong>{pin.title}</strong>
                     <span>
                       {pin.place}
-                      {pin.by ? ` ・${pin.by}` : ''}
+                      {pin.by ? ` ·${pin.by}` : ''}
                     </span>
                   </span>
                 </button>
