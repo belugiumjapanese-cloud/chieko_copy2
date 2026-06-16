@@ -11,3 +11,96 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+.dropUiOverridesRoot :global([class*='chipsRow']) {
+  position: fixed !important;
+  top: calc(126px + env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  z-index: 7 !important;
+  display: flex !important;
+  gap: 8px !important;
+  width: min(430px, 100vw) !important;
+  max-height: 56px !important;
+  padding: 4px 12px 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  opacity: 1 !important;
+  scrollbar-width: none !important;
+  transform: translateX(-50%) !important;
+}
+
+.dropUiOverridesRoot :global([class*='chipsRow'])::-webkit-scrollbar {
+  display: none;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetail']) {
+  position: absolute !important;
+  right: 0 !important;
+  bottom: calc(var(--globe-bottom) + env(safe-area-inset-bottom)) !important;
+  left: 0 !important;
+  z-index: 9 !important;
+  display: grid !important;
+  grid-template-columns: 82px minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: start !important;
+  width: auto !important;
+  height: min(50%, 390px) !important;
+  padding: 38px 14px 16px !important;
+  color: #101814 !important;
+  background: rgba(247, 250, 247, 0.96) !important;
+  border: 1px solid rgba(16, 24, 20, 0.1) !important;
+  border-bottom: 0 !important;
+  border-radius: 16px 16px 0 0 !important;
+  box-shadow: 0 -18px 38px rgba(0, 0, 0, 0.3) !important;
+  transform: none !important;
+  backdrop-filter: blur(20px) saturate(1.18) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.18) !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetail'])::before {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 32px;
+  height: 4px;
+  content: '';
+  background: rgba(16, 24, 20, 0.24);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.dropUiOverridesRoot :global([class*='friendDetail']) :global([class*='dropDetailImage']) {
+  width: 82px !important;
+  height: 82px !important;
+  border-radius: 8px !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetailBody']) {
+  gap: 6px !important;
+  padding-top: 1px !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetailBody'] strong) {
+  font-size: 1.08rem !important;
+  line-height: 1.18 !important;
+  white-space: normal !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetailBody'] span) {
+  font-size: 0.8rem !important;
+  line-height: 1.32 !important;
+  white-space: normal !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetailActions']) {
+  align-self: start !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetail'] + [class*='bottomArea']) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.dropUiOverridesRoot :global([class*='friendDetail'] ~ [class*='globeBtn']) {
+  bottom: calc(min(50%, 390px) + 12px + var(--globe-bottom) + env(safe-area-inset-bottom)) !important;
+}
