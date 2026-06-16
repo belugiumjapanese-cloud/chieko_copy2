@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { DropGlobe, DropLibrary, DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
 import { hasFirebaseConfig } from '../../src/chieko/lib/firebase'
 import type { LibraryPin } from '../../src/chieko/library/libraryData'
+import overrideStyles from './drop-ui-overrides.module.css'
 import styles from './chieko-page.module.css'
 
 type PinFocus = { id?: string; lng: number; lat: number } | null
@@ -216,7 +217,7 @@ export function ChiekoPageClient() {
   }
 
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} ${overrideStyles.dropUiOverridesRoot}`}>
       <div className={styles.phoneApp}>
         <header className={styles.statusBar}>
           <span>Drop</span>
