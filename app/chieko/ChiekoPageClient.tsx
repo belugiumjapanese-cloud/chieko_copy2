@@ -136,11 +136,8 @@ function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
       </div>
 
       <button className={styles.profileGlobePreview} type="button" onClick={onOpenWorld}>
-        <span className={styles.profileMiniGlobe} aria-hidden>
-          <span />
-          <span />
-          <span />
-          <span />
+        <span className={styles.profileRealGlobe} aria-hidden>
+          <DropGlobe topInset={0} bottomInset={0} showGlobeSignal={1} />
         </span>
         <strong>自分の世界を見る</strong>
         <small>World preview</small>
