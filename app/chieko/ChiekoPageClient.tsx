@@ -120,6 +120,12 @@ function LibraryView({
 }
 
 function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
+  const handlePreviewKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onOpenWorld()
+  }
+
   return (
     <section className={styles.panelScreen} aria-label="Profile">
       <div className={styles.profileTop}>
@@ -135,13 +141,19 @@ function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
         </div>
       </div>
 
-      <button className={styles.profileGlobePreview} type="button" onClick={onOpenWorld}>
+      <div
+        className={styles.profileGlobePreview}
+        role="button"
+        tabIndex={0}
+        onClick={onOpenWorld}
+        onKeyDown={handlePreviewKeyDown}
+      >
         <span className={styles.profileRealGlobe} aria-hidden>
           <DropGlobe topInset={0} bottomInset={0} showGlobeSignal={1} />
         </span>
         <strong>自分の世界を見る</strong>
         <small>World preview</small>
-      </button>
+      </div>
 
       <div className={styles.profileStats}>
         <span>
