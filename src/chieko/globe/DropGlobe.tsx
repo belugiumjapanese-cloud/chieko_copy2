@@ -130,6 +130,7 @@ export function DropGlobe({
   const heatOnRef = useRef(true)
   const dropsRef = useRef<DropDoc[]>([])
   const activeThemeRef = useRef<DropMapTheme>(DEFAULT_THEME)
+  const sheetTouchStartRef = useRef<number | null>(null)
 
   const [phase, setPhaseState] = useState<Phase>('loading')
   const [engineReady, setEngineReady] = useState(false)
@@ -140,6 +141,8 @@ export function DropGlobe({
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [selectedDropId, setSelectedDropId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [sheetExpanded, setSheetExpanded] = useState(false)
   const [heatOn, setHeatOn] = useState(true)
   const [activeThemeId, setActiveThemeId] = useState(DEFAULT_MAP_THEME_ID)
   const [customColors, setCustomColors] = useState<DropMapThemeColors>(DEFAULT_THEME.colors)
@@ -462,6 +465,20 @@ export function DropGlobe({
     mapRef.current?.easeTo({ zoom: 1.6, duration: 1000 })
   }
 
+  const handleSheetTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+    sheetTouchStartRef.current = event.touches[0]?.clientY ?? null
+  }
+
+  const handleSheetTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
+    const start = sheetTouchStartRef.current
+    sheetTouchStartRef.current = null
+    if (start === null) return
+    const end = event.changedTouches[0]?.clientY ?? start
+    const distance = start - end
+    if (distance > 32) setSheetExpanded(true)
+    if (distance < -32) setSheetExpanded(false)
+  }
+
   const shellStyle = { '--globe-top': `${topInset}px`, '--globe-bottom': `${bottomInset}px` } as CSSProperties
 
   return (
@@ -469,11 +486,19 @@ export function DropGlobe({
       <canvas className={styles.globeCanvas} ref={globeCanvasRef} aria-label="Dropの地球儀" />
       <div className={mapVisible ? `${styles.mapWrap} ${styles.mapWrapVisible}` : styles.mapWrap} ref={mapContainerRef} />
 
-      <header className={styles.topBar}>
-        <div className={styles.searchPill} role="search">
-          <span aria-hidden>検索</span>
-          <span>場所、Dropを検索</span>
-        </div>
+      {searchOpen ? <button className={styles.searchDismiss} type="button" aria-label="検索を閉じる" onClick={() => setSearchOpen(false)} /> : null}
+
+      <header className={searchOpen ? `${styles.topBar} ${styles.topBarSearchOpen}` : styles.topBar}>
+        {searchOpen ? (
+          <div className={styles.searchPill} role="search">
+            <span aria-hidden>検索</span>
+            <span>場所、Dropを検索</span>
+          </div>
+        ) : (
+          <button className={styles.searchIconBtn} type="button" aria-label="検索を開く" onClick={() => setSearchOpen(true)}>
+            <span aria-hidden>検索</span>
+          </button>
+        )}
         <button
           className={styles.roundBtn}
           type="button"
@@ -486,37 +511,20 @@ export function DropGlobe({
 
       <div className={styles.statsRow} aria-label="Dropの統計">
         <span className={styles.statChip}>
-          <strong>{stats.countries}</strong>カ国
+          <strong>{stats.countries}</strong>
+          <span>カ国</span>
         </span>
         <span className={styles.statChip}>
-          <strong>{stats.cities}</strong>都市
+          <strong>{stats.cities}</strong>
+          <span>都市</span>
         </span>
         <span className={styles.statChip}>
-          <strong>{stats.drops}</strong>Drops
+          <strong>{stats.drops}</strong>
+          <span>Drops</span>
         </span>
       </div>
 
-      {isPreview ? <span className={styles.previewTag}>デモデータ</span> : null}
-
-      <div className={styles.chipsRow} aria-label="フォルダフィルター">
-        <button
-          className={activeFolderId === 'all' ? `${styles.chip} ${styles.chipActive}` : styles.chip}
-          type="button"
-          onClick={() => setActiveFolderId('all')}
-        >
-          All
-        </button>
-        {folders.map((folder) => (
-          <button
-            className={activeFolderId === folder.id ? `${styles.chip} ${styles.chipActive}` : styles.chip}
-            key={folder.id}
-            type="button"
-            onClick={() => setActiveFolderId(folder.id)}
-          >
-            {folder.name}
-          </button>
-        ))}
-      </div>
+      {isPreview && process.env.NODE_ENV === 'development' ? <span className={styles.previewTag}>デモデータ</span> : null}
 
       {settingsOpen ? (
         <div className={styles.settingsCard}>
@@ -609,13 +617,45 @@ export function DropGlobe({
               場所へ
             </button>
             <button className={styles.closeAction} type="button" aria-label="閉じる" onClick={() => setSelectedDropId(null)}>
-              ✕
+              ×
             </button>
           </div>
         </div>
       ) : null}
 
-      <footer className={styles.bottomArea}>
+      <footer
+        className={sheetExpanded ? `${styles.bottomArea} ${styles.bottomAreaExpanded}` : styles.bottomArea}
+        onTouchStart={handleSheetTouchStart}
+        onTouchEnd={handleSheetTouchEnd}
+      >
+        <button
+          className={styles.sheetHandleBtn}
+          type="button"
+          aria-label={sheetExpanded ? 'Dropカードを小さくする' : 'Dropカードを広げる'}
+          onClick={() => setSheetExpanded((expanded) => !expanded)}
+        />
+        <div
+          className={sheetExpanded ? `${styles.chipsRow} ${styles.chipsRowVisible}` : styles.chipsRow}
+          aria-label="フォルダフィルター"
+        >
+          <button
+            className={activeFolderId === 'all' ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+            type="button"
+            onClick={() => setActiveFolderId('all')}
+          >
+            All
+          </button>
+          {folders.map((folder) => (
+            <button
+              className={activeFolderId === folder.id ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+              key={folder.id}
+              type="button"
+              onClick={() => setActiveFolderId(folder.id)}
+            >
+              {folder.name}
+            </button>
+          ))}
+        </div>
         <div className={styles.friendsScroller} aria-label="Drop一覧">
           {filteredDrops.map((drop) => (
             <button
