@@ -28,7 +28,7 @@
   -webkit-backdrop-filter: none;
 }
 
-.dropUiOverridesRoot :global([class*='statChip']:not(:last-child)::after) {
+.dropUiOverridesRoot :global([class*='statChip']:not(:last-child))::after {
   position: absolute;
   top: 5px;
   right: 0;
@@ -54,9 +54,9 @@
   transition: opacity 150ms ease, transform 150ms ease;
 }
 
-.dropUiOverridesRoot :global([class*='mapDropPin']:focus [class*='mapDropPinName']),
-.dropUiOverridesRoot :global([class*='mapDropPin']:focus-visible [class*='mapDropPinName']),
-.dropUiOverridesRoot :global([class*='mapDropPin']:active [class*='mapDropPinName']) {
+.dropUiOverridesRoot :global([class*='mapDropPin']:focus) :global([class*='mapDropPinName']),
+.dropUiOverridesRoot :global([class*='mapDropPin']:focus-visible) :global([class*='mapDropPinName']),
+.dropUiOverridesRoot :global([class*='mapDropPin']:active) :global([class*='mapDropPinName']) {
   opacity: 1;
   transform: translateY(0);
 }
