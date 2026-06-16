@@ -38,13 +38,17 @@ type DropGlobeProps = {
   /** ライブラリ等から飛んできたとき、この座標へダイブする */
   focusTarget?: { id?: string; lng: number; lat: number } | null
   onFocusConsumed?: () => void
+  /** Profileの地球プレビューから、直接Three.js地球状態を開くためのシグナル */
+  showGlobeSignal?: number
 }
 
 type Phase = 'loading' | 'globe' | 'diving' | 'map' | 'surfacing'
 
-const SURFACE_ZOOM = 2.05
-const DIVE_START_ZOOM = 2.2
-const FADE_MS = 480
+const GLOBE_SWITCH_ZOOM = 4
+const MAP_RETURN_ZOOM = 5.2
+const MAP_DEFAULT_ZOOM = 11.4
+const DIVE_START_ZOOM = 4.6
+const FADE_MS = 420
 const THEME_STORAGE_KEY = 'chieko-drop-map-theme'
 const CUSTOM_COLORS_STORAGE_KEY = 'chieko-drop-map-custom-colors'
 const DEFAULT_THEME = getDropMapTheme(DEFAULT_MAP_THEME_ID)
@@ -116,6 +120,7 @@ export function DropGlobe({
   onRequestDrop,
   focusTarget = null,
   onFocusConsumed,
+  showGlobeSignal = 0,
 }: DropGlobeProps) {
   const globeCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
@@ -131,6 +136,7 @@ export function DropGlobe({
   const dropsRef = useRef<DropDoc[]>([])
   const activeThemeRef = useRef<DropMapTheme>(DEFAULT_THEME)
   const sheetTouchStartRef = useRef<number | null>(null)
+  const lastMapViewRef = useRef({ lng: 139.7, lat: 35.66, zoom: MAP_DEFAULT_ZOOM })
 
   const [phase, setPhaseState] = useState<Phase>('loading')
   const [engineReady, setEngineReady] = useState(false)
@@ -143,6 +149,7 @@ export function DropGlobe({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [sheetExpanded, setSheetExpanded] = useState(false)
+  const [focusFlashId, setFocusFlashId] = useState(0)
   const [heatOn, setHeatOn] = useState(true)
   const [activeThemeId, setActiveThemeId] = useState(DEFAULT_MAP_THEME_ID)
   const [customColors, setCustomColors] = useState<DropMapThemeColors>(DEFAULT_THEME.colors)
@@ -156,6 +163,46 @@ export function DropGlobe({
     phaseRef.current = next
     setPhaseState(next)
   }, [])
+
+  const rememberMapView = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+    const center = map.getCenter()
+    lastMapViewRef.current = { lng: center.lng, lat: center.lat, zoom: map.getZoom() }
+  }, [])
+
+  const enterGlobe = useCallback(() => {
+    const map = mapRef.current
+    const engine = engineRef.current
+    rememberMapView()
+    if (map && engine) {
+      const center = map.getCenter()
+      engine.resetView(center.lng, center.lat)
+      engine.setPaused(false)
+    }
+    setPhase('surfacing')
+    setMapVisible(false)
+    window.setTimeout(() => setPhase('globe'), FADE_MS)
+  }, [rememberMapView, setPhase])
+
+  const enterMap = useCallback(
+    (target?: { lng: number; lat: number; zoom?: number }) => {
+      const map = mapRef.current
+      if (!map) return
+      const view = target ?? lastMapViewRef.current
+      setPhase('diving')
+      setMapVisible(true)
+      engineRef.current?.setPaused(true)
+      map.easeTo({
+        center: [view.lng, view.lat],
+        zoom: Math.max(view.zoom ?? MAP_RETURN_ZOOM, MAP_RETURN_ZOOM),
+        duration: 420,
+        essential: true,
+      })
+      window.setTimeout(() => setPhase('map'), FADE_MS)
+    },
+    [setPhase],
+  )
 
   const applyThemeToMap = useCallback((theme: DropMapTheme) => {
     const map = mapRef.current
@@ -199,6 +246,11 @@ export function DropGlobe({
     }
   }, [activeTheme, engineReady, mapboxStyle, mapboxToken])
 
+  useEffect(() => {
+    if (!showGlobeSignal || !engineReady) return
+    enterGlobe()
+  }, [enterGlobe, engineReady, showGlobeSignal])
+
   const handleThemeChange = (themeId: string) => {
     if (!isDropMapThemeId(themeId)) return
     const nextTheme = getDropMapTheme(themeId)
@@ -233,8 +285,11 @@ export function DropGlobe({
 
   selectDropRef.current = (drop: DropDoc) => {
     setSelectedDropId(drop.id)
+    setSheetExpanded(true)
+    setFocusFlashId((current) => current + 1)
     if (phaseRef.current === 'map' && mapRef.current) {
-      mapRef.current.flyTo({ center: [drop.lng, drop.lat], zoom: 14.5, duration: 1600, essential: true })
+      rememberMapView()
+      mapRef.current.flyTo({ center: [drop.lng, drop.lat], zoom: 14.5, duration: 600, essential: true })
     } else if (phaseRef.current === 'globe' && engineRef.current) {
       pendingDropRef.current = drop
       engineRef.current.flyToAndDive(drop.lng, drop.lat)
@@ -260,34 +315,18 @@ export function DropGlobe({
         return
       }
       setPhase('diving')
-      map.jumpTo({ center: [center.lng, center.lat], zoom: DIVE_START_ZOOM, bearing: 0, pitch: 0 })
       setMapVisible(true)
+      engineRef.current?.setPaused(true)
+      map.easeTo({ center: [center.lng, center.lat], zoom: MAP_RETURN_ZOOM, bearing: 0, pitch: 0, duration: 420 })
       window.setTimeout(() => {
         if (cancelled) return
         setPhase('map')
-        engineRef.current?.setPaused(true)
         const pending = pendingDropRef.current
         pendingDropRef.current = null
         if (pending) {
-          map.flyTo({ center: [pending.lng, pending.lat], zoom: 14.5, duration: 2400, essential: true })
-        } else {
-          map.easeTo({ zoom: 4.4, duration: 1400 })
+          map.flyTo({ center: [pending.lng, pending.lat], zoom: 14.5, duration: 600, essential: true })
         }
-      }, FADE_MS + 40)
-    }
-
-    const surfaceToGlobe = () => {
-      const map = mapRef.current
-      const engine = engineRef.current
-      if (!map || !engine || phaseRef.current !== 'map') return
-      setPhase('surfacing')
-      const center = map.getCenter()
-      engine.resetView(center.lng, center.lat)
-      engine.setPaused(false)
-      setMapVisible(false)
-      window.setTimeout(() => {
-        if (!cancelled) setPhase('globe')
-      }, FADE_MS + 40)
+      }, FADE_MS)
     }
 
     if (mapboxToken) {
@@ -297,7 +336,7 @@ export function DropGlobe({
         style: mapboxStyle,
         projection: { name: 'globe' },
         center: [139.7, 35.66],
-        zoom: DIVE_START_ZOOM,
+        zoom: MAP_DEFAULT_ZOOM,
         attributionControl: true,
       })
       mapRef.current = map
@@ -312,11 +351,16 @@ export function DropGlobe({
         }
       })
 
+      map.on('moveend', rememberMapView)
       map.on('zoomend', () => {
-        if (map.getZoom() < SURFACE_ZOOM) surfaceToGlobe()
+        rememberMapView()
+        if (map.getZoom() < GLOBE_SWITCH_ZOOM) enterGlobe()
       })
 
-      map.on('click', () => setSelectedDropId(null))
+      map.on('click', () => {
+        setSelectedDropId(null)
+        setSheetExpanded(false)
+      })
     }
 
     buildEarthTexture(mapboxToken, { styleUrl: mapboxStyle, palette: activeThemeRef.current.globe })
@@ -333,10 +377,23 @@ export function DropGlobe({
         })
         engineRef.current.resize(shell.clientWidth, shell.clientHeight)
         setEngineReady(true)
-        setPhase('globe')
+        if (mapboxToken && mapRef.current) {
+          engineRef.current.setPaused(true)
+          setMapVisible(true)
+          setPhase('map')
+        } else {
+          setPhase('globe')
+        }
       })
       .catch(() => {
-        if (!cancelled) setPhase('globe')
+        if (!cancelled) {
+          if (mapboxToken && mapRef.current) {
+            setMapVisible(true)
+            setPhase('map')
+          } else {
+            setPhase('globe')
+          }
+        }
       })
 
     const observer = new ResizeObserver(() => {
@@ -354,7 +411,7 @@ export function DropGlobe({
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [applyThemeToMap, mapboxStyle, mapboxToken, setPhase])
+  }, [applyThemeToMap, enterGlobe, mapboxStyle, mapboxToken, rememberMapView, setPhase])
 
   // ----- Dropデータの読み込み(ログイン時はFirestore、未ログインはデモ) -----
   useEffect(() => {
@@ -452,7 +509,7 @@ export function DropGlobe({
     if (drop) {
       selectDropRef.current?.(drop)
     } else if (phaseRef.current === 'map' && mapRef.current) {
-      mapRef.current.flyTo({ center: [focusTarget.lng, focusTarget.lat], zoom: 14.5, duration: 1600, essential: true })
+      mapRef.current.flyTo({ center: [focusTarget.lng, focusTarget.lat], zoom: 14.5, duration: 600, essential: true })
     } else if (phaseRef.current === 'globe') {
       engineRef.current?.flyToAndDive(focusTarget.lng, focusTarget.lat)
     }
@@ -462,7 +519,11 @@ export function DropGlobe({
   }, [focusTarget, engineReady])
 
   const handleBackToGlobe = () => {
-    mapRef.current?.easeTo({ zoom: 1.6, duration: 1000 })
+    enterGlobe()
+  }
+
+  const handleGlobeWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
+    if (phaseRef.current === 'globe' && event.deltaY < -18) enterMap()
   }
 
   const handleSheetTouchStart = (event: React.TouchEvent<HTMLElement>) => {
@@ -479,13 +540,24 @@ export function DropGlobe({
     if (distance < -32) setSheetExpanded(false)
   }
 
+  const closeSelectedDrop = () => {
+    const view = lastMapViewRef.current
+    setSelectedDropId(null)
+    setSheetExpanded(false)
+    if (phaseRef.current === 'map') {
+      mapRef.current?.easeTo({ center: [view.lng, view.lat], zoom: view.zoom, duration: 420, essential: true })
+    }
+  }
+
   const shellStyle = { '--globe-top': `${topInset}px`, '--globe-bottom': `${bottomInset}px` } as CSSProperties
 
   return (
     <div className={styles.shell} ref={shellRef} style={shellStyle}>
-      <canvas className={styles.globeCanvas} ref={globeCanvasRef} aria-label="Dropの地球儀" />
+      <canvas className={styles.globeCanvas} ref={globeCanvasRef} aria-label="Dropの地球儀" onWheel={handleGlobeWheel} />
       <div className={mapVisible ? `${styles.mapWrap} ${styles.mapWrapVisible}` : styles.mapWrap} ref={mapContainerRef} />
 
+      {selectedDrop ? <button className={styles.pinFocusBackdrop} type="button" aria-label="Drop詳細を閉じる" onClick={closeSelectedDrop} /> : null}
+      {focusFlashId > 0 && selectedDrop ? <span className={styles.pinFocusFlash} key={focusFlashId} aria-hidden /> : null}
       {searchOpen ? <button className={styles.searchDismiss} type="button" aria-label="検索を閉じる" onClick={() => setSearchOpen(false)} /> : null}
 
       <header className={searchOpen ? `${styles.topBar} ${styles.topBarSearchOpen}` : styles.topBar}>
@@ -508,6 +580,8 @@ export function DropGlobe({
           設定
         </button>
       </header>
+
+      <div className={styles.momentumBadge}>今週 3 Drops · 周辺に {filteredDrops.length} pins</div>
 
       <div className={styles.statsRow} aria-label="Dropの統計">
         <span className={styles.statChip}>
@@ -616,7 +690,7 @@ export function DropGlobe({
             <button className={styles.primaryAction} type="button" onClick={() => selectDropRef.current?.(selectedDrop)}>
               場所へ
             </button>
-            <button className={styles.closeAction} type="button" aria-label="閉じる" onClick={() => setSelectedDropId(null)}>
+            <button className={styles.closeAction} type="button" aria-label="閉じる" onClick={closeSelectedDrop}>
               ×
             </button>
           </div>
