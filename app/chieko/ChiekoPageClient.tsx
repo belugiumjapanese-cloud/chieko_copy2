@@ -10,7 +10,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { DropGlobe, DropLibrary, DropUploader, FolderList, OnThisDayBanner, UndropedMemories } from '../../src/chieko'
 import { hasFirebaseConfig } from '../../src/chieko/lib/firebase'
 import type { LibraryPin } from '../../src/chieko/library/libraryData'
@@ -120,6 +120,12 @@ function LibraryView({
 }
 
 function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
+  const handlePreviewKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onOpenWorld()
+  }
+
   return (
     <section className={styles.panelScreen} aria-label="Profile">
       <div className={styles.profileTop}>
@@ -135,16 +141,19 @@ function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
         </div>
       </div>
 
-      <button className={styles.profileGlobePreview} type="button" onClick={onOpenWorld}>
-        <span className={styles.profileMiniGlobe} aria-hidden>
-          <span />
-          <span />
-          <span />
-          <span />
+      <div
+        className={styles.profileGlobePreview}
+        role="button"
+        tabIndex={0}
+        onClick={onOpenWorld}
+        onKeyDown={handlePreviewKeyDown}
+      >
+        <span className={styles.profileRealGlobe} aria-hidden>
+          <DropGlobe topInset={0} bottomInset={0} showGlobeSignal={1} />
         </span>
         <strong>自分の世界を見る</strong>
         <small>World preview</small>
-      </button>
+      </div>
 
       <div className={styles.profileStats}>
         <span>
