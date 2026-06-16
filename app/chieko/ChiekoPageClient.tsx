@@ -131,7 +131,7 @@ function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
         <div>
           <span className={styles.eyebrow}>@chieko_nh</span>
           <h2>Chieko</h2>
-          <p>Facade hunter. Windows, corners, street textures.</p>
+          <p>Places collected as a small personal world.</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ function ProfileView({ onOpenWorld }: { onOpenWorld: () => void }) {
           <span />
         </span>
         <strong>自分の世界を見る</strong>
-        <small>3D globe preview</small>
+        <small>World preview</small>
       </button>
 
       <div className={styles.profileStats}>

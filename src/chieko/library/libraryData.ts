@@ -16,7 +16,7 @@ export type LibraryPin = {
 export const LIBRARY_CATEGORIES: Array<{ id: PinCategory; name: string; icon: string }> = [
   { id: 'architecture', name: 'Architecture', icon: 'ARCH' },
   { id: 'cafe', name: 'Cafe', icon: 'CAFE' },
-  { id: 'music', name: 'Music', icon: 'MUS' },
+  { id: 'music', name: 'Chaos', icon: 'CAOS' },
   { id: 'shops', name: 'Shops', icon: 'SHOP' },
 ]
 
@@ -27,10 +27,10 @@ export const LIBRARY_COLLECTIONS: Array<{
   tint: string
   description: string
 }> = [
-  { id: 'my-pins', name: 'My Drops', icon: 'DROP', tint: '#2f453e', description: '自分がDropした場所' },
-  { id: 'followers', name: 'Following', icon: 'LINK', tint: '#596b73', description: 'フォロー中の人のDrop' },
-  { id: 'chaos', name: 'Field Mix', icon: 'MIX', tint: '#7f7566', description: 'いろいろなDropを混ぜて見る' },
-  { id: 'wish', name: 'Wish List', icon: 'WISH', tint: '#8c7a84', description: '行ってみたい場所' },
+  { id: 'my-pins', name: 'My World', icon: 'WORLD', tint: '#243833', description: '自分がDropした場所' },
+  { id: 'followers', name: 'People', icon: 'PEOPLE', tint: '#52615d', description: 'フォロー中の人のDrop' },
+  { id: 'chaos', name: 'Mix', icon: 'MIX', tint: '#69736f', description: 'いろいろな記憶を混ぜて見る' },
+  { id: 'wish', name: 'Wish', icon: 'WISH', tint: '#5f6f69', description: 'いつかDropしたい場所' },
 ]
 
 const IMAGE_URLS = [
