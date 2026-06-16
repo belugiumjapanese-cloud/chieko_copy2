@@ -83,3 +83,7 @@ function hashId(id: string) {
 export function countCollectionPins(collectionId: LibraryCollectionId) {
   return getCollectionPins(collectionId).length
 }
+
+export function getCollectionThumbnail(collectionId: LibraryCollectionId) {
+  return getCollectionPins(collectionId)[0]?.imageUrl ?? null
+}
