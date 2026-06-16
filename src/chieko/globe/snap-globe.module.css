@@ -376,14 +376,16 @@
 }
 
 .chip {
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: 38px;
+  padding: 8px 16px;
+  border-radius: 999px;
   cursor: pointer;
 }
 
 .chipActive {
   color: #101814;
   background: #d7e2da;
+  border-color: rgba(247, 250, 247, 0.88);
 }
 
 .previewTag,
