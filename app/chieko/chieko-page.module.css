@@ -229,6 +229,15 @@
   font-weight: 780;
 }
 
+.profileRealGlobe {
+  position: relative;
+  display: block;
+  width: 176px;
+  height: 176px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
 .profileMiniGlobe {
   position: relative;
   display: block;
