@@ -16,7 +16,7 @@
   position: fixed !important;
   top: calc(142px + env(safe-area-inset-top)) !important;
   left: 50% !important;
-  z-index: 7 !important;
+  z-index: 42 !important;
   display: flex !important;
   gap: 8px !important;
   width: min(430px, 100vw) !important;
@@ -31,6 +31,10 @@
 
 .dropUiOverridesRoot :global([class*='chipsRow'])::-webkit-scrollbar {
   display: none;
+}
+
+.dropUiOverridesRoot :global([class*='bottomArea']) {
+  overflow: visible !important;
 }
 
 .dropUiOverridesRoot :global([class*='friendDetail']) {
