@@ -114,7 +114,8 @@
 
 .dropUiOverridesRoot :global([class*='panelScreen']) {
   padding-top: 66px !important;
-}\n
+}
+
 .dropUiOverridesRoot :global([class*='profileGlobePreview']) {
   order: -1;
   min-height: 254px;
