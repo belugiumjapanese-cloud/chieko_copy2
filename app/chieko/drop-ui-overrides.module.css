@@ -14,7 +14,7 @@
 
 .dropUiOverridesRoot :global([class*='chipsRow']) {
   position: fixed !important;
-  top: calc(118px + env(safe-area-inset-top)) !important;
+  top: calc(142px + env(safe-area-inset-top)) !important;
   left: 50% !important;
   z-index: 7 !important;
   display: flex !important;
@@ -114,8 +114,7 @@
 
 .dropUiOverridesRoot :global([class*='panelScreen']) {
   padding-top: 66px !important;
-}
-
+}\n
 .dropUiOverridesRoot :global([class*='profileGlobePreview']) {
   order: -1;
   min-height: 254px;
