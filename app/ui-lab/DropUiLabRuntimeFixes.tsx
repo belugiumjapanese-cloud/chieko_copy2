@@ -106,12 +106,12 @@ export function DropUiLabRuntimeFixes() {
   return (
     <style>{`
       .drop-runtime-filter-row {
-        position: absolute !important;
+        position: fixed !important;
         top: calc(158px + env(safe-area-inset-top)) !important;
         left: 50% !important;
-        z-index: 46 !important;
+        z-index: 80 !important;
         display: flex !important;
-        width: min(430px, 100%) !important;
+        width: min(430px, 100vw) !important;
         max-height: 56px !important;
         padding: 4px 12px 10px !important;
         overflow-x: auto !important;
