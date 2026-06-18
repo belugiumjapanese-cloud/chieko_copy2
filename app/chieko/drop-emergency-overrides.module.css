@@ -1,0 +1,168 @@
+.dropEmergencyRoot :global([class*='chipsRow']) {
+  position: fixed !important;
+  top: calc(var(--globe-bottom, 92px) + 308px - 100dvh) !important;
+  left: 50% !important;
+  z-index: 44 !important;
+  display: flex !important;
+  width: min(430px, 100vw) !important;
+  max-height: 56px !important;
+  padding: 4px 12px 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  transform: translateX(-50%) !important;
+}
+
+.dropEmergencyRoot :global(button[class*='mapDropPin']) {
+  width: 58px !important;
+  min-height: 86px !important;
+  overflow: visible !important;
+  padding: 0 0 30px !important;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.34)) !important;
+}
+
+.dropEmergencyRoot :global(button[class*='mapDropPin'])::before {
+  top: 0 !important;
+  bottom: auto !important;
+  left: 50% !important;
+  width: 54px !important;
+  height: 72px !important;
+  content: '' !important;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg width='54' height='72' viewBox='0 0 48 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M24 0C10.745 0 0 10.745 0 24c0 16.4 24 40 24 40s24-23.6 24-40C48 10.745 37.255 0 24 0Z' fill='%23F7FBF9'/%3E%3C/svg%3E") !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: translateX(-50%) !important;
+  animation: none !important;
+  pointer-events: none !important;
+}
+
+.dropEmergencyRoot :global(button[class*='mapDropPin'])::after {
+  display: none !important;
+}
+
+.dropEmergencyRoot :global(img[class*='mapDropPinImage']) {
+  box-sizing: border-box !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  margin-top: 6px !important;
+  object-fit: cover !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  clip-path: circle(18px at 50% 50%) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  z-index: 1 !important;
+}
+
+.dropEmergencyRoot :global(span[class*='mapDropPinName']) {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 120px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin-top: 24px !important;
+  padding: 3px 8px !important;
+  background: rgba(8, 13, 11, 0.82) !important;
+  border-color: rgba(91, 193, 178, 0.22) !important;
+  border-radius: 999px !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetail__']) {
+  position: absolute !important;
+  top: 210px !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 50% !important;
+  z-index: 45 !important;
+  display: grid !important;
+  grid-template-columns: 74px minmax(0, 1fr) 30px !important;
+  gap: 10px !important;
+  align-items: center !important;
+  width: min(330px, calc(100% - 36px)) !important;
+  height: auto !important;
+  max-height: 118px !important;
+  padding: 10px !important;
+  overflow: visible !important;
+  color: #101814 !important;
+  background: rgba(247, 250, 247, 0.98) !important;
+  border: 1px solid rgba(16, 24, 20, 0.1) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34) !important;
+  transform: translateX(-50%) !important;
+  backdrop-filter: blur(18px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.12) !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetail__'])::before {
+  display: none !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetail__'] img[class*='dropDetailImage']) {
+  position: static !important;
+  width: 74px !important;
+  height: 74px !important;
+  object-fit: cover !important;
+  border-radius: 12px !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailBody']) {
+  position: static !important;
+  display: grid !important;
+  gap: 4px !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  color: #101814 !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailBody'] strong),
+.dropEmergencyRoot :global(div[class*='friendDetailBody'] span) {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailBody'] strong) {
+  font-size: 0.92rem !important;
+  line-height: 1.15 !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailBody'] span) {
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailBody'] span:last-child) {
+  display: none !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailActions']) {
+  position: static !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailActions'] [class*='primaryAction']) {
+  display: none !important;
+}
+
+.dropEmergencyRoot :global(div[class*='friendDetailActions'] [class*='closeAction']) {
+  position: static !important;
+  width: 30px !important;
+  height: 30px !important;
+  color: #101814 !important;
+  background: rgba(227, 233, 229, 0.95) !important;
+  box-shadow: none !important;
+  pointer-events: auto !important;
+}
