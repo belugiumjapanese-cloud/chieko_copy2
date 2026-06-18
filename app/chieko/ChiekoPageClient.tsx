@@ -249,11 +249,99 @@ export function ChiekoPageClient() {
   return (
     <main className={`${styles.shell} ${overrideStyles.dropUiOverridesRoot}`}>
       <style>{`
+        .${overrideStyles.dropUiOverridesRoot} [class*='shell']::before {
+          position: absolute;
+          inset: 0 0 auto;
+          z-index: 5;
+          height: 230px;
+          content: '';
+          pointer-events: none;
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0));
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='momentumBadge'] {
+          top: calc(20px + env(safe-area-inset-top)) !important;
+          padding: 5px 10px !important;
+          color: rgba(255, 255, 255, 0.58) !important;
+          font-size: 0.6rem !important;
+          font-weight: 720 !important;
+          background: rgba(0, 0, 0, 0.26) !important;
+          border-color: rgba(255, 255, 255, 0.08) !important;
+          box-shadow: none !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='statsRow'] {
+          top: calc(82px + env(safe-area-inset-top)) !important;
+        }
+
         .${overrideStyles.dropUiOverridesRoot} [class*='chipsRow'] {
-          top: calc(var(--globe-bottom) + 302px - 100dvh) !important;
+          top: calc(var(--globe-bottom) + 308px - 100dvh) !important;
           z-index: 44 !important;
           pointer-events: auto !important;
           visibility: visible !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='bottomArea'] {
+          height: auto !important;
+          min-height: 104px !important;
+          max-height: min(70%, 470px) !important;
+          overflow-x: visible !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain !important;
+          transition: max-height 0.2s ease, background 0.2s ease !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='bottomAreaExpanded'] {
+          height: auto !important;
+          min-height: 128px !important;
+          max-height: min(70%, 470px) !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='friendsScroller'] {
+          padding-bottom: 16px !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPin'] {
+          width: 58px !important;
+          min-height: 70px !important;
+          filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.34)) !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPinImage'] {
+          width: 50px !important;
+          height: 50px !important;
+          border: 3px solid rgba(247, 251, 249, 0.98) !important;
+          border-radius: 50% !important;
+          clip-path: none !important;
+          box-shadow: 0 0 0 5px rgba(91, 193, 178, 0.12), 0 10px 20px rgba(0, 0, 0, 0.32) !important;
+          transform: none !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPin']::before {
+          bottom: 3px !important;
+          width: 26px !important;
+          height: 8px !important;
+          border-color: rgba(91, 193, 178, 0.42) !important;
+          border-radius: 50% !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPin']::after {
+          top: 43px !important;
+          left: 50% !important;
+          width: 18px !important;
+          height: 18px !important;
+          content: '' !important;
+          background: rgba(247, 251, 249, 0.98) !important;
+          border: 0 !important;
+          border-radius: 2px 0 12px 0 !important;
+          box-shadow: 2px 2px 0 rgba(91, 193, 178, 0.14) !important;
+          transform: translateX(-50%) rotate(45deg) !important;
+          animation: none !important;
+          pointer-events: none !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPinName'] {
+          margin-top: 8px !important;
         }
       `}</style>
       <div className={styles.phoneApp}>
