@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ChiekoPageClient } from '../chieko/ChiekoPageClient'
+import emergencyStyles from '../chieko/drop-emergency-overrides.module.css'
 
 export const metadata: Metadata = {
   title: 'Drop UI Lab',
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 }
 
 export default function UiLabPage() {
-  return <ChiekoPageClient />
+  return (
+    <div className={emergencyStyles.dropEmergencyRoot}>
+      <ChiekoPageClient />
+    </div>
+  )
 }
