@@ -275,10 +275,20 @@ export function ChiekoPageClient() {
         }
 
         .${overrideStyles.dropUiOverridesRoot} [class*='chipsRow'] {
+          position: fixed !important;
           top: calc(var(--globe-bottom) + 308px - 100dvh) !important;
+          left: 50% !important;
           z-index: 44 !important;
+          display: flex !important;
+          width: min(430px, 100vw) !important;
+          max-height: 56px !important;
+          padding: 4px 12px 10px !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          opacity: 1 !important;
           pointer-events: auto !important;
           visibility: visible !important;
+          transform: translateX(-50%) !important;
         }
 
         .${overrideStyles.dropUiOverridesRoot} [class*='bottomArea'] {
@@ -301,15 +311,24 @@ export function ChiekoPageClient() {
           padding-bottom: 16px !important;
         }
 
-        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPin'] {
+        .${overrideStyles.dropUiOverridesRoot} button[class*='mapDropPin'] {
           width: 58px !important;
-          min-height: 70px !important;
+          min-height: 82px !important;
+          overflow: visible !important;
+          padding: 0 0 26px !important;
           filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.34)) !important;
         }
 
-        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPinImage'] {
-          width: 50px !important;
-          height: 50px !important;
+        .${overrideStyles.dropUiOverridesRoot} img[class*='mapDropPinImage'] {
+          box-sizing: border-box !important;
+          width: 48px !important;
+          min-width: 48px !important;
+          max-width: 48px !important;
+          height: 48px !important;
+          min-height: 48px !important;
+          max-height: 48px !important;
+          aspect-ratio: 1 / 1 !important;
+          object-fit: cover !important;
           border: 3px solid rgba(247, 251, 249, 0.98) !important;
           border-radius: 50% !important;
           clip-path: none !important;
@@ -317,31 +336,121 @@ export function ChiekoPageClient() {
           transform: none !important;
         }
 
-        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPin']::before {
-          bottom: 3px !important;
-          width: 26px !important;
+        .${overrideStyles.dropUiOverridesRoot} span[class*='mapDropPinName'] {
+          width: auto !important;
+          min-width: 0 !important;
+          max-width: 120px !important;
+          height: auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          margin-top: 8px !important;
+          padding: 3px 8px !important;
+          background: rgba(8, 13, 11, 0.82) !important;
+          border-color: rgba(91, 193, 178, 0.22) !important;
+          border-radius: 999px !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} button[class*='mapDropPin']::before {
+          bottom: 18px !important;
+          width: 28px !important;
           height: 8px !important;
-          border-color: rgba(91, 193, 178, 0.42) !important;
+          border: 2px solid rgba(91, 193, 178, 0.42) !important;
           border-radius: 50% !important;
         }
 
-        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPin']::after {
-          top: 43px !important;
+        .${overrideStyles.dropUiOverridesRoot} button[class*='mapDropPin']::after {
+          top: 46px !important;
           left: 50% !important;
-          width: 18px !important;
-          height: 18px !important;
+          width: 0 !important;
+          height: 0 !important;
           content: '' !important;
-          background: rgba(247, 251, 249, 0.98) !important;
-          border: 0 !important;
-          border-radius: 2px 0 12px 0 !important;
-          box-shadow: 2px 2px 0 rgba(91, 193, 178, 0.14) !important;
-          transform: translateX(-50%) rotate(45deg) !important;
+          background: transparent !important;
+          border-top: 24px solid rgba(247, 251, 249, 0.98) !important;
+          border-right: 11px solid transparent !important;
+          border-bottom: 0 !important;
+          border-left: 11px solid transparent !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          transform: translateX(-50%) !important;
           animation: none !important;
           pointer-events: none !important;
         }
 
-        .${overrideStyles.dropUiOverridesRoot} [class*='mapDropPinName'] {
-          margin-top: 8px !important;
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetail__'] {
+          position: absolute !important;
+          top: 112px !important;
+          right: auto !important;
+          bottom: auto !important;
+          left: 50% !important;
+          z-index: 45 !important;
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: 12px !important;
+          width: min(356px, calc(100% - 32px)) !important;
+          height: auto !important;
+          max-height: calc(100% - 176px) !important;
+          padding: 14px !important;
+          overflow-y: auto !important;
+          color: #101814 !important;
+          background: rgba(247, 250, 247, 0.98) !important;
+          border: 1px solid rgba(16, 24, 20, 0.1) !important;
+          border-radius: 18px !important;
+          box-shadow: 0 24px 58px rgba(0, 0, 0, 0.36) !important;
+          transform: translateX(-50%) !important;
+          backdrop-filter: blur(18px) saturate(1.12) !important;
+          -webkit-backdrop-filter: blur(18px) saturate(1.12) !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetail__']::before {
+          display: none !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetail__'] img[class*='dropDetailImage'] {
+          position: static !important;
+          width: 100% !important;
+          height: 176px !important;
+          object-fit: cover !important;
+          border-radius: 14px !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetailBody'] {
+          position: static !important;
+          display: grid !important;
+          gap: 5px !important;
+          width: auto !important;
+          height: auto !important;
+          padding: 0 !important;
+          color: #101814 !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetailBody'] strong,
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetailBody'] span {
+          white-space: normal !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetailActions'] {
+          position: static !important;
+          display: flex !important;
+          gap: 8px !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          width: auto !important;
+          height: auto !important;
+          padding: 0 !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetailActions'] [class*='primaryAction'] {
+          min-width: 92px !important;
+        }
+
+        .${overrideStyles.dropUiOverridesRoot} div[class*='friendDetailActions'] [class*='closeAction'] {
+          position: absolute !important;
+          top: 22px !important;
+          right: 22px !important;
+          width: 34px !important;
+          height: 34px !important;
+          background: rgba(247, 250, 247, 0.92) !important;
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18) !important;
         }
       `}</style>
       <div className={styles.phoneApp}>
