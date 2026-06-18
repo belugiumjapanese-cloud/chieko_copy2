@@ -248,6 +248,14 @@ export function ChiekoPageClient() {
 
   return (
     <main className={`${styles.shell} ${overrideStyles.dropUiOverridesRoot}`}>
+      <style>{`
+        .${overrideStyles.dropUiOverridesRoot} [class*='chipsRow'] {
+          top: calc(var(--globe-bottom) + 302px - 100dvh) !important;
+          z-index: 44 !important;
+          pointer-events: auto !important;
+          visibility: visible !important;
+        }
+      `}</style>
       <div className={styles.phoneApp}>
         <header className={styles.statusBar}>
           <span>Drop</span>
