@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 
 const PIN_PATH = 'M24 0C10.745 0 0 10.745 0 24c0 16.4 24 40 24 40s24-23.6 24-40C48 10.745 37.255 0 24 0Z'
+const FILTER_FALLBACKS = ['All', 'my pins', 'followers', 'caos', 'architecture', 'cafe', 'shops']
 
 function buildSvgPin(src: string, label: string) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -70,12 +71,55 @@ function repairPins(root: ParentNode = document) {
   })
 }
 
+function getOriginalFilterButtons() {
+  return [...document.querySelectorAll('div[class*=chipsRow] button')] as HTMLButtonElement[]
+}
+
+function getFilterLabels() {
+  const labels = getOriginalFilterButtons()
+    .map((button) => button.textContent?.trim())
+    .filter((label): label is string => Boolean(label))
+  return labels.length ? labels : FILTER_FALLBACKS
+}
+
+function isMapScale() {
+  return Boolean(document.querySelector('div[class*=mapWrapVisible]'))
+}
+
 function repairFilters() {
-  const chips = document.querySelector('div[class*=chipsRow]') as HTMLDivElement | null
-  const shell = document.querySelector('div[class*=shell]') as HTMLDivElement | null
-  if (!chips || !shell) return
-  if (chips.parentElement !== shell) shell.append(chips)
-  chips.classList.add('drop-runtime-filter-row')
+  const original = document.querySelector('div[class*=chipsRow]') as HTMLDivElement | null
+  if (original) original.classList.add('drop-runtime-original-filter-row')
+
+  let proxy = document.querySelector('#drop-runtime-filter-proxy') as HTMLDivElement | null
+  if (!proxy) {
+    proxy = document.createElement('div')
+    proxy.id = 'drop-runtime-filter-proxy'
+    proxy.className = 'drop-runtime-filter-proxy'
+    proxy.setAttribute('aria-label', 'カテゴリフィルター')
+    document.body.append(proxy)
+  }
+
+  const labels = getFilterLabels()
+  const activeText = getOriginalFilterButtons().find((button) => String(button.className).includes('chipActive'))?.textContent?.trim() ?? 'All'
+  proxy.replaceChildren(
+    ...labels.map((label) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = label
+      button.className = label === activeText ? 'drop-runtime-filter-chip drop-runtime-filter-chip-active' : 'drop-runtime-filter-chip'
+      button.addEventListener('click', () => {
+        const target = getOriginalFilterButtons().find((originalButton) => originalButton.textContent?.trim() === label)
+        target?.click()
+      })
+      return button
+    }),
+  )
+}
+
+function repairScaleVisibility() {
+  const mapScale = isMapScale()
+  document.documentElement.classList.toggle('drop-runtime-map-scale', mapScale)
+  document.documentElement.classList.toggle('drop-runtime-globe-scale', !mapScale)
 }
 
 function repairPopup() {
@@ -92,25 +136,38 @@ function repairPopup() {
 function repairAll() {
   repairPins()
   repairFilters()
+  repairScaleVisibility()
   repairPopup()
 }
 
 export function DropUiLabRuntimeFixes() {
   useEffect(() => {
     repairAll()
+    const interval = window.setInterval(repairAll, 350)
     const observer = new MutationObserver(() => repairAll())
-    observer.observe(document.body, { childList: true, subtree: true })
-    return () => observer.disconnect()
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    return () => {
+      window.clearInterval(interval)
+      observer.disconnect()
+      document.querySelector('#drop-runtime-filter-proxy')?.remove()
+      document.documentElement.classList.remove('drop-runtime-map-scale', 'drop-runtime-globe-scale')
+    }
   }, [])
 
   return (
     <style>{`
-      .drop-runtime-filter-row {
+      .drop-runtime-original-filter-row {
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      .drop-runtime-filter-proxy {
         position: fixed !important;
         top: calc(158px + env(safe-area-inset-top)) !important;
         left: 50% !important;
-        z-index: 80 !important;
+        z-index: 120 !important;
         display: flex !important;
+        gap: 8px !important;
         width: min(430px, 100vw) !important;
         max-height: 56px !important;
         padding: 4px 12px 10px !important;
@@ -123,8 +180,50 @@ export function DropUiLabRuntimeFixes() {
         scrollbar-width: none !important;
       }
 
-      .drop-runtime-filter-row::-webkit-scrollbar {
+      .drop-runtime-filter-proxy::-webkit-scrollbar {
         display: none;
+      }
+
+      .drop-runtime-filter-chip {
+        flex: none !important;
+        min-height: 36px !important;
+        padding: 8px 15px !important;
+        color: #f7faf7 !important;
+        font-size: 0.72rem !important;
+        font-weight: 800 !important;
+        white-space: nowrap !important;
+        background: rgba(0, 0, 0, 0.4) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 999px !important;
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2) !important;
+        backdrop-filter: blur(8px) saturate(1.2) !important;
+        -webkit-backdrop-filter: blur(8px) saturate(1.2) !important;
+      }
+
+      .drop-runtime-filter-chip-active {
+        color: #101814 !important;
+        background: #d7e2da !important;
+        border-color: rgba(247, 250, 247, 0.88) !important;
+      }
+
+      .drop-runtime-map-scale [class*=statsRow] {
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      .drop-runtime-map-scale .drop-runtime-filter-proxy {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      .drop-runtime-globe-scale [class*=statsRow] {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      .drop-runtime-globe-scale .drop-runtime-filter-proxy {
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
 
       button[class*=mapDropPin][data-drop-svg-pin='true'] {
