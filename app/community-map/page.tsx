@@ -2365,7 +2365,8 @@ export default function CommunityMapPrototype() {
       setOwnedAccountIds(userId ? [userId] : [])
       setProfileUserId(userId)
       if (!user) {
-        setRemoteLoading(false)
+        setDropScopeId('chaos')
+        await loadRemoteData('')
         return
       }
       hydrateFromCache(userId)
@@ -2385,7 +2386,8 @@ export default function CommunityMapPrototype() {
         setActiveUserId('')
         setOwnedAccountIds([])
         setProfileUserId('')
-        setRemoteLoading(false)
+        setDropScopeId('chaos')
+        void loadRemoteData('')
         return
       }
       const userId = user?.id ?? ''
@@ -3804,7 +3806,7 @@ export default function CommunityMapPrototype() {
   const authScreen = (
     <section className={styles.authPanel}>
       <div>
-        <span>Account</span>
+        <span>Profile</span>
         <h1>Sign in to keep your world</h1>
         <p>Drop、Folder、いいね、コメントを自分のアカウントに保存します。</p>
       </div>
@@ -3867,7 +3869,7 @@ export default function CommunityMapPrototype() {
     </section>
   )
 
-  const showInitialLoader = remoteLoading && !activeUserId
+  const showInitialLoader = remoteLoading && Boolean(activeUserId)
 
   if (showInitialLoader) {
     return (
@@ -3881,16 +3883,6 @@ export default function CommunityMapPrototype() {
           <div className={styles.bootSpinner} />
           <h1>Loading your world</h1>
           <p>Supabaseからmemoriesを読み込んでいます。</p>
-        </section>
-      </main>
-    )
-  }
-
-  if (!activeUserId) {
-    return (
-      <main className={styles.shell}>
-        <section className={styles.page}>
-          {authScreen}
         </section>
       </main>
     )
@@ -4225,68 +4217,7 @@ export default function CommunityMapPrototype() {
       {activeTab === 'mypage' && !profileWorldUser && (
         <section className={styles.page}>
           {!activeUserId ? (
-            <section className={styles.authPanel}>
-              <div>
-                <span>Profile</span>
-                <h1>Sign in to keep your world</h1>
-                <p>Drop、Folder、いいね、コメントを自分のアカウントに保存します。</p>
-              </div>
-              <div className={styles.segmented}>
-                <button className={authMode === 'signin' ? styles.active : ''} type="button" onClick={() => setAuthMode('signin')}>Sign in</button>
-                <button className={authMode === 'signup' ? styles.active : ''} type="button" onClick={() => setAuthMode('signup')}>Sign up</button>
-              </div>
-              {authMode === 'signin' ? (
-                <form className={styles.authForm} onSubmit={signInLocalAccount}>
-                  <label>
-                    Email
-                    <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
-                  </label>
-                  <label>
-                    Password
-                    <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} />
-                  </label>
-                  <button className={styles.primaryButton} type="submit">Sign in</button>
-                  <div className={styles.accountGrid}>
-                    {ownedAccounts.map((account) => (
-                      <button key={account.id} type="button" onClick={() => switchAccount(account.id)}>
-                        <img src={account.avatarUrl} alt="" />
-                        <span>
-                          <strong>@{account.username}</strong>
-                          <small>{account.displayName}</small>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </form>
-              ) : (
-                <form className={styles.authForm} onSubmit={createLocalAccount}>
-                  <label>
-                    Email
-                    <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
-                  </label>
-                  <label>
-                    Password
-                    <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} />
-                  </label>
-                  <label>
-                    Password again
-                    <input type="password" value={authPasswordConfirm} onChange={(event) => setAuthPasswordConfirm(event.target.value)} />
-                  </label>
-                  <label>
-                    Display name
-                    <input value={authDisplayName} onChange={(event) => setAuthDisplayName(event.target.value)} />
-                  </label>
-                  <label>
-                    Username
-                    <div className={styles.usernameInput}>
-                      <span>@</span>
-                      <input value={authUsername} onChange={(event) => setAuthUsername(event.target.value.replace(/^@/, ''))} />
-                    </div>
-                  </label>
-                  <button className={styles.primaryButton} type="submit">Create account and switch</button>
-                </form>
-              )}
-            </section>
+            authScreen
           ) : (
             <>
           {profileUserId !== activeUserId && (
