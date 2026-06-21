@@ -1,0 +1,2 @@
+catalog_key,category_id,architect_id,name_en,name_ja,aliases,description,address,latitude,longitude,completion_year,cover_image_url,source_url,status
+villa-savoye-poissy,,,Villa Savoye,サヴォア邸,"{""Villa Savoye Poissy"",""サボア邸""}",,"82 Rue de Villiers, 78300 Poissy, France",48.9245,2.0285,1931,,,published

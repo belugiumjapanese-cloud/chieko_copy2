@@ -48,6 +48,24 @@ const AUTH_SESSION_TIMEOUT_MS = 6000
 const CACHE_VERSION = 1
 const CACHE_PREFIX = 'spot-map:swr-cache'
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
+const FALLBACK_CATEGORIES: ContentCategory[] = [
+  {
+    id: 'architecture',
+    slug: 'architecture',
+    nameEn: 'Architecture',
+    nameJa: '建築',
+    description: 'Buildings, details, architects, and urban observations.',
+    joinedByMe: false,
+  },
+  {
+    id: 'landscape',
+    slug: 'landscape',
+    nameEn: 'Landscape',
+    nameJa: 'ランドスケープ',
+    description: 'Gardens, parks, public space, and designed landscapes.',
+    joinedByMe: false,
+  },
+]
 const EMPTY_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23f2f2f2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23111111%22%20opacity%3D%22.2%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23111111%22%20opacity%3D%22.18%22/%3E%3C/svg%3E'
 const EMBEDDED_RECOMMEND_ITEMS: RecommendItem[] = [
@@ -160,6 +178,7 @@ type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
 type CommunityDetailTab = 'pins' | 'timeline' | 'map'
 type LibraryMode = 'folder' | 'pin'
 type DropScope = { id: string; label: string; pins: Pin[] }
+type ArchitectFilter = { id: string; label: string }
 type Privacy = 'public' | 'limited'
 type CommunityMapKind = 'open' | 'approval' | 'private' | 'paid'
 type CommunityPostPolicy = 'open' | 'approval' | 'contribution' | 'owner'
@@ -215,6 +234,8 @@ type Pin = Coordinates & {
   title: string
   description: string
   imageUrl: string
+  address?: string
+  landmarkId?: string | null
   tags: string[]
   visibility: 'public' | 'private'
   takenAt?: string
@@ -254,8 +275,11 @@ type PostDraft = {
   imageName: string
   coordinates: Coordinates | null
   locationSource: 'gps' | 'manual' | 'manual-pending'
+  address: string
+  landmarkId?: string | null
   takenAt?: string
   title: string
+  description: string
   tags: string
   folderIds: string[]
 }
@@ -266,6 +290,34 @@ type PostComposer = {
   tags: string
   takenAt: string
   folderIds: string[]
+}
+
+type ContentCategory = {
+  id: string
+  slug: string
+  nameEn: string
+  nameJa: string
+  description: string
+  coverImageUrl?: string
+  joinedByMe: boolean
+}
+
+type Landmark = Coordinates & {
+  id: string
+  categoryId?: string | null
+  categorySlug?: string
+  architectId?: string | null
+  architectNameEn?: string
+  architectNameJa?: string
+  architectAliases: string[]
+  nameEn: string
+  nameJa: string
+  aliases: string[]
+  description: string
+  address: string
+  completionYear?: number | null
+  coverImageUrl?: string
+  postIds: string[]
 }
 
 type CommunityActivity = {
@@ -345,6 +397,7 @@ type AppPostCardRow = {
   latitude: number
   longitude: number
   image_url: string | null
+  address?: string | null
   visibility: 'public' | 'private' | 'followers'
   tags: string[] | null
   taken_at: string | null
@@ -355,6 +408,42 @@ type AppPostCardRow = {
   created_at: string
   folder_ids: string[] | null
   community_ids: string[] | null
+}
+
+type LandmarkSearchRow = {
+  id: string
+  category_id: string | null
+  category_slug: string | null
+  category_name_en: string | null
+  category_name_ja: string | null
+  architect_id: string | null
+  architect_name_en: string | null
+  architect_name_ja: string | null
+  architect_aliases: string[] | null
+  name_en: string
+  name_ja: string | null
+  aliases: string[] | null
+  description: string | null
+  address: string | null
+  latitude: number
+  longitude: number
+  completion_year: number | null
+  cover_image_url: string | null
+  post_ids: string[] | null
+}
+
+type CategoryRow = {
+  id: string
+  slug: string
+  name_en: string
+  name_ja: string | null
+  description: string | null
+  cover_image_url: string | null
+}
+
+type ProfileCategoryRow = {
+  user_id: string
+  category_id: string
 }
 
 type AppFolderCardRow = {
@@ -465,6 +554,7 @@ type DirectPostRow = {
   latitude: number
   longitude: number
   image_url: string | null
+  address?: string | null
   visibility: 'public' | 'private' | 'followers'
   tags: string[] | null
   taken_at: string | null
@@ -753,6 +843,93 @@ function cleanTag(tag: string) {
   return tag.replace(/^#/, '').trim()
 }
 
+function normalizeSearchText(value: string) {
+  return value.normalize('NFKC').trim().toLocaleLowerCase('ja')
+}
+
+function landmarkSearchText(landmark: Landmark) {
+  return normalizeSearchText([
+    landmark.nameEn,
+    landmark.nameJa,
+    ...landmark.aliases,
+    landmark.architectNameEn,
+    landmark.architectNameJa,
+    ...landmark.architectAliases,
+    landmark.address,
+  ].filter(Boolean).join(' '))
+}
+
+function distanceInMeters(left: Coordinates, right: Coordinates) {
+  const radians = (degrees: number) => degrees * Math.PI / 180
+  const latitudeDelta = radians(right.latitude - left.latitude)
+  const longitudeDelta = radians(right.longitude - left.longitude)
+  const leftLatitude = radians(left.latitude)
+  const rightLatitude = radians(right.latitude)
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(leftLatitude) * Math.cos(rightLatitude) * Math.sin(longitudeDelta / 2) ** 2
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+async function reverseGeocodeCoordinates(coordinates: Coordinates) {
+  if (!MAPBOX_TOKEN) return '住所を取得できませんでした'
+  const params = new URLSearchParams({
+    access_token: MAPBOX_TOKEN,
+    language: 'ja,en',
+    limit: '1',
+    types: 'address,poi,place,locality,neighborhood',
+  })
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${coordinates.longitude},${coordinates.latitude}.json?${params.toString()}`,
+    )
+    if (!response.ok) return '住所を取得できませんでした'
+    const data = await response.json() as { features?: Array<{ place_name?: string; text?: string }> }
+    return data.features?.[0]?.place_name || data.features?.[0]?.text || '住所を取得できませんでした'
+  } catch {
+    return '住所を取得できませんでした'
+  }
+}
+
+function buildLandmarks(rows: LandmarkSearchRow[]): Landmark[] {
+  return rows
+    .filter((row) => Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude)))
+    .map((row) => ({
+      id: row.id,
+      categoryId: row.category_id,
+      categorySlug: row.category_slug ?? undefined,
+      architectId: row.architect_id,
+      architectNameEn: row.architect_name_en ?? undefined,
+      architectNameJa: row.architect_name_ja ?? undefined,
+      architectAliases: row.architect_aliases ?? [],
+      nameEn: row.name_en,
+      nameJa: row.name_ja ?? '',
+      aliases: row.aliases ?? [],
+      description: row.description ?? '',
+      address: row.address ?? '',
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      completionYear: row.completion_year,
+      coverImageUrl: row.cover_image_url ?? undefined,
+      postIds: row.post_ids ?? [],
+    }))
+}
+
+function buildCategories(rows: CategoryRow[], memberships: ProfileCategoryRow[], userId: string): ContentCategory[] {
+  const joinedIds = new Set(
+    memberships.filter((membership) => membership.user_id === userId).map((membership) => membership.category_id),
+  )
+  const source = rows.length ? rows.map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    nameEn: row.name_en,
+    nameJa: row.name_ja ?? '',
+    description: row.description ?? '',
+    coverImageUrl: row.cover_image_url ?? undefined,
+    joinedByMe: joinedIds.has(row.id),
+  })) : FALLBACK_CATEGORIES
+  return source.map((category) => ({ ...category, joinedByMe: joinedIds.has(category.id) || category.joinedByMe }))
+}
+
 function sameStringArray(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index])
 }
@@ -1020,6 +1197,7 @@ function directPostsToCards(rows: DirectPostRow[]): AppPostCardRow[] {
     latitude: post.latitude,
     longitude: post.longitude,
     image_url: post.image_url,
+    address: post.address ?? null,
     visibility: post.visibility,
     tags: post.tags,
     taken_at: post.taken_at,
@@ -1210,6 +1388,7 @@ function buildPins(
   likeRows: LikeRow[],
   activeUserId: string,
   folders: Folder[],
+  landmarkIdByPost = new Map<string, string>(),
 ) {
   const commentsByPost = new Map<string, PinComment[]>()
   commentRows.forEach((comment) => {
@@ -1244,6 +1423,8 @@ function buildPins(
       title: post.title || 'Untitled',
       description: post.description || '',
       imageUrl: post.image_url || EMPTY_IMAGE,
+      address: post.address ?? '',
+      landmarkId: landmarkIdByPost.get(post.id) ?? null,
       tags: (post.tags ?? []).map(cleanTag).filter(Boolean),
       visibility: mapVisibility(post.visibility),
       latitude: Number(post.latitude),
@@ -1580,6 +1761,10 @@ export default function CommunityMapPrototype() {
   const [folderEditId, setFolderEditId] = useState<string | null>(null)
   const [folderSearch, setFolderSearch] = useState('')
   const [communities, setCommunities] = useState<Community[]>([])
+  const [landmarks, setLandmarks] = useState<Landmark[]>([])
+  const [categories, setCategories] = useState<ContentCategory[]>(FALLBACK_CATEGORIES)
+  const [architectFilter, setArchitectFilter] = useState<ArchitectFilter | null>(null)
+  const [selectedLandmarkId, setSelectedLandmarkId] = useState<string | null>(null)
   const [pins, setPins] = useState<Pin[]>([])
   const [activities, setActivities] = useState<CommunityActivity[]>([])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
@@ -1617,6 +1802,8 @@ export default function CommunityMapPrototype() {
   const [composerOpen, setComposerOpen] = useState(false)
   const [postSaving, setPostSaving] = useState(false)
   const [composerFolderPanelOpen, setComposerFolderPanelOpen] = useState(false)
+  const [postSourceChooserOpen, setPostSourceChooserOpen] = useState(false)
+  const [pendingLandmarkPostId, setPendingLandmarkPostId] = useState<string | null>(null)
   const [communitySubmitOpen, setCommunitySubmitOpen] = useState(false)
   const [communitySubmitPinId, setCommunitySubmitPinId] = useState<string | null>(null)
   const [communitySubmitComposer, setCommunitySubmitComposer] = useState({ title: '', description: '', tags: '' })
@@ -1664,7 +1851,29 @@ export default function CommunityMapPrototype() {
   const communitiesById = useMemo(() => new Map(communities.map((community) => [community.id, community])), [communities])
   const foldersById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders])
   const pinsById = useMemo(() => new Map(pins.map((pin) => [pin.id, pin])), [pins])
+  const landmarksById = useMemo(() => new Map(landmarks.map((landmark) => [landmark.id, landmark])), [landmarks])
+  const landmarkCatalogPins = useMemo<Pin[]>(() => landmarks.map((landmark) => ({
+    id: `landmark:${landmark.id}`,
+    ownerId: 'catalog',
+    title: landmark.nameJa || landmark.nameEn,
+    description: landmark.description,
+    imageUrl: landmark.coverImageUrl || EMPTY_IMAGE,
+    address: landmark.address,
+    landmarkId: landmark.id,
+    tags: [landmark.categorySlug || 'landmark'],
+    visibility: 'public',
+    latitude: landmark.latitude,
+    longitude: landmark.longitude,
+    createdAt: new Date(0).toISOString(),
+    likes: 0,
+    saves: 0,
+    likedByMe: false,
+    comments: [],
+    reports: 0,
+    color: '#111111',
+  })), [landmarks])
   const selectedPin = selectedPinId ? pinsById.get(selectedPinId) ?? null : null
+  const selectedLandmark = selectedLandmarkId ? landmarksById.get(selectedLandmarkId) ?? null : null
   const selectedCommunity = selectedCommunityId ? communitiesById.get(selectedCommunityId) ?? null : null
   const selectedProfile = (profileUserId ? usersById.get(profileUserId) : null) ?? currentUser
   const isMyProfile = Boolean(activeUserId) && selectedProfile.id === activeUserId
@@ -1737,16 +1946,30 @@ export default function CommunityMapPrototype() {
     )
     : []
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
+  const joinedCategories = categories.filter((category) => category.joinedByMe)
   const followPins = publicPins.filter((pin) => currentUser.followingIds.includes(pin.ownerId))
   const recommendedPins = [...publicPins].sort((a, b) => (b.likes + b.saves + b.comments.length) - (a.likes + a.saves + a.comments.length)).slice(0, 200)
   const dropScopes: DropScope[] = [
-    { id: 'chaos', label: 'Chaos', pins: publicPins },
+    { id: 'chaos', label: 'Chaos', pins: uniquePinsById([...landmarkCatalogPins, ...publicPins]) },
     { id: 'follow', label: 'Follow', pins: followPins },
     { id: 'recommend', label: 'Recommend', pins: recommendedPins },
     ...joinedCommunities.map((community) => ({
       id: `community:${community.id}`,
       label: communityLabel(community),
       pins: pins.filter((pin) => pinCommunityIds(pin).includes(community.id)),
+    })),
+    ...joinedCategories.map((category) => ({
+      id: `category:${category.id}`,
+      label: category.nameEn,
+      pins: uniquePinsById([
+        ...landmarkCatalogPins.filter((pin) => landmarksById.get(pin.landmarkId ?? '')?.categoryId === category.id),
+        ...pins.filter((pin) => landmarksById.get(pin.landmarkId ?? '')?.categoryId === category.id),
+      ]),
+    })),
+    ...tagStatsFromPins(publicPins).slice(0, 12).map(({ tag }) => ({
+      id: `tag:${tag}`,
+      label: `#${tag}`,
+      pins: publicPins.filter((pin) => pin.tags.includes(tag)),
     })),
     { id: 'myworld', label: 'My World', pins: myPostedPins },
     ...libraryFolders.map((folder) => ({
@@ -1756,7 +1979,10 @@ export default function CommunityMapPrototype() {
     })),
   ]
   const activeDropScope = dropScopes.find((scope) => scope.id === dropScopeId) ?? dropScopes[1] ?? dropScopes[0]
-  const dropPins = activeDropScope?.pins ?? []
+  const unfilteredDropPins = activeDropScope?.pins ?? []
+  const dropPins = architectFilter
+    ? unfilteredDropPins.filter((pin) => landmarksById.get(pin.landmarkId ?? '')?.architectId === architectFilter.id)
+    : unfilteredDropPins
   const recommendedCommunities = communities.filter((community) =>
     !community.memberIds.includes(activeUserId) &&
     (currentUser.followingIds.some((userId) => community.memberIds.includes(userId)) || community.privacy === 'public'),
@@ -1842,6 +2068,14 @@ export default function CommunityMapPrototype() {
       .filter(({ tag }) => tag.toLowerCase().startsWith(query))
       .slice(0, 6)
   }, [activeTagQuery, tagStats])
+  const nearbyLandmarkSuggestions = useMemo(() => {
+    if (!postDraft?.coordinates) return []
+    return landmarks
+      .map((landmark) => ({ landmark, distance: distanceInMeters(postDraft.coordinates!, landmark) }))
+      .filter(({ distance }) => distance <= 1000)
+      .sort((left, right) => left.distance - right.distance)
+      .slice(0, 5)
+  }, [landmarks, postDraft?.coordinates])
 
   const loadPriorityRemoteData = useCallback(async (userId: string) => {
     if (!supabase) {
@@ -2055,6 +2289,31 @@ export default function CommunityMapPrototype() {
       setProfileUserId((current) => (current && remoteUsers.some((user) => user.id === current) ? current : userId))
       setRemoteLoading(false)
 
+      const [landmarksResult, categoriesResult, profileCategoriesResult] = await Promise.all([
+        supabase.from('app_landmark_search').select('*').limit(1000),
+        supabase
+          .from('content_categories')
+          .select('id,slug,name_en,name_ja,description,cover_image_url')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true }),
+        userId
+          ? supabase.from('profile_categories').select('user_id,category_id').eq('user_id', userId)
+          : Promise.resolve({ data: [] as ProfileCategoryRow[], error: null }),
+      ])
+      if (landmarksResult.error) console.warn(`Landmark search: ${landmarksResult.error.message}`)
+      if (categoriesResult.error) console.warn(`Categories: ${categoriesResult.error.message}`)
+      if (profileCategoriesResult.error) console.warn(`Profile categories: ${profileCategoriesResult.error.message}`)
+      const remoteLandmarks = buildLandmarks(
+        (landmarksResult.error ? [] : landmarksResult.data ?? []) as LandmarkSearchRow[],
+      )
+      const remoteCategories = buildCategories(
+        (categoriesResult.error ? [] : categoriesResult.data ?? []) as CategoryRow[],
+        (profileCategoriesResult.error ? [] : profileCategoriesResult.data ?? []) as ProfileCategoryRow[],
+        userId,
+      )
+      setLandmarks(remoteLandmarks)
+      setCategories(remoteCategories)
+
       const [
         foldersResult,
         communitiesResult,
@@ -2215,7 +2474,7 @@ export default function CommunityMapPrototype() {
         console.warn(postsResult.error.message)
         const directPostsResult = await supabase
           .from('posts')
-          .select('id,user_id,title,description,latitude,longitude,image_url,visibility,tags,taken_at,likes_count,comments_count,saves_count,reports_count,created_at')
+          .select('id,user_id,title,description,latitude,longitude,image_url,address,visibility,tags,taken_at,likes_count,comments_count,saves_count,reports_count,created_at')
           .order('created_at', { ascending: false })
           .limit(300)
         if (directPostsResult.error || !Array.isArray(directPostsResult.data)) {
@@ -2253,7 +2512,7 @@ export default function CommunityMapPrototype() {
           if (missingPostsResult.error) console.warn(missingPostsResult.error.message)
           const directMissingPostsResult = await supabase
             .from('posts')
-            .select('id,user_id,title,description,latitude,longitude,image_url,visibility,tags,taken_at,likes_count,comments_count,saves_count,reports_count,created_at')
+            .select('id,user_id,title,description,latitude,longitude,image_url,address,visibility,tags,taken_at,likes_count,comments_count,saves_count,reports_count,created_at')
             .in('id', requiredPostIds)
           if (!directMissingPostsResult.error && Array.isArray(directMissingPostsResult.data)) {
             postRowsForCards = uniqueRowsById([
@@ -2266,12 +2525,17 @@ export default function CommunityMapPrototype() {
         }
       }
 
+      const landmarkIdByPost = new Map<string, string>()
+      remoteLandmarks.forEach((landmark) => {
+        landmark.postIds.forEach((postId) => landmarkIdByPost.set(postId, landmark.id))
+      })
       const remotePins = buildPins(
         postRowsForCards,
         (commentsResult.error ? [] : commentsResult.data ?? []) as CommentRow[],
         (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
         userId,
         remoteFolders,
+        landmarkIdByPost,
       )
       let saveNotificationRows = (saveActivityResult.error ? [] : saveActivityResult.data ?? []) as SavedPostRow[]
       let inviteNotificationRows: CommunityInviteRow[] = []
@@ -2677,6 +2941,41 @@ export default function CommunityMapPrototype() {
     setActiveTab('find')
   }, [activeUserId, communitiesById, loadRemoteData])
 
+  const toggleCategory = useCallback(async (category: ContentCategory) => {
+    const client = supabase
+    if (!client || !requireSignedIn()) return
+    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(category.id)) {
+      setToast('Supabaseでarchitecture_landmark_search.sqlを実行してください。')
+      return
+    }
+    const wasJoined = category.joinedByMe
+    setCategories((current) => current.map((item) => item.id === category.id ? { ...item, joinedByMe: !wasJoined } : item))
+    const result = wasJoined
+      ? await client.from('profile_categories').delete().eq('user_id', activeUserId).eq('category_id', category.id)
+      : await client.from('profile_categories').upsert({ user_id: activeUserId, category_id: category.id }, { onConflict: 'user_id,category_id' })
+    if (result.error) {
+      setCategories((current) => current.map((item) => item.id === category.id ? { ...item, joinedByMe: wasJoined } : item))
+      setToast(result.error.message.includes('profile_categories')
+        ? 'Supabaseでarchitecture_landmark_search.sqlを実行してください。'
+        : result.error.message)
+    }
+  }, [activeUserId, requireSignedIn])
+
+  const openCategoryInDrop = useCallback((category: ContentCategory) => {
+    if (!category.joinedByMe) return
+    setDropScopeId(`category:${category.id}`)
+    setArchitectFilter(null)
+    setSelectedLandmarkId(null)
+    setActiveTab('myworld')
+  }, [])
+
+  const openTagInDrop = useCallback((tag: string) => {
+    setDropScopeId(`tag:${tag}`)
+    setArchitectFilter(null)
+    setSelectedLandmarkId(null)
+    setActiveTab('myworld')
+  }, [])
+
   const openProfile = useCallback((userId: string) => {
     setProfileUserId(userId)
     setProfileListMode('profile')
@@ -2900,10 +3199,21 @@ export default function CommunityMapPrototype() {
     setPostMessage('')
     setComposerOpen(false)
     setManualPlacement(false)
-    fileInputRef.current?.click()
+    setPendingLandmarkPostId(null)
+    setPostSourceChooserOpen(true)
   }, [requireSignedIn])
 
-  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'tags' | 'takenAt' | 'folderIds'>>) => {
+  const openLandmarkPost = useCallback((landmarkId: string) => {
+    if (!requireSignedIn()) return
+    setPendingLandmarkPostId(landmarkId)
+    setPostDraft(null)
+    setPostDrafts([])
+    setComposerOpen(false)
+    setManualPlacement(false)
+    setPostSourceChooserOpen(true)
+  }, [requireSignedIn])
+
+  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'description' | 'tags' | 'takenAt' | 'folderIds' | 'landmarkId' | 'address' | 'coordinates'>>) => {
     setPostDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, ...values } : draft))
     setPostDraft((current) => current?.id === draftId ? { ...current, ...values } : current)
   }, [])
@@ -2920,7 +3230,7 @@ export default function CommunityMapPrototype() {
     setPostDraft(draft)
     setPostComposer({
       title: draft.title,
-      description: '',
+      description: draft.description,
       tags: draft.tags,
       takenAt: draft.takenAt ?? '',
       folderIds: draft.folderIds,
@@ -2936,27 +3246,64 @@ export default function CommunityMapPrototype() {
     setPostMessage('この画像は位置情報がありません。map上で投稿位置を選択してください。')
   }, [])
 
+  const choosePhotoPost = useCallback(() => {
+    setPostSourceChooserOpen(false)
+    fileInputRef.current?.click()
+  }, [])
+
+  const chooseMapPinPost = useCallback(() => {
+    const landmark = pendingLandmarkPostId ? landmarksById.get(pendingLandmarkPostId) ?? null : null
+    const draft: PostDraft = {
+      id: createId('draft'),
+      communityId: selectedCommunityId,
+      imageUrl: landmark?.coverImageUrl || EMPTY_IMAGE,
+      imageName: 'map-pin',
+      coordinates: landmark ? { latitude: landmark.latitude, longitude: landmark.longitude } : null,
+      locationSource: landmark ? 'manual' : 'manual-pending',
+      address: landmark?.address ?? '',
+      landmarkId: landmark?.id ?? null,
+      title: landmark?.nameJa || landmark?.nameEn || '',
+      description: '',
+      tags: '',
+      folderIds: [],
+    }
+    setPostSourceChooserOpen(false)
+    setPostDrafts([draft])
+    activatePostDraft(draft)
+    if (!landmark) {
+      setActiveTab('myworld')
+      setPostMessage('map上で投稿位置を選択してください。検索から場所へ移動することもできます。')
+    }
+  }, [activatePostDraft, landmarksById, pendingLandmarkPostId, selectedCommunityId])
+
   const handlePostImage = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
     if (!files.length) return
 
     setPostMessage('画像を読み込んでいます。')
+    const selectedLandmark = pendingLandmarkPostId ? landmarksById.get(pendingLandmarkPostId) ?? null : null
     const drafts = await Promise.all(files.map(async (file) => {
       const image = await getDisplayImage(file)
       const [gps, takenAt] = await Promise.all([getGpsFromImage(file), getTakenAtFromImage(file)])
-      const title = image.imageName.replace(/\.[^.]+$/, '')
+      const coordinates = selectedLandmark
+        ? { latitude: selectedLandmark.latitude, longitude: selectedLandmark.longitude }
+        : gps
+      const address = selectedLandmark?.address || (coordinates ? await reverseGeocodeCoordinates(coordinates) : '')
       return {
         id: createId('draft'),
         communityId: selectedCommunityId,
         imageUrl: image.imageUrl,
         imageName: image.imageName,
-        coordinates: gps,
-        locationSource: gps ? 'gps' : 'manual-pending',
+        coordinates,
+        locationSource: selectedLandmark ? 'manual' : gps ? 'gps' : 'manual-pending',
+        address,
+        landmarkId: selectedLandmark?.id ?? null,
         takenAt,
-        title,
+        title: selectedLandmark?.nameJa || selectedLandmark?.nameEn || '',
+        description: '',
         tags: '',
-        folderIds: userFolders[0] ? [userFolders[0].id] : [],
+        folderIds: [],
       } satisfies PostDraft
     }))
 
@@ -2965,7 +3312,7 @@ export default function CommunityMapPrototype() {
     setPostDraft(firstDraft)
     setPostComposer({
       title: firstDraft.title,
-      description: '',
+      description: firstDraft.description,
       tags: firstDraft.tags,
       takenAt: firstDraft.takenAt ?? '',
       folderIds: firstDraft.folderIds,
@@ -2981,16 +3328,18 @@ export default function CommunityMapPrototype() {
       if (!selectedCommunityId) setActiveTab('myworld')
       setPostMessage('位置情報がありません。map上で投稿位置を選択してください。')
     }
-  }, [selectedCommunityId, userFolders])
+  }, [landmarksById, pendingLandmarkPostId, selectedCommunityId])
 
-  const confirmManualLocation = useCallback((coordinates: Coordinates) => {
+  const confirmManualLocation = useCallback(async (coordinates: Coordinates) => {
     if (!postDraft) return
-    const nextDraft = { ...postDraft, coordinates, locationSource: 'manual' as const }
+    setPostMessage('住所を取得しています。')
+    const address = await reverseGeocodeCoordinates(coordinates)
+    const nextDraft = { ...postDraft, coordinates, address, locationSource: 'manual' as const }
     setPostDraft(nextDraft)
     setPostDrafts((current) => current.map((draft) => draft.id === postDraft.id ? nextDraft : draft))
     setManualPlacement(false)
     setComposerOpen(true)
-    setPostMessage(`map上で位置を確定しました。緯度 ${coordinates.latitude.toFixed(5)} / 経度 ${coordinates.longitude.toFixed(5)}`)
+    setPostMessage(`位置を確定しました: ${address}`)
   }, [postDraft])
 
   const submitCommunityPost = useCallback(async (event: FormEvent<HTMLFormElement>) => {
@@ -3005,6 +3354,7 @@ export default function CommunityMapPrototype() {
         ? {
             ...draft,
             title: postComposer.title,
+            description: postComposer.description,
             tags: postComposer.tags,
             takenAt: postComposer.takenAt,
             folderIds: postComposer.folderIds,
@@ -3017,11 +3367,16 @@ export default function CommunityMapPrototype() {
       setPostMessage('位置情報がない画像があります。map上で位置を指定してください。')
       return
     }
-    const draftMissingFolder = syncedDrafts.find((draft) => draft.folderIds.length === 0)
-    if (draftMissingFolder) {
-      activatePostDraft(draftMissingFolder)
-      setComposerFolderPanelOpen(true)
-      setPostMessage('各画像に最低1つのFolderを選択してください。')
+    const draftMissingTitle = syncedDrafts.find((draft) => !draft.title.trim())
+    if (draftMissingTitle) {
+      activatePostDraft(draftMissingTitle)
+      setPostMessage('各PINのタイトルを入力してください。')
+      return
+    }
+    const draftMissingTags = syncedDrafts.find((draft) => !draft.tags.split(/\s+/).map(cleanTag).filter(Boolean).length)
+    if (draftMissingTags) {
+      activatePostDraft(draftMissingTags)
+      setPostMessage('各PINに最低1つの#を追加してください。')
       return
     }
 
@@ -3032,7 +3387,7 @@ export default function CommunityMapPrototype() {
       let lastPostId = ''
       for (const draft of syncedDrafts) {
         if (!draft.coordinates) continue
-        const title = draft.title.trim() || draft.imageName.replace(/\.[^.]+$/, '') || 'Untitled pin'
+        const title = draft.title.trim()
         const tags = draft.tags
           .split(/\s+/)
           .map((tag) => cleanTag(tag))
@@ -3043,10 +3398,11 @@ export default function CommunityMapPrototype() {
           .insert({
             user_id: activeUserId,
             title,
-            description: '',
+            description: draft.description.trim(),
             latitude: draft.coordinates.latitude,
             longitude: draft.coordinates.longitude,
             image_url: draft.imageUrl,
+            address: draft.address || null,
             visibility: draft.communityId ? 'public' : 'private',
             tags,
             taken_at: draft.takenAt ? new Date(draft.takenAt).toISOString() : null,
@@ -3071,6 +3427,15 @@ export default function CommunityMapPrototype() {
           if (error) setToast(error.message)
         }
 
+        if (draft.landmarkId) {
+          const { error } = await client.from('landmark_posts').upsert({
+            landmark_id: draft.landmarkId,
+            post_id: newPost.id,
+            linked_by: activeUserId,
+          }, { onConflict: 'landmark_id,post_id' })
+          if (error) console.warn(`Landmark link: ${error.message}`)
+        }
+
         if (draft.communityId) {
           const { error } = await client
             .from('community_posts')
@@ -3079,7 +3444,7 @@ export default function CommunityMapPrototype() {
               post_id: newPost.id,
               user_id: activeUserId,
               title_override: title,
-              description_override: '',
+              description_override: draft.description.trim(),
               tags_override: tags,
             }, { onConflict: 'community_id,post_id' })
 
@@ -4092,29 +4457,40 @@ export default function CommunityMapPrototype() {
             <header className={styles.findSimpleHeader}>
               <h1>Find</h1>
             </header>
-            <section className={styles.communitySpotlight}>
-              <div className={styles.communitySpotlightHeader}>
-                <div>
-                  <h2>Community</h2>
-                </div>
-                <button className={styles.primaryButton} type="button" onClick={() => { setSelectedFindFolderId(null); setFindCommunityOpen(true) }}>
-                  Open
-                </button>
+            <section className={styles.categorySection}>
+              <div className={styles.sectionTitleRow}>
+                <h2>Category</h2>
+                <span>JoinするとDropとProfileに追加</span>
               </div>
-              <label className={styles.communitySearchInline}>
-                <Search size={17} />
-                <input value={communityQuery} onChange={(event) => setCommunityQuery(event.target.value)} placeholder="Community search" />
-                <button type="button" onClick={() => setFindCommunityOpen(true)}>Open</button>
-              </label>
-              <div className={styles.communitySpotlightGrid}>
-                {communitySpotlightItems.map((community) => (
-                  <button key={community.id} type="button" onClick={() => openCommunity(community.id)}>
-                    <img src={community.thumbnailUrl || EMPTY_IMAGE} alt="" />
-                    <span>{communityTypeLabel(community.communityType)}</span>
-                    <strong>{community.name}</strong>
-                    <small>{community.memberIds.includes(activeUserId) ? 'Open' : 'Join'} / {community.memberIds.length}人</small>
+              <div className={styles.categoryGrid}>
+                {categories.map((category) => (
+                  <article key={category.id}>
+                    <button className={styles.categoryOpenButton} type="button" onClick={() => openCategoryInDrop(category)}>
+                      {category.coverImageUrl && <img src={category.coverImageUrl} alt="" />}
+                      <span>{category.nameJa || category.nameEn}</span>
+                      <strong>{category.nameEn}</strong>
+                      <small>{category.description}</small>
+                    </button>
+                    <button
+                      className={category.joinedByMe ? styles.active : ''}
+                      type="button"
+                      onClick={() => void toggleCategory(category)}
+                    >
+                      {category.joinedByMe ? 'Joined' : 'Join'}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+            <section className={styles.findTagSection}>
+              <div className={styles.sectionTitleRow}><h2>#</h2><span>細部やテーマから探す</span></div>
+              <div className={styles.findTagRail}>
+                {tagStats.slice(0, 16).map(({ tag, count }) => (
+                  <button key={tag} type="button" onClick={() => openTagInDrop(tag)}>
+                    #{tag}<span>{count}</span>
                   </button>
                 ))}
+                {!tagStats.length && <p>投稿の#がここに表示されます。</p>}
               </div>
             </section>
             <div className={styles.searchBox}>
@@ -4132,13 +4508,38 @@ export default function CommunityMapPrototype() {
       )}
 
       {activeTab === 'myworld' && (
-        <SplitMapView
+        selectedLandmark ? (
+          <LandmarkDetail
+            landmark={selectedLandmark}
+            pins={pins.filter((pin) => pin.landmarkId === selectedLandmark.id)}
+            onBack={() => setSelectedLandmarkId(null)}
+            onPost={() => openLandmarkPost(selectedLandmark.id)}
+            onOpenPin={(pinId) => {
+              setSelectedPinId(pinId)
+              setSelectedLandmarkId(null)
+            }}
+          />
+        ) : <SplitMapView
           pins={dropPins}
+          landmarks={landmarks}
+          activeArchitectFilter={architectFilter}
           selectedPinId={selectedPinId}
           seenPinIds={seenPinIds}
           onPinClick={openPinFromMap}
           onListFocus={openPinFromMap}
           onMapSurfaceClick={() => setSelectedPinId(null)}
+          onLandmarkSelect={(landmarkId) => {
+            setSelectedPinId(null)
+            setSelectedLandmarkId(landmarkId)
+          }}
+          onArchitectFilter={(filter) => {
+            setArchitectFilter(filter)
+            setSelectedPinId(null)
+          }}
+          onClearArchitectFilter={() => {
+            setArchitectFilter(null)
+            setSelectedPinId(null)
+          }}
           currentLocation={userLocation}
           startAtCurrentLocation
           panelsHidden={myWorldPanelsHidden}
@@ -4162,6 +4563,7 @@ export default function CommunityMapPrototype() {
                     onClick={() => {
                       setDropScopeId(scope.id)
                       setSelectedPinId(null)
+                      setSelectedLandmarkId(null)
                     }}
                   >
                     {scope.label}
@@ -4210,7 +4612,12 @@ export default function CommunityMapPrototype() {
           onReorderFolderPin={reorderFolderPin}
           currentUserId={activeUserId}
           showModeSwitch
-          getMeta={(pin) => pin.ownerId === activeUserId ? 'My drop' : getMapPinMeta(pin)}
+          getMeta={(pin) => {
+            const folderNames = libraryFolders.filter((folder) => folder.pinIds.includes(pin.id)).map((folder) => folder.name)
+            const owner = usersById.get(pin.ownerId)
+            if (pin.ownerId === activeUserId) return folderNames.length ? folderNames.join(' / ') : '未分類'
+            return `${owner ? `@${owner.username}` : 'Saved pin'}${folderNames.length ? ` / ${folderNames.join(' / ')}` : ''}`
+          }}
         />
       )}
 
@@ -4393,17 +4800,20 @@ export default function CommunityMapPrototype() {
             </section>
           ) : (
             <>
-              <section className={styles.contentSection}>
-                <h2>参加しているコミュニティ</h2>
-                <div className={styles.communityMiniGrid}>
-                  {profileCommunities.map((community) => (
-                    <button key={community.id} type="button" onClick={() => openCommunity(community.id)}>
-                      <strong>{communityLabel(community)}</strong>
-                      <span>{community.memberIds.length}人</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
+              {isMyProfile && (
+                <section className={styles.contentSection}>
+                  <h2>Categories</h2>
+                  <div className={styles.communityMiniGrid}>
+                    {joinedCategories.map((category) => (
+                      <button key={category.id} type="button" onClick={() => openCategoryInDrop(category)}>
+                        <strong>{category.nameEn}</strong>
+                        <span>{category.nameJa}</span>
+                      </button>
+                    ))}
+                    {!joinedCategories.length && <p className={styles.muted}>FindからCategoryにJoinできます。</p>}
+                  </div>
+                </section>
+              )}
               <section className={styles.contentSection}>
                 <h2>最近投稿したピン</h2>
                 <div className={styles.thumbnailGrid}>
@@ -4613,6 +5023,31 @@ export default function CommunityMapPrototype() {
         </aside>
       )}
 
+      {postSourceChooserOpen && (
+        <aside className={styles.modalBackdrop} onClick={() => setPostSourceChooserOpen(false)}>
+          <section className={styles.postSourceChooser} onClick={(event) => event.stopPropagation()}>
+            <button className={styles.closeButton} type="button" aria-label="閉じる" onClick={() => setPostSourceChooserOpen(false)}><X size={17} /></button>
+            <span>NEW PIN</span>
+            <h2>{pendingLandmarkPostId ? 'この建築に投稿する' : '投稿方法を選択'}</h2>
+            {pendingLandmarkPostId && landmarksById.get(pendingLandmarkPostId) && (
+              <p>{landmarksById.get(pendingLandmarkPostId)!.nameJa || landmarksById.get(pendingLandmarkPostId)!.nameEn}</p>
+            )}
+            <div>
+              <button type="button" onClick={choosePhotoPost}>
+                <Grid2X2 size={22} />
+                <strong>写真を選択</strong>
+                <small>写真の位置情報を読み取ります</small>
+              </button>
+              <button type="button" onClick={chooseMapPinPost}>
+                <MapIcon size={22} />
+                <strong>MAPにPINを刺す</strong>
+                <small>検索または地図から場所を選びます</small>
+              </button>
+            </div>
+          </section>
+        </aside>
+      )}
+
       {composerOpen && postDraft && (
         <aside className={styles.modalBackdrop} onClick={() => setComposerOpen(false)}>
           <form className={styles.composer} onSubmit={submitCommunityPost} onClick={(event) => event.stopPropagation()}>
@@ -4627,6 +5062,7 @@ export default function CommunityMapPrototype() {
                     onClick={() => {
                       updateDraftComposer(postDraft.id, {
                         title: postComposer.title,
+                        description: postComposer.description,
                         tags: postComposer.tags,
                         takenAt: postComposer.takenAt,
                         folderIds: postComposer.folderIds,
@@ -4634,6 +5070,7 @@ export default function CommunityMapPrototype() {
                       activatePostDraft(draft.id === postDraft.id ? {
                         ...draft,
                         title: postComposer.title,
+                        description: postComposer.description,
                         tags: postComposer.tags,
                         takenAt: postComposer.takenAt,
                         folderIds: postComposer.folderIds,
@@ -4643,7 +5080,6 @@ export default function CommunityMapPrototype() {
                     <img src={draft.imageUrl} alt="" />
                     <span>{index + 1}</span>
                     {!draft.coordinates && <b>位置未設定</b>}
-                    {!draft.folderIds.length && <em>Folder</em>}
                   </button>
                 ))}
               </div>
@@ -4675,7 +5111,7 @@ export default function CommunityMapPrototype() {
                 <MapIcon size={18} />
                 <div>
                   <strong>{postDraft.locationSource === 'gps' ? '写真の位置情報を取得済み' : 'map上で位置を指定済み'}</strong>
-                  <span>緯度 {postDraft.coordinates.latitude.toFixed(6)} / 経度 {postDraft.coordinates.longitude.toFixed(6)}</span>
+                  <span>{postDraft.address || '住所を確認中'}</span>
                 </div>
               </div>
             )}
@@ -4692,15 +5128,52 @@ export default function CommunityMapPrototype() {
               />
             </label>
             <label>
-              一言加えて
+              タイトル
               <input
                 value={postComposer.title}
                 onChange={(event) => {
                   const title = event.target.value
-                  setPostComposer((current) => ({ ...current, title, description: '' }))
+                  setPostComposer((current) => ({ ...current, title }))
                   updateDraftComposer(postDraft.id, { title })
                 }}
-                placeholder="この瞬間を一言で"
+                placeholder="建築・ランドマーク名"
+              />
+            </label>
+            {nearbyLandmarkSuggestions.length > 0 && (
+              <div className={styles.titleSuggestions}>
+                <small>近くの建築</small>
+                {nearbyLandmarkSuggestions.map(({ landmark, distance }) => (
+                  <button
+                    key={landmark.id}
+                    type="button"
+                    onClick={() => {
+                      const title = landmark.nameJa || landmark.nameEn
+                      const coordinates = { latitude: landmark.latitude, longitude: landmark.longitude }
+                      setPostComposer((current) => ({ ...current, title }))
+                      updateDraftComposer(postDraft.id, {
+                        title,
+                        landmarkId: landmark.id,
+                        address: landmark.address,
+                        coordinates,
+                      })
+                    }}
+                  >
+                    <strong>{landmark.nameJa || landmark.nameEn}</strong>
+                    <span>{Math.round(distance)}m / {landmark.architectNameEn || landmark.address}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <label>
+              コメント（任意）
+              <textarea
+                value={postComposer.description}
+                onChange={(event) => {
+                  const description = event.target.value
+                  setPostComposer((current) => ({ ...current, description }))
+                  updateDraftComposer(postDraft.id, { description })
+                }}
+                placeholder="この場所について残したいこと"
               />
             </label>
             <label>
@@ -4727,11 +5200,11 @@ export default function CommunityMapPrototype() {
             )}
             <div className={styles.composerFolderField}>
               <button type="button" onClick={() => setComposerFolderPanelOpen((value) => !value)}>
-                <span>Folder</span>
+                <span>Folder（任意）</span>
                 <strong>
                   {postComposer.folderIds.length
                     ? userFolders.filter((folder) => postComposer.folderIds.includes(folder.id)).map((folder) => folder.name).join(', ')
-                    : 'フォルダーを選択'}
+                    : '未分類のまま投稿'}
                 </strong>
               </button>
               {composerFolderPanelOpen && (
@@ -5621,8 +6094,69 @@ function MapFolderFilter({
   )
 }
 
+function LandmarkDetail({
+  landmark,
+  pins,
+  onBack,
+  onPost,
+  onOpenPin,
+}: {
+  landmark: Landmark
+  pins: Pin[]
+  onBack: () => void
+  onPost: () => void
+  onOpenPin: (pinId: string) => void
+}) {
+  const [activeTag, setActiveTag] = useState('')
+  const tags = tagStatsFromPins(pins).map(({ tag }) => tag)
+  const filteredPins = activeTag ? pins.filter((pin) => pin.tags.includes(activeTag)) : pins
+  const coverImage = landmark.coverImageUrl || pins[0]?.imageUrl || EMPTY_IMAGE
+
+  return (
+    <section className={styles.landmarkDetailPage}>
+      <header className={styles.landmarkHero} style={{ backgroundImage: `url(${coverImage})` }}>
+        <button type="button" aria-label="Dropへ戻る" onClick={onBack}><ArrowLeft size={22} /></button>
+        <div>
+          <span>{landmark.categorySlug || 'LANDMARK'} / {landmark.id.slice(0, 3).toUpperCase()}</span>
+          <h1>{landmark.nameJa || landmark.nameEn}</h1>
+          <p>
+            {[landmark.architectNameEn || landmark.architectNameJa, landmark.address, landmark.completionYear]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+      </header>
+      <div className={styles.landmarkDetailBody}>
+        <div className={styles.landmarkStats}>
+          <strong>{pins.length} <span>POSTS</span></strong>
+          <strong>{new Set(pins.map((pin) => pin.ownerId)).size} <span>CONTRIBUTORS</span></strong>
+          <button type="button" onClick={onPost}><Plus size={18} />画像を投稿</button>
+        </div>
+        {landmark.description && <p className={styles.landmarkDescription}>{landmark.description}</p>}
+        <div className={styles.landmarkTagRail}>
+          <button className={!activeTag ? styles.active : ''} type="button" onClick={() => setActiveTag('')}>すべて</button>
+          {tags.map((tag) => (
+            <button className={activeTag === tag ? styles.active : ''} key={tag} type="button" onClick={() => setActiveTag(tag)}>#{tag}</button>
+          ))}
+        </div>
+        <div className={styles.landmarkPinGrid}>
+          {filteredPins.map((pin) => (
+            <button key={pin.id} type="button" onClick={() => onOpenPin(pin.id)}>
+              <img src={pin.imageUrl} alt="" />
+              <span>{pin.tags[0] ? `#${pin.tags[0]}` : pin.title}</span>
+            </button>
+          ))}
+          {!filteredPins.length && <p>この建築にはまだ投稿がありません。</p>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function SplitMapView({
   pins,
+  landmarks = [],
+  activeArchitectFilter = null,
   selectedPinId,
   seenPinIds,
   currentLocation,
@@ -5642,8 +6176,13 @@ function SplitMapView({
   disableExpandedStory = false,
   overlay,
   floatingAction,
+  onLandmarkSelect,
+  onArchitectFilter,
+  onClearArchitectFilter,
 }: {
   pins: Pin[]
+  landmarks?: Landmark[]
+  activeArchitectFilter?: ArchitectFilter | null
   selectedPinId: string | null
   seenPinIds?: string[]
   currentLocation?: Coordinates | null
@@ -5663,6 +6202,9 @@ function SplitMapView({
   disableExpandedStory?: boolean
   overlay?: ReactNode
   floatingAction?: ReactNode
+  onLandmarkSelect?: (landmarkId: string) => void
+  onArchitectFilter?: (filter: ArchitectFilter) => void
+  onClearArchitectFilter?: () => void
 }) {
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>(pins.map((pin) => pin.id))
   const [focusedPinId, setFocusedPinId] = useState<string | null>(null)
@@ -5763,8 +6305,13 @@ function SplitMapView({
   const selectMapPin = useCallback((pinId: string) => {
     setExpandedStoryPinId(null)
     setFocusedPinId(pinId)
+    const pin = pins.find((item) => item.id === pinId)
+    if (pin?.landmarkId && onLandmarkSelect) {
+      onLandmarkSelect(pin.landmarkId)
+      return
+    }
     onPinClick(pinId)
-  }, [onPinClick])
+  }, [onLandmarkSelect, onPinClick, pins])
 
   useEffect(() => {
     const query = mapSearch.trim()
@@ -5802,6 +6349,31 @@ function SplitMapView({
       .slice(0, 5)
   }, [mapSearch, pins])
 
+  const landmarkSearchSuggestions = useMemo(() => {
+    const query = normalizeSearchText(mapSearch)
+    if (!query) return []
+    return landmarks.filter((landmark) => landmarkSearchText(landmark).includes(query)).slice(0, 6)
+  }, [landmarks, mapSearch])
+
+  const architectSearchSuggestions = useMemo(() => {
+    const query = normalizeSearchText(mapSearch)
+    if (!query) return []
+    const architects = new Map<string, ArchitectFilter & { aliases: string[] }>()
+    landmarks.forEach((landmark) => {
+      if (!landmark.architectId) return
+      const label = landmark.architectNameJa || landmark.architectNameEn || landmark.architectAliases[0]
+      if (!label) return
+      architects.set(landmark.architectId, {
+        id: landmark.architectId,
+        label,
+        aliases: [landmark.architectNameEn ?? '', landmark.architectNameJa ?? '', ...landmark.architectAliases],
+      })
+    })
+    return Array.from(architects.values())
+      .filter((architect) => normalizeSearchText([architect.label, ...architect.aliases].join(' ')).includes(query))
+      .slice(0, 4)
+  }, [landmarks, mapSearch])
+
   const selectPlaceSuggestion = useCallback(async (suggestion: MapboxSearchSuggestion) => {
     setMapSearch(suggestion.name)
     const coordinates = suggestion.coordinates ?? await retrieveMapboxSearchSuggestion(suggestion.mapboxId, searchSessionTokenRef.current)
@@ -5818,6 +6390,21 @@ function SplitMapView({
     if (matchedPin) {
       setFocusedPinId(matchedPin.id)
       onListFocus?.(matchedPin.id)
+      return
+    }
+
+    const matchedLandmark = landmarkSearchSuggestions[0]
+    if (matchedLandmark) {
+      onLandmarkSelect?.(matchedLandmark.id)
+      setFlyToCoordinates(matchedLandmark)
+      setPlaceSearchSuggestions([])
+      return
+    }
+
+    const matchedArchitect = architectSearchSuggestions[0]
+    if (matchedArchitect) {
+      onArchitectFilter?.({ id: matchedArchitect.id, label: matchedArchitect.label })
+      setPlaceSearchSuggestions([])
       return
     }
 
@@ -5840,7 +6427,7 @@ function SplitMapView({
     } catch (error) {
       console.warn('地名検索に失敗しました。', error)
     }
-  }, [mapSearch, onListFocus, pinSearchSuggestions, placeSearchSuggestions, selectPlaceSuggestion])
+  }, [architectSearchSuggestions, landmarkSearchSuggestions, mapSearch, onArchitectFilter, onLandmarkSelect, onListFocus, pinSearchSuggestions, placeSearchSuggestions, selectPlaceSuggestion])
 
   const moveToCurrentLocation = useCallback(() => {
     if (currentLocation) {
@@ -5894,9 +6481,38 @@ function SplitMapView({
           {showSearch && (
             <form className={styles.mapSearchBox} onSubmit={submitMapSearch}>
               <Search size={17} />
-              <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="場所、pinを検索" />
-              {(pinSearchSuggestions.length > 0 || placeSearchSuggestions.length > 0 || placeSearchLoading) && (
+              <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="建築、建築家、場所を検索" />
+              {(landmarkSearchSuggestions.length > 0 || architectSearchSuggestions.length > 0 || pinSearchSuggestions.length > 0 || placeSearchSuggestions.length > 0 || placeSearchLoading) && (
                 <div className={styles.mapSearchSuggestions}>
+                  {architectSearchSuggestions.map((architect) => (
+                    <button
+                      key={`architect-${architect.id}`}
+                      type="button"
+                      onClick={() => {
+                        setMapSearch(architect.label)
+                        onArchitectFilter?.({ id: architect.id, label: architect.label })
+                        setPlaceSearchSuggestions([])
+                      }}
+                    >
+                      <span className={styles.searchResultType}>ARCHITECT</span>
+                      <span><strong>{architect.label}</strong><small>関連するPINだけを表示</small></span>
+                    </button>
+                  ))}
+                  {landmarkSearchSuggestions.map((landmark) => (
+                    <button
+                      key={`landmark-${landmark.id}`}
+                      type="button"
+                      onClick={() => {
+                        setMapSearch(landmark.nameJa || landmark.nameEn)
+                        setFlyToCoordinates(landmark)
+                        onLandmarkSelect?.(landmark.id)
+                        setPlaceSearchSuggestions([])
+                      }}
+                    >
+                      <img src={landmark.coverImageUrl || EMPTY_IMAGE} alt="" />
+                      <span><strong>{landmark.nameJa || landmark.nameEn}</strong><small>{landmark.architectNameEn || landmark.address}</small></span>
+                    </button>
+                  ))}
                   {pinSearchSuggestions.map((pin) => (
                     <button
                       key={pin.id}
@@ -5924,6 +6540,13 @@ function SplitMapView({
                 </div>
               )}
             </form>
+          )}
+          {activeArchitectFilter && (
+            <div className={styles.activeSearchFilter}>
+              <span>ARCHITECT</span>
+              <strong>{activeArchitectFilter.label}</strong>
+              <button type="button" onClick={onClearArchitectFilter}>Exit</button>
+            </div>
           )}
           <button className={styles.locateButton} type="button" aria-label="現在地へ移動" onClick={moveToCurrentLocation}>
             <LocateFixed size={25} />

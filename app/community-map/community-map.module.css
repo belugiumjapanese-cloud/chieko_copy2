@@ -4311,6 +4311,435 @@
   font-weight: 850;
 }
 
+.searchResultType {
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 76px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border: 1px solid #d8d8d3;
+  border-radius: 4px;
+  color: #60605b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.activeSearchFilter {
+  position: absolute;
+  z-index: 12;
+  top: 88px;
+  left: 20px;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 40px);
+  padding: 8px 9px 8px 12px;
+  border: 1px solid #232323;
+  border-radius: 5px;
+  background: #111;
+  color: #fff;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+.activeSearchFilter span {
+  color: #aaa;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.activeSearchFilter strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeSearchFilter button {
+  padding: 6px 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.postSourceChooser {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  padding: 28px;
+  border: 1px solid #d6d6d0;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 20%);
+}
+
+.postSourceChooser > span {
+  color: #777;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.postSourceChooser h2,
+.postSourceChooser p {
+  margin: 7px 0 0;
+}
+
+.postSourceChooser > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.postSourceChooser > div > button {
+  display: grid;
+  min-height: 138px;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid #cfcfc9;
+  border-radius: 6px;
+  background: #f8f8f5;
+  color: #111;
+  text-align: left;
+}
+
+.postSourceChooser > div > button:first-child {
+  background: #111;
+  color: #fff;
+}
+
+.postSourceChooser small {
+  color: #888;
+  line-height: 1.4;
+}
+
+.titleSuggestions {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #d7d7d1;
+  border-radius: 6px;
+  background: #f5f5f2;
+}
+
+.titleSuggestions > small {
+  color: #777;
+  font-weight: 800;
+}
+
+.titleSuggestions button {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #fff;
+  color: #111;
+  text-align: left;
+}
+
+.titleSuggestions button span {
+  color: #777;
+  font-size: 11px;
+}
+
+.categorySection,
+.findTagSection {
+  margin: 0 0 30px;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sectionTitleRow h2,
+.sectionTitleRow span {
+  margin: 0;
+}
+
+.sectionTitleRow span {
+  color: #777;
+  font-size: 12px;
+}
+
+.categoryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.categoryGrid article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #d6d6d0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.categoryOpenButton {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111;
+  text-align: left;
+}
+
+.categoryOpenButton img {
+  width: 100%;
+  aspect-ratio: 1.8;
+  object-fit: cover;
+  margin-bottom: 8px;
+}
+
+.categoryOpenButton span,
+.categoryOpenButton small {
+  color: #777;
+  font-size: 11px;
+}
+
+.categoryOpenButton small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.categoryGrid article > button:last-child {
+  align-self: start;
+  padding: 7px 9px;
+  border: 1px solid #111;
+  border-radius: 4px;
+  background: #111;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.categoryGrid article > button:last-child.active {
+  background: #fff;
+  color: #111;
+}
+
+.findTagRail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+}
+
+.findTagRail button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid #d0d0ca;
+  border-radius: 4px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-weight: 800;
+}
+
+.findTagRail button span {
+  color: #888;
+  font-size: 11px;
+}
+
+.landmarkDetailPage {
+  min-height: calc(100dvh - 86px);
+  padding-bottom: 100px;
+  background: #f4f1e9;
+  color: #111;
+}
+
+.landmarkHero {
+  position: relative;
+  display: flex;
+  min-height: min(54dvh, 560px);
+  align-items: flex-end;
+  padding: 28px;
+  background-position: center;
+  background-size: cover;
+  color: #fff;
+}
+
+.landmarkHero::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgb(0 0 0 / 70%));
+  content: '';
+}
+
+.landmarkHero > button,
+.landmarkHero > div {
+  position: relative;
+  z-index: 1;
+}
+
+.landmarkHero > button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 50%;
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+}
+
+.landmarkHero h1 {
+  margin: 8px 0;
+  font-size: clamp(34px, 7vw, 62px);
+  letter-spacing: 0;
+}
+
+.landmarkHero p,
+.landmarkHero span {
+  margin: 0;
+  font-weight: 700;
+}
+
+.landmarkDetailBody {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 26px;
+}
+
+.landmarkStats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #cbc6ba;
+}
+
+.landmarkStats strong span {
+  color: #77736b;
+  font-size: 12px;
+}
+
+.landmarkStats button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 12px 16px;
+  border: 1px solid #111;
+  border-radius: 4px;
+  background: #ffd84d;
+  color: #111;
+  font: inherit;
+  font-weight: 900;
+  box-shadow: 4px 4px 0 #111;
+}
+
+.landmarkDescription {
+  max-width: 720px;
+  line-height: 1.7;
+}
+
+.landmarkTagRail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 18px 0;
+}
+
+.landmarkTagRail button {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 1px solid #cbc6ba;
+  border-radius: 0;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-weight: 700;
+}
+
+.landmarkTagRail button.active {
+  border-color: #111;
+  background: #ffd84d;
+}
+
+.landmarkPinGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.landmarkPinGrid button {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: #ddd;
+}
+
+.landmarkPinGrid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.landmarkPinGrid span {
+  position: absolute;
+  bottom: 7px;
+  left: 7px;
+  max-width: calc(100% - 14px);
+  overflow: hidden;
+  padding: 4px 6px;
+  background: rgb(0 0 0 / 72%);
+  color: #fff;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .postSourceChooser > div,
+  .categoryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .landmarkHero {
+    min-height: 43dvh;
+    padding: 22px;
+  }
+
+  .landmarkDetailBody {
+    padding: 20px;
+  }
+
+  .landmarkStats {
+    gap: 10px;
+  }
+
+  .landmarkStats button {
+    padding: 10px 12px;
+  }
+}
+
 .placeSuggestionIcon {
   display: grid !important;
   place-items: center;
