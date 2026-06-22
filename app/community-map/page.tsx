@@ -276,14 +276,20 @@ type Landmark = Coordinates & {
   categoryId?: string | null
   categorySlug?: string
   architectId?: string | null
+  architectIds: string[]
   architectNameEn?: string
   architectNameJa?: string
+  architectNamesEn: string[]
+  architectNamesJa: string[]
   architectAliases: string[]
   nameEn: string
   nameJa: string
   aliases: string[]
+  names: string[]
+  keywords: string[]
   description: string
   address: string
+  websiteUrl?: string
   completionYear?: number | null
   coverImageUrl?: string
   postIds: string[]
@@ -370,14 +376,20 @@ type LandmarkSearchRow = {
   category_name_en: string | null
   category_name_ja: string | null
   architect_id: string | null
+  architect_ids?: string[] | null
   architect_name_en: string | null
   architect_name_ja: string | null
+  architect_names_en?: string[] | null
+  architect_names_ja?: string[] | null
   architect_aliases: string[] | null
   name_en: string
   name_ja: string | null
   aliases: string[] | null
+  names?: string[] | null
+  keywords?: string[] | null
   description: string | null
   address: string | null
+  source_url?: string | null
   latitude: number
   longitude: number
   completion_year: number | null
@@ -805,8 +817,12 @@ function landmarkSearchText(landmark: Landmark) {
     landmark.nameEn,
     landmark.nameJa,
     ...landmark.aliases,
+    ...landmark.names,
+    ...landmark.keywords,
     landmark.architectNameEn,
     landmark.architectNameJa,
+    ...landmark.architectNamesEn,
+    ...landmark.architectNamesJa,
     ...landmark.architectAliases,
     landmark.address,
   ].filter(Boolean).join(' '))
@@ -851,14 +867,20 @@ function buildLandmarks(rows: LandmarkSearchRow[]): Landmark[] {
       categoryId: row.category_id,
       categorySlug: row.category_slug ?? undefined,
       architectId: row.architect_id,
+      architectIds: row.architect_ids ?? (row.architect_id ? [row.architect_id] : []),
       architectNameEn: row.architect_name_en ?? undefined,
       architectNameJa: row.architect_name_ja ?? undefined,
+      architectNamesEn: row.architect_names_en ?? (row.architect_name_en ? [row.architect_name_en] : []),
+      architectNamesJa: row.architect_names_ja ?? (row.architect_name_ja ? [row.architect_name_ja] : []),
       architectAliases: row.architect_aliases ?? [],
       nameEn: row.name_en,
       nameJa: row.name_ja ?? '',
       aliases: row.aliases ?? [],
+      names: row.names ?? [row.name_en, row.name_ja ?? '', ...(row.aliases ?? [])].filter(Boolean),
+      keywords: row.keywords ?? [],
       description: row.description ?? '',
       address: row.address ?? '',
+      websiteUrl: row.source_url ?? undefined,
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
       completionYear: row.completion_year,
@@ -1666,6 +1688,7 @@ function PinMap({
 export default function CommunityMapPrototype() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('myworld')
   const [findCommunityOpen, setFindCommunityOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
   const [communityBrowseTab, setCommunityBrowseTab] = useState<'discover' | 'limited' | 'joined'>('discover')
   const [selectedFindFolderId, setSelectedFindFolderId] = useState<string | null>(null)
   const [toVisitMode, setToVisitMode] = useState<LibraryMode>('folder')
@@ -1747,6 +1770,7 @@ export default function CommunityMapPrototype() {
   const [composerFolderName, setComposerFolderName] = useState('')
   const [composerFolderColor, setComposerFolderColor] = useState(COLORS[1])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const mapPinImageInputRef = useRef<HTMLInputElement | null>(null)
   const communityThumbInputRef = useRef<HTMLInputElement | null>(null)
   const postSubmitLockRef = useRef(false)
 
@@ -1912,7 +1936,10 @@ export default function CommunityMapPrototype() {
   const activeDropScope = dropScopes.find((scope) => scope.id === dropScopeId) ?? dropScopes[1] ?? dropScopes[0]
   const unfilteredDropPins = activeDropScope?.pins ?? []
   const dropPins = architectFilter
-    ? unfilteredDropPins.filter((pin) => landmarksById.get(pin.landmarkId ?? '')?.architectId === architectFilter.id)
+    ? unfilteredDropPins.filter((pin) => {
+        const landmark = landmarksById.get(pin.landmarkId ?? '')
+        return landmark?.architectIds.includes(architectFilter.id) || landmark?.architectId === architectFilter.id
+      })
     : unfilteredDropPins
   const profileCommunities = communities.filter((community) => community.memberIds.includes(selectedProfile.id))
   const filteredCommunities = communities.filter((community) => {
@@ -2001,6 +2028,11 @@ export default function CommunityMapPrototype() {
       .sort((left, right) => left.distance - right.distance)
       .slice(0, 5)
   }, [landmarks, postDraft?.coordinates])
+  const findLandmarkResults = useMemo(() => {
+    const query = normalizeSearchText(findQuery)
+    if (!query) return []
+    return landmarks.filter((landmark) => landmarkSearchText(landmark).includes(query)).slice(0, 12)
+  }, [findQuery, landmarks])
 
   const loadPriorityRemoteData = useCallback(async (userId: string) => {
     if (!supabase) {
@@ -3121,7 +3153,7 @@ export default function CommunityMapPrototype() {
     setPostSourceChooserOpen(true)
   }, [requireSignedIn])
 
-  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'description' | 'tags' | 'takenAt' | 'folderIds' | 'landmarkId' | 'address' | 'coordinates'>>) => {
+  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'description' | 'tags' | 'takenAt' | 'folderIds' | 'landmarkId' | 'address' | 'coordinates' | 'imageUrl' | 'imageName'>>) => {
     setPostDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, ...values } : draft))
     setPostDraft((current) => current?.id === draftId ? { ...current, ...values } : current)
   }, [])
@@ -3237,6 +3269,28 @@ export default function CommunityMapPrototype() {
       setPostMessage('位置情報がありません。map上で投稿位置を選択してください。')
     }
   }, [landmarksById, pendingLandmarkPostId, selectedCommunityId])
+
+  const handleMapPinImage = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !postDraft) return
+
+    try {
+      setPostMessage('画像を読み込んでいます。')
+      const [image, takenAt] = await Promise.all([getDisplayImage(file), getTakenAtFromImage(file)])
+      const values = {
+        imageUrl: image.imageUrl,
+        imageName: image.imageName,
+        takenAt: postDraft.takenAt || takenAt,
+      }
+      updateDraftComposer(postDraft.id, values)
+      setPostComposer((current) => ({ ...current, takenAt: values.takenAt ?? current.takenAt }))
+      setPostMessage('PINに画像を追加しました。')
+    } catch (error) {
+      console.error(error)
+      setPostMessage('画像を読み込めませんでした。')
+    }
+  }, [postDraft, updateDraftComposer])
 
   const confirmManualLocation = useCallback(async (coordinates: Coordinates) => {
     if (!postDraft) return
@@ -4149,6 +4203,7 @@ export default function CommunityMapPrototype() {
   return (
     <main className={styles.shell}>
       <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" multiple onChange={handlePostImage} />
+      <input ref={mapPinImageInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handleMapPinImage} />
       <input ref={communityThumbInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handleCommunityThumbnail} />
       {activeTab === 'mypage' && profileWorldUser && (
         <SplitMapView
@@ -4329,11 +4384,48 @@ export default function CommunityMapPrototype() {
                 {!tagStats.length && <p>投稿の#がここに表示されます。</p>}
               </div>
             </section>
-            <div className={styles.searchBox}>
+            <form
+              className={styles.searchBox}
+              onSubmit={(event) => {
+                event.preventDefault()
+                const landmark = findLandmarkResults[0]
+                if (!landmark) return
+                setActiveTab('myworld')
+                setSelectedLandmarkId(landmark.id)
+              }}
+            >
               <Search size={18} />
-              <input placeholder="キーワードで検索" />
-              <button type="button">検索</button>
-            </div>
+              <input value={findQuery} onChange={(event) => setFindQuery(event.target.value)} placeholder="建築名、設計者、関連ワードで検索" />
+              <button type="submit">検索</button>
+            </form>
+            {findQuery.trim() && (
+              <section className={styles.findLandmarkResults}>
+                <div className={styles.sectionTitleRow}>
+                  <h2>Landmarks</h2>
+                  <span>{findLandmarkResults.length}件</span>
+                </div>
+                <div>
+                  {findLandmarkResults.map((landmark) => (
+                    <button
+                      key={landmark.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('myworld')
+                        setSelectedLandmarkId(landmark.id)
+                      }}
+                    >
+                      <img src={landmark.coverImageUrl || EMPTY_IMAGE} alt="" />
+                      <span>
+                        <strong>{landmark.nameJa || landmark.nameEn}</strong>
+                        <small>{landmark.nameEn}</small>
+                        <em>{[landmark.architectNamesEn.join(', '), landmark.keywords.slice(0, 4).join(' · ')].filter(Boolean).join(' / ')}</em>
+                      </span>
+                    </button>
+                  ))}
+                  {!findLandmarkResults.length && <p>一致する建築・設計者・関連ワードはありません。</p>}
+                </div>
+              </section>
+            )}
             <div className={styles.findMain}>
               <FolderShelf title="最近公開されたフォルダー" folders={publicFindFolders} pinsById={pinsById} usersById={usersById} onOpenFolder={setSelectedFindFolderId} onOpenProfile={openProfile} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
               <FolderShelf title="ランダムなフォルダー" folders={[...publicFindFolders].reverse()} pinsById={pinsById} usersById={usersById} onOpenFolder={setSelectedFindFolderId} onOpenProfile={openProfile} onToggleLike={toggleFolderLike} onSaveFolder={saveFolderToLibrary} />
@@ -4344,86 +4436,89 @@ export default function CommunityMapPrototype() {
       )}
 
       {activeTab === 'myworld' && (
-        selectedLandmark ? (
-          <LandmarkDetail
-            landmark={selectedLandmark}
-            pins={pins.filter((pin) => pin.landmarkId === selectedLandmark.id)}
-            onBack={() => setSelectedLandmarkId(null)}
-            onPost={() => openLandmarkPost(selectedLandmark.id)}
-            onOpenPin={(pinId) => {
-              setSelectedPinId(pinId)
-              setSelectedLandmarkId(null)
+        <>
+          <SplitMapView
+            pins={dropPins}
+            landmarks={landmarks}
+            activeArchitectFilter={architectFilter}
+            selectedPinId={selectedPinId}
+            seenPinIds={seenPinIds}
+            onPinClick={openPinFromMap}
+            onListFocus={openPinFromMap}
+            onMapSurfaceClick={() => setSelectedPinId(null)}
+            onLandmarkSelect={(landmarkId) => {
+              setSelectedPinId(null)
+              setSelectedLandmarkId(landmarkId)
             }}
-          />
-        ) : <SplitMapView
-          pins={dropPins}
-          landmarks={landmarks}
-          activeArchitectFilter={architectFilter}
-          selectedPinId={selectedPinId}
-          seenPinIds={seenPinIds}
-          onPinClick={openPinFromMap}
-          onListFocus={openPinFromMap}
-          onMapSurfaceClick={() => setSelectedPinId(null)}
-          onLandmarkSelect={(landmarkId) => {
-            setSelectedPinId(null)
-            setSelectedLandmarkId(landmarkId)
-          }}
-          onArchitectFilter={(filter) => {
-            setArchitectFilter(filter)
-            setSelectedPinId(null)
-          }}
-          onClearArchitectFilter={() => {
-            setArchitectFilter(null)
-            setSelectedPinId(null)
-          }}
-          currentLocation={userLocation}
-          startAtCurrentLocation
-          panelsHidden={myWorldPanelsHidden}
-          onPanelsHiddenChange={setMyWorldPanelsHidden}
-          getPinMeta={(pin) => {
-            const owner = usersById.get(pin.ownerId)
-            return owner ? `@${owner.username}` : activeDropScope?.label ?? 'Drop'
-          }}
-          onDeletePin={deletePin}
-          onSavePin={saveExternalPin}
-          showPanelsToggle={false}
-          onMapClick={manualPlacement ? confirmManualLocation : undefined}
-          overlay={(
-            <>
-              <div className={styles.dropScopeBar}>
-                {dropScopes.map((scope) => (
-                  <button
-                    key={scope.id}
-                    className={activeDropScope?.id === scope.id ? styles.active : ''}
-                    type="button"
-                    onClick={() => {
-                      setDropScopeId(scope.id)
-                      setSelectedPinId(null)
-                      setSelectedLandmarkId(null)
-                    }}
-                  >
-                    {scope.label}
-                  </button>
-                ))}
-              </div>
-              <div className={styles.dropStatusCard}>
-                <strong>{activeDropScope?.label ?? 'Drop'}</strong>
-                <span>{dropPins.length} drops</span>
-              </div>
-              {manualPlacement && (
-                <div className={styles.placementBanner}>
-                  map上で投稿位置をクリックしてください。
+            onArchitectFilter={(filter) => {
+              setArchitectFilter(filter)
+              setSelectedPinId(null)
+            }}
+            onClearArchitectFilter={() => {
+              setArchitectFilter(null)
+              setSelectedPinId(null)
+            }}
+            currentLocation={userLocation}
+            startAtCurrentLocation
+            panelsHidden={myWorldPanelsHidden}
+            onPanelsHiddenChange={setMyWorldPanelsHidden}
+            getPinMeta={(pin) => {
+              const owner = usersById.get(pin.ownerId)
+              return owner ? `@${owner.username}` : activeDropScope?.label ?? 'Drop'
+            }}
+            onDeletePin={deletePin}
+            onSavePin={saveExternalPin}
+            showPanelsToggle={false}
+            onMapClick={manualPlacement ? confirmManualLocation : undefined}
+            overlay={(
+              <>
+                <div className={styles.dropScopeBar}>
+                  {dropScopes.map((scope) => (
+                    <button
+                      key={scope.id}
+                      className={activeDropScope?.id === scope.id ? styles.active : ''}
+                      type="button"
+                      onClick={() => {
+                        setDropScopeId(scope.id)
+                        setSelectedPinId(null)
+                        setSelectedLandmarkId(null)
+                      }}
+                    >
+                      {scope.label}
+                    </button>
+                  ))}
                 </div>
-              )}
-              {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
-            </>
+                <div className={styles.dropStatusCard}>
+                  <strong>{activeDropScope?.label ?? 'Drop'}</strong>
+                  <span>{dropPins.length} drops</span>
+                </div>
+                {manualPlacement && (
+                  <div className={styles.placementBanner}>
+                    map上で投稿位置をクリックしてください。
+                  </div>
+                )}
+                {postMessage && <div className={styles.postMessage}>{postMessage}</div>}
+              </>
+            )}
+            floatingAction={(
+              <button className={styles.dropPostButton} type="button" aria-label="dropを投稿" onClick={openLibraryPicker}>
+                <Plus size={25} />
+              </button>
+            )}
+          />
+          {selectedLandmark && (
+            <LandmarkDetail
+              landmark={selectedLandmark}
+              pins={pins.filter((pin) => pin.landmarkId === selectedLandmark.id)}
+              onBack={() => setSelectedLandmarkId(null)}
+              onPost={() => openLandmarkPost(selectedLandmark.id)}
+              onOpenPin={(pinId) => {
+                setSelectedPinId(pinId)
+                setSelectedLandmarkId(null)
+              }}
+            />
           )}
-          floatingAction={(
-            <button className={styles.dropPostButton} type="button" aria-label="dropを投稿" onClick={openLibraryPicker}>
-              <Plus size={25} />
-            </button>
-          )}
-        />
+        </>
       )}
 
       {activeTab === 'tovisit' && (
@@ -4922,6 +5017,14 @@ export default function CommunityMapPrototype() {
             )}
             <div className={styles.composerImageWrap}>
               <img src={postDraft.imageUrl} alt="" />
+              <button
+                className={styles.composerImageAdd}
+                type="button"
+                onClick={() => mapPinImageInputRef.current?.click()}
+              >
+                <Plus size={16} />
+                {postDraft.imageName === 'map-pin' ? '画像を追加' : '画像を変更'}
+              </button>
               {postDrafts.length > 1 && (
                 <button
                   type="button"
@@ -5945,46 +6048,57 @@ function LandmarkDetail({
   const [activeTag, setActiveTag] = useState('')
   const tags = tagStatsFromPins(pins).map(({ tag }) => tag)
   const filteredPins = activeTag ? pins.filter((pin) => pin.tags.includes(activeTag)) : pins
-  const coverImage = landmark.coverImageUrl || pins[0]?.imageUrl || EMPTY_IMAGE
+  const exteriorPin = pins.find((pin) => pin.tags.some((tag) => ['外観', 'facade', 'exterior'].includes(cleanTag(tag).toLowerCase())))
+  const coverImage = landmark.coverImageUrl || exteriorPin?.imageUrl || pins[0]?.imageUrl || EMPTY_IMAGE
+  const architectNames = Array.from(new Set([
+    ...landmark.architectNamesJa,
+    ...landmark.architectNamesEn,
+  ].filter(Boolean)))
 
   return (
-    <section className={styles.landmarkDetailPage}>
-      <header className={styles.landmarkHero} style={{ backgroundImage: `url(${coverImage})` }}>
-        <button type="button" aria-label="Dropへ戻る" onClick={onBack}><ArrowLeft size={22} /></button>
-        <div>
-          <span>{landmark.categorySlug || 'LANDMARK'} / {landmark.id.slice(0, 3).toUpperCase()}</span>
-          <h1>{landmark.nameJa || landmark.nameEn}</h1>
-          <p>
-            {[landmark.architectNameEn || landmark.architectNameJa, landmark.address, landmark.completionYear]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+    <aside className={styles.landmarkSheetBackdrop} onClick={onBack}>
+      <section className={styles.landmarkDetailPage} onClick={(event) => event.stopPropagation()}>
+        <header className={styles.landmarkHero} style={{ backgroundImage: `url(${coverImage})` }}>
+          <button type="button" aria-label="建築詳細を閉じる" onClick={onBack}><X size={22} /></button>
+          <div>
+            <span>{landmark.categorySlug || 'LANDMARK'} / {landmark.id.slice(0, 3).toUpperCase()}</span>
+            <h1>{landmark.nameJa || landmark.nameEn}</h1>
+            <p>
+              {[architectNames.join(', '), landmark.address, landmark.completionYear]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </div>
+        </header>
+        <div className={styles.landmarkDetailBody}>
+          <div className={styles.landmarkStats}>
+            <strong>{pins.length} <span>POSTS</span></strong>
+            <strong>{new Set(pins.map((pin) => pin.ownerId)).size} <span>CONTRIBUTORS</span></strong>
+            <button type="button" onClick={onPost}><Plus size={18} />画像を投稿</button>
+          </div>
+          {landmark.description && <p className={styles.landmarkDescription}>{landmark.description}</p>}
+          {landmark.keywords.length > 0 && (
+            <p className={styles.landmarkKeywords}>{landmark.keywords.map((keyword) => `#${keyword}`).join(' ')}</p>
+          )}
+          {landmark.websiteUrl && <a className={styles.landmarkWebsite} href={landmark.websiteUrl} target="_blank" rel="noreferrer">Official site</a>}
+          <div className={styles.landmarkTagRail}>
+            <button className={!activeTag ? styles.active : ''} type="button" onClick={() => setActiveTag('')}>すべて</button>
+            {tags.map((tag) => (
+              <button className={activeTag === tag ? styles.active : ''} key={tag} type="button" onClick={() => setActiveTag(tag)}>#{tag}</button>
+            ))}
+          </div>
+          <div className={styles.landmarkPinGrid}>
+            {filteredPins.map((pin) => (
+              <button key={pin.id} type="button" onClick={() => onOpenPin(pin.id)}>
+                <img src={pin.imageUrl} alt="" />
+                <span>{pin.tags[0] ? `#${pin.tags[0]}` : pin.title}</span>
+              </button>
+            ))}
+            {!filteredPins.length && <p>この建築にはまだ投稿がありません。</p>}
+          </div>
         </div>
-      </header>
-      <div className={styles.landmarkDetailBody}>
-        <div className={styles.landmarkStats}>
-          <strong>{pins.length} <span>POSTS</span></strong>
-          <strong>{new Set(pins.map((pin) => pin.ownerId)).size} <span>CONTRIBUTORS</span></strong>
-          <button type="button" onClick={onPost}><Plus size={18} />画像を投稿</button>
-        </div>
-        {landmark.description && <p className={styles.landmarkDescription}>{landmark.description}</p>}
-        <div className={styles.landmarkTagRail}>
-          <button className={!activeTag ? styles.active : ''} type="button" onClick={() => setActiveTag('')}>すべて</button>
-          {tags.map((tag) => (
-            <button className={activeTag === tag ? styles.active : ''} key={tag} type="button" onClick={() => setActiveTag(tag)}>#{tag}</button>
-          ))}
-        </div>
-        <div className={styles.landmarkPinGrid}>
-          {filteredPins.map((pin) => (
-            <button key={pin.id} type="button" onClick={() => onOpenPin(pin.id)}>
-              <img src={pin.imageUrl} alt="" />
-              <span>{pin.tags[0] ? `#${pin.tags[0]}` : pin.title}</span>
-            </button>
-          ))}
-          {!filteredPins.length && <p>この建築にはまだ投稿がありません。</p>}
-        </div>
-      </div>
-    </section>
+      </section>
+    </aside>
   )
 }
 
@@ -6195,13 +6309,16 @@ function SplitMapView({
     if (!query) return []
     const architects = new Map<string, ArchitectFilter & { aliases: string[] }>()
     landmarks.forEach((landmark) => {
-      if (!landmark.architectId) return
-      const label = landmark.architectNameJa || landmark.architectNameEn || landmark.architectAliases[0]
-      if (!label) return
-      architects.set(landmark.architectId, {
-        id: landmark.architectId,
-        label,
-        aliases: [landmark.architectNameEn ?? '', landmark.architectNameJa ?? '', ...landmark.architectAliases],
+      landmark.architectIds.forEach((architectId, index) => {
+        const nameEn = landmark.architectNamesEn[index] ?? landmark.architectNameEn ?? ''
+        const nameJa = landmark.architectNamesJa[index] ?? landmark.architectNameJa ?? ''
+        const label = nameJa || nameEn || landmark.architectAliases[0]
+        if (!label) return
+        architects.set(architectId, {
+          id: architectId,
+          label,
+          aliases: [nameEn, nameJa, ...landmark.architectAliases],
+        })
       })
     })
     return Array.from(architects.values())
@@ -6345,7 +6462,10 @@ function SplitMapView({
                       }}
                     >
                       <img src={landmark.coverImageUrl || EMPTY_IMAGE} alt="" />
-                      <span><strong>{landmark.nameJa || landmark.nameEn}</strong><small>{landmark.architectNameEn || landmark.address}</small></span>
+                      <span>
+                        <strong>{landmark.nameJa || landmark.nameEn}</strong>
+                        <small>{[landmark.architectNamesEn.join(', '), landmark.keywords.slice(0, 3).join(' · '), landmark.address].filter(Boolean).join(' / ')}</small>
+                      </span>
                     </button>
                   ))}
                   {pinSearchSuggestions.map((pin) => (

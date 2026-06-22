@@ -3235,6 +3235,21 @@
   cursor: pointer;
 }
 
+.composerImageWrap > .composerImageAdd {
+  top: auto;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  width: auto;
+  height: 38px;
+  gap: 6px;
+  padding: 0 13px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .composerDraftRail {
   display: flex;
   gap: 8px;
@@ -4493,17 +4508,108 @@
   font-size: 11px;
 }
 
+.findLandmarkResults {
+  margin: 18px 0 28px;
+}
+
+.findLandmarkResults > div:last-child {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #d6d6d0;
+  border-radius: 6px;
+  background: #d6d6d0;
+}
+
+.findLandmarkResults > div:last-child > button {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 0;
+  background: #fff;
+  color: #111;
+  text-align: left;
+}
+
+.findLandmarkResults img {
+  width: 72px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.findLandmarkResults span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.findLandmarkResults strong,
+.findLandmarkResults small,
+.findLandmarkResults em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.findLandmarkResults small,
+.findLandmarkResults em {
+  color: #777;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.findLandmarkResults p {
+  margin: 0;
+  padding: 18px;
+  background: #fff;
+  color: #777;
+}
+
+.landmarkSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 18px 18px 0;
+  background: rgb(0 0 0 / 42%);
+  backdrop-filter: blur(3px);
+}
+
 .landmarkDetailPage {
-  min-height: calc(100dvh - 86px);
-  padding-bottom: 100px;
+  width: min(920px, 100%);
+  max-height: calc(100dvh - 30px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
   background: #f4f1e9;
   color: #111;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -20px 60px rgb(0 0 0 / 28%);
+  animation: landmarkSheetIn 260ms cubic-bezier(.2, .8, .2, 1);
+}
+
+@keyframes landmarkSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .landmarkHero {
   position: relative;
   display: flex;
-  min-height: min(54dvh, 560px);
+  min-height: min(42dvh, 460px);
   align-items: flex-end;
   padding: 28px;
   background-position: center;
@@ -4527,7 +4633,7 @@
 .landmarkHero > button {
   position: absolute;
   top: 20px;
-  left: 20px;
+  right: 20px;
   display: grid;
   width: 44px;
   height: 44px;
@@ -4587,6 +4693,25 @@
 .landmarkDescription {
   max-width: 720px;
   line-height: 1.7;
+}
+
+.landmarkKeywords {
+  max-width: 720px;
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+  color: #555149;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.landmarkWebsite {
+  display: inline-flex;
+  margin-top: 4px;
+  color: #111;
+  font-size: 13px;
+  font-weight: 900;
+  text-underline-offset: 3px;
 }
 
 .landmarkTagRail {
@@ -4654,8 +4779,17 @@
   }
 
   .landmarkHero {
-    min-height: 43dvh;
+    min-height: 32dvh;
     padding: 22px;
+  }
+
+  .landmarkSheetBackdrop {
+    padding: 10px 0 0;
+  }
+
+  .landmarkDetailPage {
+    max-height: calc(100dvh - 10px);
+    border-radius: 10px 10px 0 0;
   }
 
   .landmarkDetailBody {
