@@ -43,7 +43,24 @@ SQLの最後のSELECTで、Bauhaus Dessauの1行が返れば成功です。
 
 ## 2件目からの追加方法
 
-外部キーがUUIDなので、Table Editorへ別々に手入力するより、`landmark_catalog_v2_bauhaus.sql`末尾のseed部分を複製して`catalog_key`と内容を書き換える方法が安全です。
+新規追加には`landmark_insert_template.sql`を使います。ファイル上部の「ここだけ編集」にある値だけを置き換え、Supabase SQL Editorで全文実行してください。
+
+このテンプレートは以下を自動で行います。
+
+- 設計者と建築のUUID発行
+- `architects`と`landmarks`の作成または更新
+- `landmark_architects`の紐付け
+- 英語・日本語の主名称の自動登録
+- 追加名称と検索関連語の件数無制限登録
+- 同じ`catalog_key`で再実行した場合の重複防止
+
+設計者、追加名称、関連語はJSON配列へ行を増やすだけです。
+
+通常の文章欄で`'`を使う場合は、SQLでは`''`と2個続けて書きます。JSON配列内の文章はダブルクォートで囲みます。
+
+注意: 同じ`catalog_key`で再実行すると、その建築の設計者・名称・関連語はテンプレートに書かれた最新内容へ同期されます。
+
+Table Editorへ個別に手入力する場合は、次の順番です。
 
 1. `architects`へ設計者をupsertする。
 2. `landmarks`へ建築をupsertする。
