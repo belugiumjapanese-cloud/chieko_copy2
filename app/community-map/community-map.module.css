@@ -6,10 +6,6 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.homeShell {
-  padding-bottom: 0;
-}
-
 .hiddenInput {
   position: absolute;
   width: 1px;
@@ -159,71 +155,6 @@
   height: calc(100dvh - 78px);
   padding: 14px 12px 12px;
   overflow: hidden;
-}
-
-.recommendPage {
-  display: grid;
-  gap: 22px;
-  min-height: 100dvh;
-  padding: 22px 16px 104px;
-  background: #f6f6f6;
-}
-
-.recommendHeroRail {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(280px, 76vw);
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-
-.recommendHeroRail::-webkit-scrollbar {
-  display: none;
-}
-
-.recommendHeroRail article {
-  position: relative;
-  min-height: 210px;
-  overflow: hidden;
-  color: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 18px 44px rgba(24, 34, 29, 0.18);
-}
-
-.recommendHeroRail img {
-  width: 100%;
-  height: 100%;
-  min-height: 210px;
-  object-fit: cover;
-  filter: brightness(0.72);
-}
-
-.recommendHeroRail div {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  left: 18px;
-  display: grid;
-  gap: 5px;
-}
-
-.recommendHeroRail span,
-.recommendHeroRail small {
-  font-weight: 900;
-  opacity: 0.86;
-}
-
-.recommendHeroRail strong {
-  max-width: 680px;
-  font-size: clamp(1.7rem, 5vw, 3.4rem);
-  line-height: 1.05;
-}
-
-.recommendSection {
-  display: grid;
-  gap: 12px;
 }
 
 .homeTopbar {
@@ -4020,7 +3951,7 @@
   left: 0;
   z-index: 70;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
   min-height: 78px;
   padding: 8px 8px max(8px, env(safe-area-inset-bottom));

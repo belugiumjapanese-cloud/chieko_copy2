@@ -24,7 +24,6 @@ import {
   Send,
   SlidersHorizontal,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Users,
   UserRound,
@@ -45,7 +44,7 @@ const PRODUCTION_SITE_URL = 'https://map-omega-nine.vercel.app'
 const CONFIGURED_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
 const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
 const AUTH_SESSION_TIMEOUT_MS = 6000
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 const CACHE_PREFIX = 'spot-map:swr-cache'
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const FALLBACK_CATEGORIES: ContentCategory[] = [
@@ -68,36 +67,6 @@ const FALLBACK_CATEGORIES: ContentCategory[] = [
 ]
 const EMPTY_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20width%3D%22400%22%20height%3D%22300%22%20fill%3D%22%23f2f2f2%22/%3E%3Cpath%20d%3D%22M64%20224l82-96%2059%2068%2045-48%2086%2076z%22%20fill%3D%22%23111111%22%20opacity%3D%22.2%22/%3E%3Ccircle%20cx%3D%22288%22%20cy%3D%2282%22%20r%3D%2230%22%20fill%3D%22%23111111%22%20opacity%3D%22.18%22/%3E%3C/svg%3E'
-const EMBEDDED_RECOMMEND_ITEMS: RecommendItem[] = [
-  {
-    id: 'embedded-event-architecture-walk',
-    item_type: 'event',
-    title: '週末に歩きたい建築と街のイベント',
-    description: '公式ピックアップ',
-    image_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=80',
-    target_url: null,
-    folder_id: null,
-    post_id: null,
-    community_id: null,
-    priority: 1,
-    is_published: true,
-    created_at: '2026-05-01T00:00:00.000Z',
-  },
-  {
-    id: 'embedded-community-city-details',
-    item_type: 'announcement',
-    title: '街の細部を集めるCommunity',
-    description: 'マンホール、看板、階段、ドアノブなどの公開mapを育てる場所。',
-    image_url: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1100&q=80',
-    target_url: null,
-    folder_id: null,
-    post_id: null,
-    community_id: null,
-    priority: 2,
-    is_published: true,
-    created_at: '2026-05-01T00:00:00.000Z',
-  },
-]
 const COMMUNITY_PRESETS: Array<{
   type: CommunityMapKind
   title: string
@@ -174,7 +143,7 @@ function getAuthRedirectUrl() {
   return `${siteUrl}/community-map`
 }
 
-type ActiveTab = 'home' | 'find' | 'myworld' | 'tovisit' | 'mypage'
+type ActiveTab = 'find' | 'myworld' | 'tovisit' | 'mypage'
 type CommunityDetailTab = 'pins' | 'timeline' | 'map'
 type LibraryMode = 'folder' | 'pin'
 type DropScope = { id: string; label: string; pins: Pin[] }
@@ -341,21 +310,6 @@ type NotificationItem = {
   createdAt: string
 }
 
-type RecommendItem = {
-  id: string
-  item_type: string
-  title: string
-  description: string | null
-  image_url: string | null
-  target_url: string | null
-  folder_id: string | null
-  post_id: string | null
-  community_id: string | null
-  priority: number | null
-  is_published: boolean | null
-  created_at: string
-}
-
 type CachedRemoteSnapshot = {
   version: number
   userId: string
@@ -366,7 +320,6 @@ type CachedRemoteSnapshot = {
   communities: Community[]
   activities: CommunityActivity[]
   notifications: NotificationItem[]
-  recommendItems: RecommendItem[]
   savedPinIds: string[]
   savedFolderIds: string[]
 }
@@ -943,24 +896,6 @@ function uniquePinsById(pins: Pin[]) {
   })
 }
 
-function uniqueFoldersById(folders: Folder[]) {
-  const seen = new Set<string>()
-  return folders.filter((folder) => {
-    if (seen.has(folder.id)) return false
-    seen.add(folder.id)
-    return true
-  })
-}
-
-function uniqueCommunitiesById(communities: Community[]) {
-  const seen = new Set<string>()
-  return communities.filter((community) => {
-    if (seen.has(community.id)) return false
-    seen.add(community.id)
-    return true
-  })
-}
-
 function uniquePinsByMemory(pins: Pin[]) {
   const seen = new Set<string>()
   return pins.filter((pin) => {
@@ -1106,7 +1041,6 @@ function normalizeCachedSnapshot(value: unknown, userId: string): CachedRemoteSn
     communities: Array.isArray(value.communities) ? value.communities as Community[] : [],
     activities: Array.isArray(value.activities) ? value.activities as CommunityActivity[] : [],
     notifications: Array.isArray(value.notifications) ? value.notifications as NotificationItem[] : [],
-    recommendItems: Array.isArray(value.recommendItems) ? value.recommendItems as RecommendItem[] : [],
     savedPinIds: Array.isArray(value.savedPinIds) ? value.savedPinIds.filter((item): item is string => typeof item === 'string') : [],
     savedFolderIds: Array.isArray(value.savedFolderIds) ? value.savedFolderIds.filter((item): item is string => typeof item === 'string') : [],
   }
@@ -1768,7 +1702,6 @@ export default function CommunityMapPrototype() {
   const [pins, setPins] = useState<Pin[]>([])
   const [activities, setActivities] = useState<CommunityActivity[]>([])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [recommendItems, setRecommendItems] = useState<RecommendItem[]>(EMBEDDED_RECOMMEND_ITEMS)
   const [folders, setFolders] = useState<Folder[]>([])
   const [savedPinIds, setSavedPinIds] = useState<string[]>([])
   const [savedFolderIds, setSavedFolderIds] = useState<string[]>([])
@@ -1948,11 +1881,9 @@ export default function CommunityMapPrototype() {
   const joinedCommunities = communities.filter((community) => community.memberIds.includes(activeUserId))
   const joinedCategories = categories.filter((category) => category.joinedByMe)
   const followPins = publicPins.filter((pin) => currentUser.followingIds.includes(pin.ownerId))
-  const recommendedPins = [...publicPins].sort((a, b) => (b.likes + b.saves + b.comments.length) - (a.likes + a.saves + a.comments.length)).slice(0, 200)
   const dropScopes: DropScope[] = [
     { id: 'chaos', label: 'Chaos', pins: uniquePinsById([...landmarkCatalogPins, ...publicPins]) },
     { id: 'follow', label: 'Follow', pins: followPins },
-    { id: 'recommend', label: 'Recommend', pins: recommendedPins },
     ...joinedCommunities.map((community) => ({
       id: `community:${community.id}`,
       label: communityLabel(community),
@@ -1983,11 +1914,6 @@ export default function CommunityMapPrototype() {
   const dropPins = architectFilter
     ? unfilteredDropPins.filter((pin) => landmarksById.get(pin.landmarkId ?? '')?.architectId === architectFilter.id)
     : unfilteredDropPins
-  const recommendedCommunities = communities.filter((community) =>
-    !community.memberIds.includes(activeUserId) &&
-    (currentUser.followingIds.some((userId) => community.memberIds.includes(userId)) || community.privacy === 'public'),
-  )
-  const communitySpotlightItems = uniqueCommunitiesById([...recommendedCommunities, ...joinedCommunities, ...communities]).slice(0, 6)
   const profileCommunities = communities.filter((community) => community.memberIds.includes(selectedProfile.id))
   const filteredCommunities = communities.filter((community) => {
     const query = communityQuery.trim().toLowerCase()
@@ -2051,7 +1977,6 @@ export default function CommunityMapPrototype() {
     setCommunities(cached.communities)
     setActivities(cached.activities)
     setNotifications(cached.notifications)
-    setRecommendItems(cached.recommendItems.length ? cached.recommendItems : EMBEDDED_RECOMMEND_ITEMS)
     setSavedPinIds(cached.savedPinIds)
     setSavedFolderIds(cached.savedFolderIds)
     setRemoteLoading(false)
@@ -2320,20 +2245,12 @@ export default function CommunityMapPrototype() {
         membersResult,
         folderLikesResult,
         savedFoldersResult,
-        recommendResult,
       ] = await Promise.all([
         supabase.from('app_folder_cards').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('app_community_cards').select('*').order('created_at', { ascending: false }).limit(200),
         supabase.from('community_members').select('community_id,user_id,role'),
         supabase.from('folder_likes').select('folder_id,user_id,created_at').limit(2000),
         supabase.from('saved_folders').select('folder_id,user_id,created_at').limit(2000),
-        supabase
-          .from('recommend_items')
-          .select('id,item_type,title,description,image_url,target_url,folder_id,post_id,community_id,priority,is_published,created_at')
-          .eq('is_published', true)
-          .order('priority', { ascending: true })
-          .order('created_at', { ascending: false })
-          .limit(30),
       ])
 
       let memberRows = (membersResult.error ? [] : membersResult.data ?? []) as CommunityMemberRow[]
@@ -2438,17 +2355,10 @@ export default function CommunityMapPrototype() {
         ? savedFolderRows.filter((row) => row.user_id === userId).map((row) => row.folder_id)
         : []
 
-      const remoteRecommendItems = (!recommendResult.error && Array.isArray(recommendResult.data)
-        ? recommendResult.data
-        : []) as RecommendItem[]
-      if (recommendResult.error) console.warn(recommendResult.error.message)
-      const nextRecommendItems = remoteRecommendItems.length ? remoteRecommendItems : EMBEDDED_RECOMMEND_ITEMS
-
       const remoteFolders = buildFolders(folderRows, folderLikeRows, userId, savedFolderRows)
       const remoteCommunities = buildCommunities(communityRows, memberRows, userId)
       setFolders(remoteFolders)
       setCommunities(remoteCommunities)
-      setRecommendItems(nextRecommendItems)
       setSavedFolderIds(remoteSavedFolderIds)
 
       const [
@@ -2586,7 +2496,6 @@ export default function CommunityMapPrototype() {
         communities: remoteCommunities,
         activities: remoteActivities,
         notifications: remoteNotifications,
-        recommendItems: nextRecommendItems,
         savedPinIds: remoteSavedPinIds,
         savedFolderIds: remoteSavedFolderIds,
       })
@@ -2738,7 +2647,6 @@ export default function CommunityMapPrototype() {
     setActivities([])
     setNotifications([])
     setSavedPinIds([])
-    setRecommendItems(EMBEDDED_RECOMMEND_ITEMS)
     setRemoteError('')
     void supabase?.auth.signOut()
   }, [activeUserId])
@@ -3403,10 +3311,12 @@ export default function CommunityMapPrototype() {
             longitude: draft.coordinates.longitude,
             image_url: draft.imageUrl,
             address: draft.address || null,
-            visibility: draft.communityId ? 'public' : 'private',
+            visibility: draft.communityId || draft.landmarkId ? 'public' : 'private',
             tags,
             taken_at: draft.takenAt ? new Date(draft.takenAt).toISOString() : null,
             source_type: 'original',
+            post_kind: draft.imageName === 'map-pin' ? 'map_pin' : 'photo',
+            location_source: draft.landmarkId ? 'landmark' : draft.locationSource === 'gps' ? 'photo_gps' : 'manual',
           })
           .select('id')
           .single()
@@ -3672,9 +3582,6 @@ export default function CommunityMapPrototype() {
     setComposerFolderPanelOpen(false)
     setInviteCommunityId(null)
     setProfileWorldUserId(null)
-    if (nextTab === 'home') {
-      setCommunityDetailTab('pins')
-    }
     if (nextTab === 'find') {
       setSelectedCommunityId(null)
       setFindCommunityOpen(false)
@@ -4154,20 +4061,6 @@ export default function CommunityMapPrototype() {
     return `@${owner?.username ?? 'user'} / ${communityLabel(communitiesById.get(pinCommunityIds(pin)[0] ?? ''))}`
   }, [communitiesById, usersById])
 
-  const recommendHeroItems = recommendItems.length ? recommendItems : EMBEDDED_RECOMMEND_ITEMS
-  const recommendedFolderItems = recommendItems.filter((item) => item.folder_id && ['folder_pick', 'official_folder'].includes(item.item_type))
-  const recommendedCommunityItems = recommendItems.filter((item) => item.community_id && item.item_type === 'community_pick')
-  const recommendedFoldersFromAdmin = uniqueFoldersById(
-    recommendedFolderItems
-      .map((item) => item.folder_id ? foldersById.get(item.folder_id) : null)
-      .filter((folder): folder is Folder => Boolean(folder)),
-  )
-  const recommendedCommunitiesFromAdmin = uniqueCommunitiesById(
-    recommendedCommunityItems
-      .map((item) => item.community_id ? communitiesById.get(item.community_id) : null)
-      .filter((community): community is Community => Boolean(community)),
-  )
-
   const authScreen = (
     <section className={styles.authPanel}>
       <div>
@@ -4254,7 +4147,7 @@ export default function CommunityMapPrototype() {
   }
 
   return (
-    <main className={`${styles.shell} ${activeTab === 'home' ? styles.homeShell : ''}`}>
+    <main className={styles.shell}>
       <input ref={fileInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" multiple onChange={handlePostImage} />
       <input ref={communityThumbInputRef} className={styles.hiddenInput} type="file" accept="image/*,.heic,.heif,.HEIC,.HEIF" onChange={handleCommunityThumbnail} />
       {activeTab === 'mypage' && profileWorldUser && (
@@ -4280,63 +4173,6 @@ export default function CommunityMapPrototype() {
           )}
         />
       )}
-      {activeTab === 'home' && (
-        <section className={styles.recommendPage}>
-          <header className={styles.pageHeader}>
-            <span>Recommend</span>
-            <h1>運営のおすすめと、今見てほしい場所</h1>
-          </header>
-          <div className={styles.recommendHeroRail}>
-            {recommendHeroItems.map((item) => (
-              <article key={item.id}>
-                <img src={item.image_url || EMPTY_IMAGE} alt="" />
-                <div>
-                  <span>{item.item_type.replace(/_/g, ' ')}</span>
-                  <strong>{item.title}</strong>
-                  <small>{item.description || '公式ピックアップ'}</small>
-                </div>
-              </article>
-            ))}
-          </div>
-          <section className={styles.recommendSection}>
-            <div className={styles.sectionHeadingRow}>
-              <div>
-                <h2>Pick up folders</h2>
-                <p>運営が見せたい公開フォルダーをここに出していきます。</p>
-              </div>
-            </div>
-            <FolderShelf
-              title={recommendedFoldersFromAdmin.length ? 'Official / picked folders' : 'Public folders'}
-              folders={(recommendedFoldersFromAdmin.length ? recommendedFoldersFromAdmin : publicFindFolders).slice(0, 8)}
-              pinsById={pinsById}
-              usersById={usersById}
-              onOpenFolder={(folderId) => { setActiveTab('find'); setSelectedFindFolderId(folderId) }}
-              onOpenProfile={openProfile}
-              onToggleLike={toggleFolderLike}
-              onSaveFolder={saveFolderToLibrary}
-            />
-          </section>
-          <section className={styles.recommendSection}>
-            <div className={styles.sectionHeadingRow}>
-              <div>
-                <h2>Community pulse</h2>
-                <p>参加すると、自分のdropをコミュニティへ共有できます。</p>
-              </div>
-            </div>
-            <CommunityListSection
-              title="Recommended community"
-              communities={(recommendedCommunitiesFromAdmin.length ? recommendedCommunitiesFromAdmin : [...recommendedCommunities, ...joinedCommunities]).slice(0, 8)}
-              currentUserId={activeUserId}
-              onOpen={openCommunity}
-              onShare={(communityId) => {
-                setInviteCommunityId(communityId)
-                setInviteQuery('')
-              }}
-            />
-          </section>
-        </section>
-      )}
-
       {activeTab === 'find' && (
         selectedCommunity ? (
           <CommunityMapView
@@ -5248,7 +5084,6 @@ export default function CommunityMapPrototype() {
 
       <nav className={styles.footer}>
         <button className={activeTab === 'find' ? styles.active : ''} type="button" onClick={() => switchTab('find')}><Search size={21} /><span>Find</span></button>
-        <button className={activeTab === 'home' ? styles.active : ''} type="button" onClick={() => switchTab('home')}><Sparkles size={21} /><span>Recommend</span></button>
         <button className={activeTab === 'myworld' ? styles.active : ''} type="button" onClick={() => switchTab('myworld')}><Droplet size={21} /><span>Drop</span></button>
         <button className={activeTab === 'tovisit' ? styles.active : ''} type="button" onClick={() => switchTab('tovisit')}><Folder size={21} /><span>Library</span></button>
         <button className={activeTab === 'mypage' ? styles.active : ''} type="button" onClick={() => switchTab('mypage')}><UserRound size={21} /><span>Profile</span></button>
