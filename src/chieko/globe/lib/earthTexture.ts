@@ -6,6 +6,7 @@ const TILE_SIZE = 512
 const MAX_MERCATOR_LAT = 85.051129
 const OUTPUT_WIDTH = 2048
 const OUTPUT_HEIGHT = 1024
+const TILE_LOAD_TIMEOUT_MS = 2200
 
 type EarthTexturePalette = DropMapTheme['globe']
 
@@ -47,9 +48,25 @@ function styleTileUrl(style: StyleParts, token: string, x: number, y: number) {
 function loadTile(url: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
+    const cleanup = () => {
+      window.clearTimeout(timer)
+      image.onload = null
+      image.onerror = null
+    }
+    const timer = window.setTimeout(() => {
+      cleanup()
+      reject(new Error('Mapboxタイルの読み込みがタイムアウトしました'))
+    }, TILE_LOAD_TIMEOUT_MS)
+
     image.crossOrigin = 'anonymous'
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('Mapboxタイルを読み込めませんでした'))
+    image.onload = () => {
+      cleanup()
+      resolve(image)
+    }
+    image.onerror = () => {
+      cleanup()
+      reject(new Error('Mapboxタイルを読み込めませんでした'))
+    }
     image.src = url
   })
 }
