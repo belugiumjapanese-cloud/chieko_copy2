@@ -242,6 +242,7 @@ type PostDraft = {
   communityId?: string | null
   imageUrl: string
   imageName: string
+  status: 'publish' | 'draft'
   coordinates: Coordinates | null
   locationSource: 'gps' | 'manual' | 'manual-pending'
   address: string
@@ -809,7 +810,11 @@ function cleanTag(tag: string) {
 }
 
 function normalizeSearchText(value: string) {
-  return value.normalize('NFKC').trim().toLocaleLowerCase('ja')
+  return value
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase('ja')
+    .replace(/[\s　・･._-]+/g, '')
 }
 
 function landmarkSearchText(landmark: Landmark) {
@@ -3148,12 +3153,17 @@ export default function CommunityMapPrototype() {
     setPendingLandmarkPostId(landmarkId)
     setPostDraft(null)
     setPostDrafts([])
+    setPostMessage('画像を選択してください。')
     setComposerOpen(false)
     setManualPlacement(false)
-    setPostSourceChooserOpen(true)
+    setPostSourceChooserOpen(false)
+    setSelectedLandmarkId(null)
+    window.requestAnimationFrame(() => {
+      fileInputRef.current?.click()
+    })
   }, [requireSignedIn])
 
-  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'description' | 'tags' | 'takenAt' | 'folderIds' | 'landmarkId' | 'address' | 'coordinates' | 'imageUrl' | 'imageName'>>) => {
+  const updateDraftComposer = useCallback((draftId: string, values: Partial<Pick<PostDraft, 'title' | 'description' | 'tags' | 'takenAt' | 'folderIds' | 'landmarkId' | 'address' | 'coordinates' | 'imageUrl' | 'imageName' | 'status'>>) => {
     setPostDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, ...values } : draft))
     setPostDraft((current) => current?.id === draftId ? { ...current, ...values } : current)
   }, [])
@@ -3198,6 +3208,7 @@ export default function CommunityMapPrototype() {
       communityId: selectedCommunityId,
       imageUrl: landmark?.coverImageUrl || EMPTY_IMAGE,
       imageName: 'map-pin',
+      status: 'publish',
       coordinates: landmark ? { latitude: landmark.latitude, longitude: landmark.longitude } : null,
       locationSource: landmark ? 'manual' : 'manual-pending',
       address: landmark?.address ?? '',
@@ -3235,6 +3246,7 @@ export default function CommunityMapPrototype() {
         communityId: selectedCommunityId,
         imageUrl: image.imageUrl,
         imageName: image.imageName,
+        status: 'publish',
         coordinates,
         locationSource: selectedLandmark ? 'manual' : gps ? 'gps' : 'manual-pending',
         address,
@@ -3306,7 +3318,7 @@ export default function CommunityMapPrototype() {
 
   const submitCommunityPost = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!postDraft?.coordinates) return
+    if (!postDraft) return
     const client = supabase
     if (!client || !requireSignedIn()) return
     if (postSubmitLockRef.current) return
@@ -3323,19 +3335,24 @@ export default function CommunityMapPrototype() {
           }
         : draft,
     )
-    const draftMissingLocation = syncedDrafts.find((draft) => !draft.coordinates)
+    const publishDrafts = syncedDrafts.filter((draft) => draft.status !== 'draft')
+    if (!publishDrafts.length) {
+      setPostMessage('下書きだけが選択されています。投稿する写真を1枚以上「投稿」にしてください。')
+      return
+    }
+    const draftMissingLocation = publishDrafts.find((draft) => !draft.coordinates)
     if (draftMissingLocation) {
       activatePostDraft(draftMissingLocation)
       setPostMessage('位置情報がない画像があります。map上で位置を指定してください。')
       return
     }
-    const draftMissingTitle = syncedDrafts.find((draft) => !draft.title.trim())
+    const draftMissingTitle = publishDrafts.find((draft) => !draft.title.trim())
     if (draftMissingTitle) {
       activatePostDraft(draftMissingTitle)
       setPostMessage('各PINのタイトルを入力してください。')
       return
     }
-    const draftMissingTags = syncedDrafts.find((draft) => !draft.tags.split(/\s+/).map(cleanTag).filter(Boolean).length)
+    const draftMissingTags = publishDrafts.find((draft) => !draft.tags.split(/\s+/).map(cleanTag).filter(Boolean).length)
     if (draftMissingTags) {
       activatePostDraft(draftMissingTags)
       setPostMessage('各PINに最低1つの#を追加してください。')
@@ -3347,7 +3364,7 @@ export default function CommunityMapPrototype() {
 
     try {
       let lastPostId = ''
-      for (const draft of syncedDrafts) {
+      for (const draft of publishDrafts) {
         if (!draft.coordinates) continue
         const title = draft.title.trim()
         const tags = draft.tags
@@ -3424,7 +3441,8 @@ export default function CommunityMapPrototype() {
       setPostDraft(null)
       setPostDrafts([])
       setSelectedPinId(lastPostId || null)
-      setPostMessage(syncedDrafts.some((draft) => draft.communityId) ? '投稿しました。' : 'Dropに保存しました。')
+      const draftCount = syncedDrafts.length - publishDrafts.length
+      setPostMessage(`${publishDrafts.some((draft) => draft.communityId) ? '投稿しました。' : 'Dropに保存しました。'}${draftCount ? ` 下書き${draftCount}枚は保存していません。` : ''}`)
     } finally {
       postSubmitLockRef.current = false
       setPostSaving(false)
@@ -4969,11 +4987,13 @@ export default function CommunityMapPrototype() {
                 <strong>写真を選択</strong>
                 <small>写真の位置情報を読み取ります</small>
               </button>
-              <button type="button" onClick={chooseMapPinPost}>
-                <MapIcon size={22} />
-                <strong>MAPにPINを刺す</strong>
-                <small>検索または地図から場所を選びます</small>
-              </button>
+              {!pendingLandmarkPostId && (
+                <button type="button" onClick={chooseMapPinPost}>
+                  <MapIcon size={22} />
+                  <strong>MAPにPINを刺す</strong>
+                  <small>検索または地図から場所を選びます</small>
+                </button>
+              )}
             </div>
           </section>
         </aside>
@@ -5011,6 +5031,7 @@ export default function CommunityMapPrototype() {
                     <img src={draft.imageUrl} alt="" />
                     <span>{index + 1}</span>
                     {!draft.coordinates && <b>位置未設定</b>}
+                    {draft.status === 'draft' && <em>下書き</em>}
                   </button>
                 ))}
               </div>
@@ -5045,6 +5066,23 @@ export default function CommunityMapPrototype() {
               )}
             </div>
             <strong>{postDraft.communityId ? `${communityLabel(communitiesById.get(postDraft.communityId))} に投稿` : 'Dropする'}</strong>
+            <div className={styles.draftStatusToggle} role="group" aria-label="この写真の扱い">
+              <span>この写真</span>
+              <button
+                className={postDraft.status === 'publish' ? styles.active : ''}
+                type="button"
+                onClick={() => updateDraftComposer(postDraft.id, { status: 'publish' })}
+              >
+                投稿
+              </button>
+              <button
+                className={postDraft.status === 'draft' ? styles.active : ''}
+                type="button"
+                onClick={() => updateDraftComposer(postDraft.id, { status: 'draft' })}
+              >
+                下書き
+              </button>
+            </div>
             {postDraft.coordinates && (
               <div className={styles.locationSummary}>
                 <MapIcon size={18} />
@@ -6338,13 +6376,6 @@ function SplitMapView({
     const query = mapSearch.trim()
     if (!query) return
 
-    const matchedPin = pinSearchSuggestions[0]
-    if (matchedPin) {
-      setFocusedPinId(matchedPin.id)
-      onListFocus?.(matchedPin.id)
-      return
-    }
-
     const matchedLandmark = landmarkSearchSuggestions[0]
     if (matchedLandmark) {
       onLandmarkSelect?.(matchedLandmark.id)
@@ -6357,6 +6388,13 @@ function SplitMapView({
     if (matchedArchitect) {
       onArchitectFilter?.({ id: matchedArchitect.id, label: matchedArchitect.label })
       setPlaceSearchSuggestions([])
+      return
+    }
+
+    const matchedPin = pinSearchSuggestions[0]
+    if (matchedPin) {
+      setFocusedPinId(matchedPin.id)
+      onListFocus?.(matchedPin.id)
       return
     }
 

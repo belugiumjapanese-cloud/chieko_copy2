@@ -3322,6 +3322,41 @@
   background: #f59e0b;
 }
 
+.draftStatusToggle {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d7d7d1;
+  border-radius: 8px;
+  background: #f7f7f4;
+}
+
+.draftStatusToggle span {
+  color: #58645e;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.draftStatusToggle button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #d2d2cc;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.draftStatusToggle button.active {
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
+}
+
 .locationSummary {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
