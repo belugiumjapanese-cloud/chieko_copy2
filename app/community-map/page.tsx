@@ -44,7 +44,7 @@ const PRODUCTION_SITE_URL = 'https://map-omega-nine.vercel.app'
 const CONFIGURED_SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
 const DEFAULT_CENTER: [number, number] = [4.3517, 50.8503]
 const AUTH_SESSION_TIMEOUT_MS = 6000
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 const CACHE_PREFIX = 'spot-map:swr-cache'
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#7c3aed', '#0891b2', '#db2777']
 const FALLBACK_CATEGORIES: ContentCategory[] = [
@@ -396,6 +396,11 @@ type LandmarkSearchRow = {
   completion_year: number | null
   cover_image_url: string | null
   post_ids: string[] | null
+}
+
+type LandmarkPostLinkRow = {
+  landmark_id: string
+  post_id: string
 }
 
 type CategoryRow = {
@@ -2181,22 +2186,47 @@ export default function CommunityMapPrototype() {
             console.warn(folderPostsResult.error.message)
           }
         }
+        const priorityPostRows = uniqueRowsById([
+          ...((myPostsResult.data ?? []) as AppPostCardRow[]),
+          ...savedPostRows,
+          ...folderPostRows,
+        ])
+        const priorityPostIds = priorityPostRows.map((post) => post.id)
+        let priorityLandmarkLinks: LandmarkPostLinkRow[] = []
+        if (priorityPostIds.length) {
+          const priorityLandmarkLinksResult = await supabase
+            .from('landmark_posts')
+            .select('landmark_id,post_id')
+            .in('post_id', priorityPostIds)
+          if (!priorityLandmarkLinksResult.error && Array.isArray(priorityLandmarkLinksResult.data)) {
+            priorityLandmarkLinks = priorityLandmarkLinksResult.data as LandmarkPostLinkRow[]
+          } else if (priorityLandmarkLinksResult.error) {
+            console.warn(priorityLandmarkLinksResult.error.message)
+          }
+        }
+        const priorityLandmarkIdByPost = new Map(priorityLandmarkLinks.map((link) => [link.post_id, link.landmark_id]))
+        const priorityVisiblePostRows = priorityPostRows.filter((post) => priorityLandmarkIdByPost.has(post.id))
+        const priorityVisiblePostIds = new Set(priorityVisiblePostRows.map((post) => post.id))
+        const priorityVisibleFolders = priorityFolders
+          .map((folder) => ({
+            ...folder,
+            pinIds: folder.pinIds.filter((pinId) => priorityVisiblePostIds.has(pinId)),
+          }))
+          .filter((folder) => folder.ownerId === userId || folder.pinIds.length > 0)
+        const priorityVisibleFolderIds = new Set(priorityVisibleFolders.map((folder) => folder.id))
         const priorityPins = buildPins(
-          uniqueRowsById([
-            ...((myPostsResult.data ?? []) as AppPostCardRow[]),
-            ...savedPostRows,
-            ...folderPostRows,
-          ]),
+          priorityVisiblePostRows,
           [],
           (myLikesResult.data ?? []) as LikeRow[],
           userId,
-          priorityFolders,
+          priorityVisibleFolders,
+          priorityLandmarkIdByPost,
         )
 
-        setFolders((current) => mergeById(current, priorityFolders))
+        setFolders((current) => mergeById(current, priorityVisibleFolders))
         setPins((current) => mergeById(current, priorityPins))
-        setSavedPinIds(savedIds)
-        setSavedFolderIds(nextSavedFolderIds)
+        setSavedPinIds(savedIds.filter((postId) => priorityVisiblePostIds.has(postId)))
+        setSavedFolderIds(nextSavedFolderIds.filter((folderId) => priorityVisibleFolderIds.has(folderId)))
       })()
     } catch (error) {
       console.error(error)
@@ -2394,9 +2424,7 @@ export default function CommunityMapPrototype() {
 
       const remoteFolders = buildFolders(folderRows, folderLikeRows, userId, savedFolderRows)
       const remoteCommunities = buildCommunities(communityRows, memberRows, userId)
-      setFolders(remoteFolders)
       setCommunities(remoteCommunities)
-      setSavedFolderIds(remoteSavedFolderIds)
 
       const [
         postsResult,
@@ -2476,14 +2504,24 @@ export default function CommunityMapPrototype() {
       remoteLandmarks.forEach((landmark) => {
         landmark.postIds.forEach((postId) => landmarkIdByPost.set(postId, landmark.id))
       })
+      const landmarkPostRowsForCards = postRowsForCards.filter((post) => landmarkIdByPost.has(post.id))
       const remotePins = buildPins(
-        postRowsForCards,
+        landmarkPostRowsForCards,
         (commentsResult.error ? [] : commentsResult.data ?? []) as CommentRow[],
         (likesResult.error ? [] : likesResult.data ?? []) as LikeRow[],
         userId,
         remoteFolders,
         landmarkIdByPost,
       )
+      const visiblePostIds = new Set(remotePins.map((pin) => pin.id))
+      const remoteVisibleFolders = remoteFolders
+        .map((folder) => ({
+          ...folder,
+          pinIds: folder.pinIds.filter((pinId) => visiblePostIds.has(pinId)),
+        }))
+        .filter((folder) => folder.ownerId === userId || folder.pinIds.length > 0)
+      const visibleFolderIds = new Set(remoteVisibleFolders.map((folder) => folder.id))
+      const remoteVisibleSavedFolderIds = remoteSavedFolderIds.filter((folderId) => visibleFolderIds.has(folderId))
       let saveNotificationRows = (saveActivityResult.error ? [] : saveActivityResult.data ?? []) as SavedPostRow[]
       let inviteNotificationRows: CommunityInviteRow[] = []
       let folderLikeNotificationRows = folderLikeRows
@@ -2515,26 +2553,28 @@ export default function CommunityMapPrototype() {
         folderSaveNotificationRows,
         inviteNotificationRows,
         remotePins,
-        remoteFolders,
+        remoteVisibleFolders,
         remoteCommunities,
         userId,
       )
+      setFolders(remoteVisibleFolders)
       setPins(remotePins)
       setActivities(remoteActivities)
       setNotifications(remoteNotifications)
-      setSavedPinIds(remoteSavedPinIds)
+      setSavedPinIds(remoteSavedPinIds.filter((postId) => visiblePostIds.has(postId)))
+      setSavedFolderIds(remoteVisibleSavedFolderIds)
       saveCachedSnapshot({
         version: CACHE_VERSION,
         userId,
         savedAt: new Date().toISOString(),
         users: remoteUsers,
         pins: remotePins,
-        folders: remoteFolders,
+        folders: remoteVisibleFolders,
         communities: remoteCommunities,
         activities: remoteActivities,
         notifications: remoteNotifications,
-        savedPinIds: remoteSavedPinIds,
-        savedFolderIds: remoteSavedFolderIds,
+        savedPinIds: remoteSavedPinIds.filter((postId) => visiblePostIds.has(postId)),
+        savedFolderIds: remoteVisibleSavedFolderIds,
       })
     } catch (error) {
       console.error(error)
@@ -6202,9 +6242,11 @@ function SplitMapView({
   const [flyToCoordinates, setFlyToCoordinates] = useState<Coordinates | null>(null)
   const [expandedStoryPinId, setExpandedStoryPinId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const searchBoxRef = useRef<HTMLFormElement | null>(null)
   const searchSessionTokenRef = useRef(createSearchSessionToken())
   const listInteractionRef = useRef(false)
   const listInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false)
   const listCollapsed = onPanelsHiddenChange ? panelsHidden : internalPanelsHidden
   const setPanelsHidden = useCallback((hidden: boolean) => {
     if (onPanelsHiddenChange) {
@@ -6214,10 +6256,29 @@ function SplitMapView({
     setInternalPanelsHidden(hidden)
   }, [onPanelsHiddenChange])
 
+  const closeSearchSuggestions = useCallback(() => {
+    setSearchSuggestionsOpen(false)
+    setPlaceSearchSuggestions([])
+  }, [])
+
   useEffect(() => {
     const nextIds = pins.map((pin) => pin.id)
     setVisiblePinIds((currentIds) => (sameStringArray(currentIds, nextIds) ? currentIds : nextIds))
   }, [pins])
+
+  useEffect(() => {
+    if (!searchSuggestionsOpen) return undefined
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (searchBoxRef.current?.contains(target)) return
+      closeSearchSuggestions()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [closeSearchSuggestions, searchSuggestionsOpen])
 
   useEffect(() => {
     return () => {
@@ -6302,7 +6363,7 @@ function SplitMapView({
 
   useEffect(() => {
     const query = mapSearch.trim()
-    if (!showSearch || query.length < 2) {
+    if (!showSearch || !searchSuggestionsOpen || query.length < 2) {
       setPlaceSearchSuggestions([])
       setPlaceSearchLoading(false)
       return
@@ -6326,13 +6387,13 @@ function SplitMapView({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [mapSearch, showSearch])
+  }, [mapSearch, searchSuggestionsOpen, showSearch])
 
   const pinSearchSuggestions = useMemo(() => {
-    const query = mapSearch.trim().toLowerCase()
+    const query = normalizeSearchText(mapSearch)
     if (!query) return []
     return pins
-      .filter((pin) => `${pin.title} ${pin.description} ${pin.tags.join(' ')}`.toLowerCase().includes(query))
+      .filter((pin) => pin.landmarkId && normalizeSearchText(`${pin.title} ${pin.description} ${pin.tags.join(' ')}`).includes(query))
       .slice(0, 5)
   }, [mapSearch, pins])
 
@@ -6364,12 +6425,34 @@ function SplitMapView({
       .slice(0, 4)
   }, [landmarks, mapSearch])
 
+  const selectLandmarkSearchResult = useCallback((landmark: Landmark) => {
+    setMapSearch(landmark.nameJa || landmark.nameEn)
+    setFocusedPinId(null)
+    setExpandedStoryPinId(null)
+    onMapSurfaceClick?.()
+    onLandmarkSelect?.(landmark.id)
+    setFlyToCoordinates({ latitude: landmark.latitude, longitude: landmark.longitude })
+    closeSearchSuggestions()
+  }, [closeSearchSuggestions, onLandmarkSelect, onMapSurfaceClick])
+
+  const selectArchitectSearchResult = useCallback((architect: ArchitectFilter) => {
+    setMapSearch(architect.label)
+    setFocusedPinId(null)
+    setExpandedStoryPinId(null)
+    onMapSurfaceClick?.()
+    onArchitectFilter?.({ id: architect.id, label: architect.label })
+    closeSearchSuggestions()
+  }, [closeSearchSuggestions, onArchitectFilter, onMapSurfaceClick])
+
   const selectPlaceSuggestion = useCallback(async (suggestion: MapboxSearchSuggestion) => {
     setMapSearch(suggestion.name)
+    setFocusedPinId(null)
+    setExpandedStoryPinId(null)
+    onMapSurfaceClick?.()
     const coordinates = suggestion.coordinates ?? await retrieveMapboxSearchSuggestion(suggestion.mapboxId, searchSessionTokenRef.current)
     if (coordinates) setFlyToCoordinates(coordinates)
-    setPlaceSearchSuggestions([])
-  }, [])
+    closeSearchSuggestions()
+  }, [closeSearchSuggestions, onMapSurfaceClick])
 
   const submitMapSearch = useCallback(async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
@@ -6378,16 +6461,13 @@ function SplitMapView({
 
     const matchedLandmark = landmarkSearchSuggestions[0]
     if (matchedLandmark) {
-      onLandmarkSelect?.(matchedLandmark.id)
-      setFlyToCoordinates(matchedLandmark)
-      setPlaceSearchSuggestions([])
+      selectLandmarkSearchResult(matchedLandmark)
       return
     }
 
     const matchedArchitect = architectSearchSuggestions[0]
     if (matchedArchitect) {
-      onArchitectFilter?.({ id: matchedArchitect.id, label: matchedArchitect.label })
-      setPlaceSearchSuggestions([])
+      selectArchitectSearchResult(matchedArchitect)
       return
     }
 
@@ -6395,6 +6475,7 @@ function SplitMapView({
     if (matchedPin) {
       setFocusedPinId(matchedPin.id)
       onListFocus?.(matchedPin.id)
+      closeSearchSuggestions()
       return
     }
 
@@ -6412,12 +6493,16 @@ function SplitMapView({
       const data = await response.json()
       const center = data?.features?.[0]?.center
       if (Array.isArray(center) && center.length >= 2) {
+        setFocusedPinId(null)
+        setExpandedStoryPinId(null)
+        onMapSurfaceClick?.()
         setFlyToCoordinates({ longitude: Number(center[0]), latitude: Number(center[1]) })
+        closeSearchSuggestions()
       }
     } catch (error) {
       console.warn('地名検索に失敗しました。', error)
     }
-  }, [architectSearchSuggestions, landmarkSearchSuggestions, mapSearch, onArchitectFilter, onLandmarkSelect, onListFocus, pinSearchSuggestions, placeSearchSuggestions, selectPlaceSuggestion])
+  }, [architectSearchSuggestions, closeSearchSuggestions, landmarkSearchSuggestions, mapSearch, onListFocus, onMapSurfaceClick, pinSearchSuggestions, placeSearchSuggestions, selectArchitectSearchResult, selectLandmarkSearchResult, selectPlaceSuggestion])
 
   const moveToCurrentLocation = useCallback(() => {
     if (currentLocation) {
@@ -6447,6 +6532,11 @@ function SplitMapView({
       </div>
     </>
   ) : null
+  const hasSearchSuggestions = landmarkSearchSuggestions.length > 0
+    || architectSearchSuggestions.length > 0
+    || pinSearchSuggestions.length > 0
+    || placeSearchSuggestions.length > 0
+    || placeSearchLoading
 
   return (
     <section className={`${styles.mapPage} ${embedded ? styles.mapPageEmbedded : ''} ${listCollapsed ? styles.mapPageListCollapsed : ''}`}>
@@ -6469,41 +6559,46 @@ function SplitMapView({
             flyToCoordinates={flyToCoordinates}
           />
           {showSearch && (
-            <form className={styles.mapSearchBox} onSubmit={submitMapSearch}>
+            <form ref={searchBoxRef} className={styles.mapSearchBox} onSubmit={submitMapSearch}>
               <Search size={17} />
-              <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="建築、建築家、場所を検索" />
-              {(landmarkSearchSuggestions.length > 0 || architectSearchSuggestions.length > 0 || pinSearchSuggestions.length > 0 || placeSearchSuggestions.length > 0 || placeSearchLoading) && (
+              <input
+                value={mapSearch}
+                onChange={(event) => {
+                  setMapSearch(event.target.value)
+                  setSearchSuggestionsOpen(true)
+                }}
+                onFocus={() => setSearchSuggestionsOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    closeSearchSuggestions()
+                    event.currentTarget.blur()
+                  }
+                }}
+                placeholder="建築、建築家、場所を検索"
+              />
+              {searchSuggestionsOpen && hasSearchSuggestions && (
                 <div className={styles.mapSearchSuggestions}>
-                  {architectSearchSuggestions.map((architect) => (
-                    <button
-                      key={`architect-${architect.id}`}
-                      type="button"
-                      onClick={() => {
-                        setMapSearch(architect.label)
-                        onArchitectFilter?.({ id: architect.id, label: architect.label })
-                        setPlaceSearchSuggestions([])
-                      }}
-                    >
-                      <span className={styles.searchResultType}>ARCHITECT</span>
-                      <span><strong>{architect.label}</strong><small>関連するPINだけを表示</small></span>
-                    </button>
-                  ))}
                   {landmarkSearchSuggestions.map((landmark) => (
                     <button
                       key={`landmark-${landmark.id}`}
                       type="button"
-                      onClick={() => {
-                        setMapSearch(landmark.nameJa || landmark.nameEn)
-                        setFlyToCoordinates(landmark)
-                        onLandmarkSelect?.(landmark.id)
-                        setPlaceSearchSuggestions([])
-                      }}
+                      onClick={() => selectLandmarkSearchResult(landmark)}
                     >
                       <img src={landmark.coverImageUrl || EMPTY_IMAGE} alt="" />
                       <span>
                         <strong>{landmark.nameJa || landmark.nameEn}</strong>
                         <small>{[landmark.architectNamesEn.join(', '), landmark.keywords.slice(0, 3).join(' · '), landmark.address].filter(Boolean).join(' / ')}</small>
                       </span>
+                    </button>
+                  ))}
+                  {architectSearchSuggestions.map((architect) => (
+                    <button
+                      key={`architect-${architect.id}`}
+                      type="button"
+                      onClick={() => selectArchitectSearchResult(architect)}
+                    >
+                      <span className={styles.searchResultType}>ARCHITECT</span>
+                      <span><strong>{architect.label}</strong><small>関連するPINだけを表示</small></span>
                     </button>
                   ))}
                   {pinSearchSuggestions.map((pin) => (
@@ -6514,6 +6609,7 @@ function SplitMapView({
                         setMapSearch(pin.title)
                         setFocusedPinId(pin.id)
                         onListFocus?.(pin.id)
+                        closeSearchSuggestions()
                       }}
                     >
                       <img src={pin.imageUrl} alt="" />
